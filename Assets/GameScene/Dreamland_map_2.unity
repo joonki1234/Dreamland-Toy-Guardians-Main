@@ -663,7 +663,6 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 0}
     m_TransformParent: {fileID: 1312978814}
     m_Modifications:
     - target: {fileID: 2897293089621926864, guid: b0ae11e8444147246b7de50503a27b9c, type: 3}
