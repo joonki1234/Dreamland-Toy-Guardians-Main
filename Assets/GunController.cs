@@ -1,3 +1,4 @@
+using System.Collections; // 코루틴을 쓰기 위해 추가해야 합니다.
 using UnityEngine;
 using UnityEngine.InputSystem; 
 
@@ -9,7 +10,13 @@ public class GunController : MonoBehaviour
     public float bulletSpeed = 40f; // 총알 속도
 
     [Header("카메라 설정")]
-    public Camera playerCamera;     // Player 하위의 Main Camera를 드래그해 넣으세요!
+    public Camera playerCamera;     // Main Camera
+
+    [Header("이펙트 설정")]
+    public Light muzzleFlashLight;  // 방금 만든 총구 불빛(Point Light)
+    public float flashDuration = 0.05f; // 불빛이 번쩍이고 켜져 있을 시간 (초)
+
+    private Coroutine flashCoroutine; // 번쩍임 제어를 위한 변수
 
     void Update()
     {
@@ -24,21 +31,16 @@ public class GunController : MonoBehaviour
     {
         if (bulletPrefab == null || firePoint == null || playerCamera == null) return;
 
-        // 1. 카메라가 바라보는 월드 기준 정면 방향을 구합니다.
+        // 1. 카메라 정면 기준으로 총알 스폰 위치 보정
         Vector3 shootDirection = playerCamera.transform.forward;
-
-        // [핵심] 총의 반전된 축(Scale -1) 영향을 받지 않기 위해, 
-        // 카메라의 실시간 앞쪽 방향으로 1.2미터 전진한 안전한 위치를 생성 좌표로 잡습니다.
         Vector3 spawnPosition = playerCamera.transform.position + (shootDirection * 1.2f);
 
-        // 2. 총알 생성 (총의 꼬인 회전값을 무시하고, 카메라가 보는 방향으로 생성)
+        // 2. 총알 생성 및 눕히기
         Quaternion bulletRotation = Quaternion.LookRotation(shootDirection);
         GameObject bullet = Instantiate(bulletPrefab, spawnPosition, bulletRotation);
-
-        // 세로로 선 총알 모델을 날아가는 방향(정면)으로 90도 눕혀줍니다.
         bullet.transform.Rotate(90f, 0f, 0f);
 
-        // 3. 물리 속도 주기 (카메라 정면 방향으로 시원하게 쏩니다)
+        // 3. 물리 속도 주기
         Rigidbody rb = bullet.GetComponent<Rigidbody>();
         if (rb != null)
         {
@@ -46,7 +48,23 @@ public class GunController : MonoBehaviour
             rb.angularVelocity = Vector3.zero; // 회전 방지
         }
 
-        // 4. 3초 뒤 자동 파괴
+        // 4. [추가] 총구 화염 번쩍임 코루틴 실행
+        if (muzzleFlashLight != null)
+        {
+            // 이미 켜져 있는 번쩍임이 있다면 중복 방지를 위해 꺼줍니다.
+            if (flashCoroutine != null) StopCoroutine(flashCoroutine);
+            flashCoroutine = StartCoroutine(FlashMuzzle());
+        }
+
+        // 5. 3초 뒤 자동 파괴
         Destroy(bullet, 3f);
+    }
+
+    // [추가] 아주 잠깐 불빛을 켰다가 끄는 코루틴 함수입니다.
+    IEnumerator FlashMuzzle()
+    {
+        muzzleFlashLight.enabled = true; // 불빛 켜기
+        yield return new WaitForSeconds(flashDuration); // 0.05초 대기
+        muzzleFlashLight.enabled = false; // 불빛 끄기
     }
 }
