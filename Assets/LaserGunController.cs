@@ -5,97 +5,164 @@ using UnityEngine.InputSystem;
 public class LaserGunController : MonoBehaviour
 {
     [Header("발사 설정")]
-    public Transform firePoint;         // 새 총의 총구 위치
-    public float maxLaserDistance = 30f; // 레이저 최대 거리
+    public Transform firePoint;         
+    public float maxLaserDistance = 15f; 
     
     [Header("딜레이 설정")]
-    public float shootDelay = 0.7f;    // 켤 때 딜레이 (기 모으는 시간)
-    public float turnOffDelay = 0.2f;   // [추가] 마우스를 떼고 레이저가 꺼지기까지 걸리는 시간 (잔상 시간)
+    public float shootDelay = 1.2f;    
+    public float turnOffDelay = 0.5f;   
 
     [Header("카메라 설정")]
-    public Camera playerCamera;         // Main Camera
+    public Camera playerCamera;         
 
     [Header("광선 컴포넌트")]
-    public LineRenderer lineRenderer;   // LaserLine의 Line Renderer
+    public LineRenderer lineRenderer;   
 
-    private float pressTime = 0f;       // 누르고 있는 시간 측정용
-    private Coroutine turnOffCoroutine;  // 꺼짐 지연을 제어할 코루틴 변수
-    private bool isLaserActive = false;  // 현재 레이저가 실제로 발사 중인지 여부
+    [Header("이펙트 설정")]
+    public ParticleSystem muzzleParticles; 
+    public ParticleSystem hitParticles;    
+
+    private float pressTime = 0f;       
+    private Coroutine turnOffCoroutine;  
+    private bool isLaserActive = false;  
+
+    // [추가] 게임이 시작될 때 딱 한 번 실행되는 함수
+    void Start()
+    {
+        // 게임 시작하자마자 총구 이펙트를 강제로 정지시키고 꺼버립니다. (치트키)
+        if (muzzleParticles != null)
+        {
+            muzzleParticles.Stop();
+            muzzleParticles.gameObject.SetActive(false); 
+        }
+
+        if (hitParticles != null)
+        {
+            hitParticles.Stop();
+            hitParticles.gameObject.SetActive(false);
+        }
+    }
 
     void Update()
     {
         if (Pointer.current == null || lineRenderer == null || firePoint == null || playerCamera == null) return;
 
-        // 1. 마우스를 꾹 누르고 있는 동안
         if (Mouse.current.leftButton.isPressed)
         {
-            // 꺼지려고 대기 중이던 타이머가 있다면 취소합니다. (연사 대응)
             if (turnOffCoroutine != null)
             {
                 StopCoroutine(turnOffCoroutine);
                 turnOffCoroutine = null;
             }
 
-            pressTime += Time.deltaTime; // 누르는 시간 누적
+            pressTime += Time.deltaTime;
 
-            // 켤 때 딜레이(차징 시간)를 넘었을 때만 발사 시작
             if (pressTime >= shootDelay)
             {
                 isLaserActive = true;
                 ShootLaser();
             }
         }
-        // 2. 마우스에서 손을 떼는 순간
         else
         {
-            pressTime = 0f; // 누른 시간 리셋
+            pressTime = 0f;
 
-            // 레이저가 켜져 있는 상태에서 손을 뗐다면, 0.7초 딜레이 코루틴을 돌립니다.
             if (isLaserActive && turnOffCoroutine == null)
             {
                 turnOffCoroutine = StartCoroutine(DisableLaserAfterDelay());
             }
         }
 
-        // 레이저가 완전히 꺼지기 직전까지는 계속 총구를 쫓아다니며 빔을 그려줍니다.
         if (isLaserActive && lineRenderer.enabled)
         {
             UpdateLaserPositions();
         }
     }
 
-    // 레이저 발사 시작 세팅
     void ShootLaser()
     {
         lineRenderer.enabled = true;
+        
+        // 마우스를 누르면 그제서야 오브젝트를 켜고 재생합니다.
+        if (muzzleParticles != null)
+        {
+            if (!muzzleParticles.gameObject.activeSelf)
+            {
+                muzzleParticles.gameObject.SetActive(true);
+            }
+            if (!muzzleParticles.isPlaying)
+            {
+                muzzleParticles.Play();
+            }
+        }
+
+        if (hitParticles != null && !hitParticles.gameObject.activeSelf)
+        {
+            hitParticles.gameObject.SetActive(true);
+            hitParticles.Play();
+        }
+
         UpdateLaserPositions();
     }
 
-    // 레이저 선의 시작점과 끝점을 실시간으로 갱신하는 함수
     void UpdateLaserPositions()
     {
-        lineRenderer.SetPosition(0, firePoint.position); // 시작점: 총구 위치
+        lineRenderer.SetPosition(0, firePoint.position); 
 
         Vector3 rayDirection = playerCamera.transform.forward;
         Vector3 targetPosition = firePoint.position + (rayDirection * maxLaserDistance);
 
         RaycastHit hit;
-        // 카메라 정면 방향 물리 충돌 체크
         if (Physics.Raycast(playerCamera.transform.position, rayDirection, out hit, maxLaserDistance))
         {
             targetPosition = hit.point;
+
+            if (hitParticles != null)
+            {
+                if (!hitParticles.gameObject.activeSelf)
+                {
+                    hitParticles.gameObject.SetActive(true);
+                }
+                if (!hitParticles.isPlaying)
+                {
+                    hitParticles.Play();
+                }
+
+                hitParticles.transform.position = hit.point + (hit.normal * 0.15f);
+                hitParticles.transform.rotation = Quaternion.LookRotation(hit.normal);
+            }
+        }
+        else
+        {
+            if (hitParticles != null && hitParticles.isPlaying)
+            {
+                hitParticles.Stop();
+                hitParticles.gameObject.SetActive(false);
+            }
         }
 
-        lineRenderer.SetPosition(1, targetPosition); // 끝점 연결
+        lineRenderer.SetPosition(1, targetPosition); 
     }
 
-    // [핵심] 설정한 시간(turnOffDelay)만큼 대기한 뒤 레이저를 끄는 코루틴
     IEnumerator DisableLaserAfterDelay()
     {
-        yield return new WaitForSeconds(turnOffDelay); // 0.7초 대기
+        yield return new WaitForSeconds(turnOffDelay); 
         
-        lineRenderer.enabled = false; // 레이저 끄기
-        isLaserActive = false;        // 발사 상태 해제
+        lineRenderer.enabled = false; 
+        isLaserActive = false;        
         turnOffCoroutine = null;
+
+        // 마우스를 떼고 0.7초가 지나면 다시 완전히 꺼버립니다.
+        if (muzzleParticles != null)
+        {
+            muzzleParticles.Stop();
+            muzzleParticles.gameObject.SetActive(false); // 오브젝트 자체를 꺼서 확실히 비활성화
+        }
+        
+        if (hitParticles != null)
+        {
+            hitParticles.Stop();
+            hitParticles.gameObject.SetActive(false);
+        }
     }
 }
