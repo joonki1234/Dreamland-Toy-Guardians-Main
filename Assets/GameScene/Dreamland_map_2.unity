@@ -1919,8 +1919,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 7150971544766200243, guid: 491bd2f8e55e1db45a195465b18740bd, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1419444766}
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 683182934616091483, guid: 491bd2f8e55e1db45a195465b18740bd, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2019763646}
   m_SourcePrefab: {fileID: 100100000, guid: 491bd2f8e55e1db45a195465b18740bd, type: 3}
 --- !u!1001 &125473925
 PrefabInstance:
@@ -1988,6 +1994,55 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}
   m_PrefabInstance: {fileID: 1751285691}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &130377118
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 130377119}
+  - component: {fileID: 130377120}
+  m_Layer: 0
+  m_Name: West Spawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &130377119
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 130377118}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: -15, y: 2.05, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1147087183}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &130377120
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 130377118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e06e8d4e7dbc46b4a9d54f53a029b4f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.FloorRiftMarker
+  riftColor: {r: 0.65, g: 0.08, b: 1, a: 1}
+  visibleDuration: 1.8
+  openDuration: 0.35
+  closeDuration: 0.45
+  visualScale: {x: 1.6, y: 1, z: 1.05}
 --- !u!4 &130584869 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}
@@ -2533,6 +2588,7 @@ GameObject:
   - component: {fileID: 162254664}
   - component: {fileID: 162254666}
   - component: {fileID: 162254665}
+  - component: {fileID: 162254667}
   m_Layer: 0
   m_Name: Camera
   m_TagString: Untagged
@@ -2662,6 +2718,28 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 162254662}
   m_Enabled: 1
+--- !u!114 &162254667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 162254662}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d28d62920c80a5f4999574a8eae313ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.PrototypeRayWeapon
+  aimCamera: {fileID: 162254664}
+  missionUI: {fileID: 2125966795}
+  enableMouseInput: 1
+  damage: 25
+  range: 50
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  playerId: LOCAL
+  role: 1
 --- !u!1 &163858680
 GameObject:
   m_ObjectHideFlags: 0
@@ -3035,6 +3113,55 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3925678453792752139, guid: a3b798421dc4d19498df476ced323b0a, type: 3}
   m_PrefabInstance: {fileID: 185337266}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &187807802
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 187807803}
+  - component: {fileID: 187807804}
+  m_Layer: 0
+  m_Name: North Spawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &187807803
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 187807802}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
+  m_LocalPosition: {x: 0, y: 2.05, z: 15}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1147087183}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &187807804
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 187807802}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e06e8d4e7dbc46b4a9d54f53a029b4f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.FloorRiftMarker
+  riftColor: {r: 0.65, g: 0.08, b: 1, a: 1}
+  visibleDuration: 1.8
+  openDuration: 0.35
+  closeDuration: 0.45
+  visualScale: {x: 1.6, y: 1, z: 1.05}
 --- !u!4 &188287344 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 150790926590101587, guid: 217c83cba1802804e9aca651c8a2b50c, type: 3}
@@ -3060,6 +3187,55 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 150790926590101587, guid: 217c83cba1802804e9aca651c8a2b50c, type: 3}
   m_PrefabInstance: {fileID: 1988106206}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &197264529
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 197264530}
+  - component: {fileID: 197264531}
+  m_Layer: 0
+  m_Name: South Spawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &197264530
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 197264529}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.05, z: -15}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1147087183}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &197264531
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 197264529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e06e8d4e7dbc46b4a9d54f53a029b4f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.FloorRiftMarker
+  riftColor: {r: 0.65, g: 0.08, b: 1, a: 1}
+  visibleDuration: 1.8
+  openDuration: 0.35
+  closeDuration: 0.45
+  visualScale: {x: 1.6, y: 1, z: 1.05}
 --- !u!1001 &203207208
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -18627,6 +18803,55 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}
   m_PrefabInstance: {fileID: 55326128}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &916058878
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 916058879}
+  - component: {fileID: 916058880}
+  m_Layer: 0
+  m_Name: East Spawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &916058879
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 916058878}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.7071068, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 15, y: 2.05, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1147087183}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &916058880
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 916058878}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e06e8d4e7dbc46b4a9d54f53a029b4f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.FloorRiftMarker
+  riftColor: {r: 0.65, g: 0.08, b: 1, a: 1}
+  visibleDuration: 1.8
+  openDuration: 0.35
+  closeDuration: 0.45
+  visualScale: {x: 1.6, y: 1, z: 1.05}
 --- !u!1001 &916509817
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -19081,6 +19306,11 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}
   m_PrefabInstance: {fileID: 934709193}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &936686795 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 683182934616091483, guid: 491bd2f8e55e1db45a195465b18740bd, type: 3}
+  m_PrefabInstance: {fileID: 124548876}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &937134923
 GameObject:
@@ -22198,6 +22428,41 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5516487406859467972, guid: 45e0f06c750176947862c10346226439, type: 3}
   m_PrefabInstance: {fileID: 1140903253}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1147087182
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1147087183}
+  m_Layer: 0
+  m_Name: Stage1 Spawn Points
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1147087183
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147087182}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 187807803}
+  - {fileID: 916058879}
+  - {fileID: 197264530}
+  - {fileID: 130377119}
+  m_Father: {fileID: 2125966796}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1150824825
 GameObject:
   m_ObjectHideFlags: 0
@@ -23017,6 +23282,55 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 217c83cba1802804e9aca651c8a2b50c, type: 3}
+--- !u!1 &1215213846
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1215213847}
+  - component: {fileID: 1215213848}
+  m_Layer: 0
+  m_Name: Tutorial Enemy Spawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1215213847
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1215213846}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
+  m_LocalPosition: {x: 0, y: 0.25, z: 11.97}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2125966796}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1215213848
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1215213846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e06e8d4e7dbc46b4a9d54f53a029b4f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.FloorRiftMarker
+  riftColor: {r: 0.65, g: 0.08, b: 1, a: 1}
+  visibleDuration: 1.8
+  openDuration: 0.35
+  closeDuration: 0.45
+  visualScale: {x: 1.6, y: 1, z: 1.05}
 --- !u!4 &1215422040 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}
@@ -26066,6 +26380,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}
   m_PrefabInstance: {fileID: 254110779}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1419444765
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1419444766}
+  m_Layer: 0
+  m_Name: DreamEnergyTarget
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1419444766
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1419444765}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2019763643}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1421415597
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -38846,6 +39191,22 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7150971544766200243, guid: 491bd2f8e55e1db45a195465b18740bd, type: 3}
   m_PrefabInstance: {fileID: 124548876}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &2019763646
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 936686795}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1d022a0acf0a3e45b0102372e22e6e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.CoreState
+  maxHealth: 1000
+  currentHealth: 1000
+  currentEnergy: 0
+  energyTarget: {fileID: 1419444766}
 --- !u!1001 &2021521535
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -40554,6 +40915,178 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2045374326}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2125966790
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2125966796}
+  - component: {fileID: 2125966795}
+  - component: {fileID: 2125966794}
+  - component: {fileID: 2125966793}
+  - component: {fileID: 2125966792}
+  - component: {fileID: 2125966791}
+  m_Layer: 0
+  m_Name: '[Dreamland Tutorial + Stage1 Prototype]'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2125966791
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2125966790}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81571073e51292943972d8b7b9a2f644, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.PrototypeAimReticle
+  aimCamera: {fileID: 162254664}
+  range: 50
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  totalSize: 28
+  lineThickness: 3
+  centerGap: 5
+  centerDotSize: 4
+  neutralColor: {r: 0.95, g: 1, b: 1, a: 1}
+  targetColor: {r: 1, g: 0.15, b: 0.65, a: 1}
+  hitColor: {r: 0.2, g: 1, b: 0.55, a: 1}
+  outlineColor: {r: 0, g: 0, b: 0, a: 0.9}
+  hitFlashDuration: 0.15
+--- !u!114 &2125966792
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2125966790}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56c68168f59ca6e468cf796724daee15, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.TutorialStage1Director
+  spawner: {fileID: 2125966794}
+  stage1: {fileID: 2125966793}
+  missionUI: {fileID: 2125966795}
+  tutorialSpawnPoint: {fileID: 1215213847}
+  dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
+  requiredHitsPerPlayer: 3
+  expectedPlayerCount: 1
+  requireBothSynergiesBeforePurification: 0
+  autoStart: 1
+  firstSpawnDelay: 0.8
+  waveStartDelay: 2
+--- !u!114 &2125966793
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2125966790}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43a3989cd7e189047aaa490c8891b6c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.Stage1WaveController
+  spawner: {fileID: 2125966794}
+  missionUI: {fileID: 2125966795}
+  core: {fileID: 2019763646}
+  dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
+  groups:
+  - label: "1\uCC28 \uACF5\uACA9"
+    enemyCount: 3
+    spawnInterval: 2.5
+    healthMultiplier: 1
+    preDelay: 2
+    transitionDelay: 10
+    minimumDuration: 0
+  - label: "2\uCC28 \uACF5\uACA9"
+    enemyCount: 3
+    spawnInterval: 2.5
+    healthMultiplier: 1.25
+    preDelay: 2
+    transitionDelay: 12
+    minimumDuration: 0
+  - label: "\uCD5C\uC885 \uACF5\uACA9"
+    enemyCount: 6
+    spawnInterval: 1.8
+    healthMultiplier: 1.5
+    preDelay: 3
+    transitionDelay: 0
+    minimumDuration: 0
+  waveStartDelay: 3
+  clearSequenceDuration: 3
+  targetStageDurationSeconds: 240
+--- !u!114 &2125966794
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2125966790}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78dfedf034649d54581d4b2e0ac2ad3c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.DreamEnemySpawner
+  enemyPrefab: {fileID: 7208967736245470348, guid: e9ca6d0fb3a1c4643b165805b83a86eb, type: 3}
+  baseEnemyHealth: 100
+  energyRewardPerEnemy: 10
+  moveSpeed: 0.35
+  attackRingRadius: 4.2
+  attackSlotSpreadAngle: 12
+  coreDamage: 10
+  attackInterval: 1.5
+  useFloorRift: 1
+  enemyGroundOffset: 0.8
+  riseDepth: 0.9
+  riseDuration: 1.25
+  targetCore: {fileID: 2019763646}
+  spawnPoints:
+  - {fileID: 187807803}
+  - {fileID: 916058879}
+  - {fileID: 197264530}
+  - {fileID: 130377119}
+--- !u!114 &2125966795
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2125966790}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a00b0d3305a7fc3429d8bb5169edd359, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.MissionBannerUI
+  uiCamera: {fileID: 162254664}
+  defaultBannerDuration: 2
+--- !u!4 &2125966796
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2125966790}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1147087183}
+  - {fileID: 1215213847}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2127337040
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -40930,3 +41463,4 @@ SceneRoots:
   - {fileID: 1132296214}
   - {fileID: 392132404}
   - {fileID: 2045374326}
+  - {fileID: 2125966796}
