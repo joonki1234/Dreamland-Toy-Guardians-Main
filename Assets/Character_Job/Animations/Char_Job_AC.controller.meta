@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 9fcd5849038b478488efe10805d7f590
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283826
+  packageName: Job Character Pack - Low Poly
+  packageVersion: 1.0
+  assetPath: Assets/Character_Job/Animations/Char_Job_AC.controller
+  uploadId: 663945
