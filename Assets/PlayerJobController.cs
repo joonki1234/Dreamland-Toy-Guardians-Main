@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public enum PlayerJob
 {
@@ -25,23 +26,25 @@ public class PlayerJobController : MonoBehaviour
     public GameObject weaponChef;
     public GameObject weaponBuilder;
 
-    [Header("건설자(Builder) 흙 생성 세팅")]
-    public GameObject dirtPrefab;        // 방금 만든 DirtBlock 프리팹 연결용
-    public Transform shovelFirePoint;    // Weapon_Builder 하위의 FirePoint 연결용
-    public float throwForce = 5f;        // 흙이 튀어나가는 힘
+    [Header("건설자(Builder) 흙 발사 세팅")]
+    public GameObject dirtPrefab;             // 흙 클러스터 메인 프리팹
+    public Transform shovelFirePoint;         // FirePoint 위치
+    public ParticleSystem dirtParticleSystem; // 흙 먼지/빛 파티클
+    public Light dirtFlashLight;              // 흙 빛(섬광) 조명
+    public float throwForce = 32f;            // 먼 거리로 발사하는 강한 힘
+    public float builderCooldown = 0.5f;      // 쿨타임 (0.5초)
+
+    private float lastAttackTime = -999f;
+    private bool isSwinging = false;
 
     private void Start()
     {
-        // 1. 하이얼라키에서 현재 켜져 있는 모델 감지
         DetectActiveJobFromHierarchy();
-
-        // 2. 해당 직업의 모델과 무기 세팅 적용
         ApplyJobSettings(currentJob);
     }
 
     private void Update()
     {
-        // 마우스 좌클릭 시 공격
         if (Input.GetButtonDown("Fire1"))
         {
             Attack();
@@ -58,46 +61,125 @@ public class PlayerJobController : MonoBehaviour
 
     public void Attack()
     {
+        if (Time.time < lastAttackTime + builderCooldown) return;
+
         switch (currentJob)
         {
             case PlayerJob.Police:
-                Debug.Log("경찰: Sci-Fi Pistol 발사!");
+                lastAttackTime = Time.time;
                 break;
 
             case PlayerJob.Firefighter:
-                Debug.Log("소방관: LaserBeam 발사!");
+                lastAttackTime = Time.time;
                 break;
 
             case PlayerJob.Chef:
-                Debug.Log("요리사: 뒤집기 공격!");
+                lastAttackTime = Time.time;
                 break;
 
             case PlayerJob.Builder:
-                Debug.Log("건설자: 삽질/흙 퍼기 공격!");
-                SpawnDirt(); // 흙 덩어리 생성 함수 호출
+                lastAttackTime = Time.time;
+                if (weaponBuilder != null && !isSwinging)
+                {
+                    StartCoroutine(ShovelScoopRoutine());
+                }
                 break;
         }
     }
 
-    // 흙 덩어리를 생성하고 앞으로 튕겨내는 함수
-    private void SpawnDirt()
+    private IEnumerator ShovelScoopRoutine()
     {
+        isSwinging = true;
+
+        Transform targetTransform = weaponBuilder.transform;
+        Transform shovelChild = weaponBuilder.transform.Find("Shovel_001");
+        if (shovelChild != null) targetTransform = shovelChild;
+
+        Vector3 origPos = targetTransform.localPosition;
+        Vector3 origEuler = targetTransform.localEulerAngles;
+
+        Vector3 downPos = origPos + new Vector3(0f, -0.2f, -0.1f);
+        Vector3 downEuler = origEuler + new Vector3(35f, 0f, 0f);
+
+        Vector3 upPos = origPos + new Vector3(0f, 0.2f, 0.15f);
+        Vector3 upEuler = origEuler + new Vector3(-25f, 0f, 0f);
+
+        float elapsed = 0f;
+        float durationDownToUp = 0.14f;
+        bool hasFired = false;
+
+        while (elapsed < durationDownToUp)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / durationDownToUp;
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            targetTransform.localPosition = Vector3.Lerp(downPos, upPos, smoothT);
+            targetTransform.localEulerAngles = new Vector3(
+                Mathf.LerpAngle(downEuler.x, upEuler.x, smoothT),
+                origEuler.y,
+                origEuler.z
+            );
+
+            if (!hasFired && t >= 0.65f)
+            {
+                SpawnDirtCluster();
+                hasFired = true;
+            }
+
+            yield return null;
+        }
+
+        if (!hasFired) SpawnDirtCluster();
+
+        elapsed = 0f;
+        float durationReturn = 0.16f;
+
+        while (elapsed < durationReturn)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / durationReturn;
+
+            targetTransform.localPosition = Vector3.Lerp(upPos, origPos, t);
+            targetTransform.localEulerAngles = new Vector3(
+                Mathf.LerpAngle(upEuler.x, origEuler.x, t),
+                origEuler.y,
+                origEuler.z
+            );
+
+            yield return null;
+        }
+
+        targetTransform.localPosition = origPos;
+        targetTransform.localEulerAngles = origEuler;
+
+        isSwinging = false;
+    }
+
+    // 메인 탄환 1개를 쏘아 보내는 함수 (공중에서 폭죽처럼 분열하는 탄환)
+    private void SpawnDirtCluster()
+    {
+        if (dirtParticleSystem != null) dirtParticleSystem.Play();
+        if (dirtFlashLight != null) StartCoroutine(FlashDirtLight());
+
         if (dirtPrefab != null && shovelFirePoint != null)
         {
-            // FirePoint 위치에 흙 프리팹 복사 생성
-            GameObject dirt = Instantiate(dirtPrefab, shovelFirePoint.position, shovelFirePoint.rotation);
+            GameObject mainDirt = Instantiate(dirtPrefab, shovelFirePoint.position, shovelFirePoint.rotation);
 
-            // 생성된 흙에 물리적 힘을 가해 전방+위쪽으로 살짝 날려줌
-            Rigidbody dirtRb = dirt.GetComponent<Rigidbody>();
+            Rigidbody dirtRb = mainDirt.GetComponent<Rigidbody>();
             if (dirtRb != null)
             {
-                dirtRb.AddForce(shovelFirePoint.forward * throwForce + Vector3.up * 2f, ForceMode.Impulse);
+                Vector3 throwDirection = shovelFirePoint.forward * throwForce + Vector3.up * 4f;
+                dirtRb.AddForce(throwDirection, ForceMode.Impulse);
             }
         }
-        else
-        {
-            Debug.LogWarning("Builder 흙 생성 실패: Dirt Prefab 또는 Shovel FirePoint가 인스펙터에 연결되지 않았습니다!");
-        }
+    }
+
+    private IEnumerator FlashDirtLight()
+    {
+        dirtFlashLight.enabled = true;
+        yield return new WaitForSeconds(0.1f);
+        dirtFlashLight.enabled = false;
     }
 
     public void ApplyJobSettings(PlayerJob job)
@@ -111,17 +193,14 @@ public class PlayerJobController : MonoBehaviour
                 if (modelPolice) modelPolice.SetActive(true);
                 if (weaponPolice) weaponPolice.SetActive(true);
                 break;
-
             case PlayerJob.Firefighter:
                 if (modelFirefighter) modelFirefighter.SetActive(true);
                 if (weaponFirefighter) weaponFirefighter.SetActive(true);
                 break;
-
             case PlayerJob.Chef:
                 if (modelChef) modelChef.SetActive(true);
                 if (weaponChef) weaponChef.SetActive(true);
                 break;
-
             case PlayerJob.Builder:
                 if (modelBuilder) modelBuilder.SetActive(true);
                 if (weaponBuilder) weaponBuilder.SetActive(true);
