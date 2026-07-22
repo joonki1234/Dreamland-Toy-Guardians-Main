@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -27,11 +28,19 @@ namespace DreamGuardians
         private Coroutine flowRoutine;
         private bool emergencySuppressionCompleted;
         private bool starlightBlueprintCompleted;
+        private Coroutine stage1CompletionRoutine;
+        private bool stage1CompletionEventRaised;
 
         public TutorialStage1State State { get; private set; } = TutorialStage1State.Idle;
         public int RequiredHitsPerPlayer => requiredHitsPerPlayer;
         public int ExpectedPlayerCount => expectedPlayerCount;
         public TutorialDialogueData DialogueData => dialogueData;
+
+        /// <summary>
+        /// Stage 1 전투 완료 후 코어/무기 강화와 완료 연출까지 모두 끝났을 때 발생합니다.
+        /// 전체 진행 컨트롤러는 Stage1WaveController.Completed가 아니라 이 이벤트를 구독합니다.
+        /// </summary>
+        public event Action Stage1Completed;
 
         private void OnEnable()
         {
@@ -119,6 +128,7 @@ namespace DreamGuardians
                 return;
             }
 
+            stage1CompletionEventRaised = false;
             flowRoutine = StartCoroutine(BeginRoutine());
         }
 
@@ -430,27 +440,66 @@ namespace DreamGuardians
                 return;
             }
 
+            if (stage1CompletionRoutine != null || stage1CompletionEventRaised)
+            {
+                return;
+            }
+
+            stage1CompletionRoutine = StartCoroutine(CompleteStage1Routine());
+        }
+
+        private IEnumerator CompleteStage1Routine()
+        {
             State = TutorialStage1State.Complete;
+
+            const float fallbackDuration = 3f;
+            float completionDuration = fallbackDuration;
+
             missionUI?.ShowBanner(
                 dialogueData != null ? dialogueData.CoreUpgradeTitle : "CORE UPGRADE",
                 dialogueData != null
                     ? dialogueData.CoreUpgradeSubtitle
                     : "꿈빛 코어가 무기를 강화합니다",
-                3f);
+                fallbackDuration);
 
             if (dialogueData != null)
             {
                 ShowDialogueLine(dialogueData.CoreUpgradeLine);
+
+                if (dialogueData.CoreUpgradeLine != null)
+                {
+                    completionDuration = Mathf.Max(
+                        completionDuration,
+                        dialogueData.CoreUpgradeLine.Duration);
+                }
             }
             else
             {
                 missionUI?.ShowDialogue(
                     "장난감 친구",
                     "코어가 되찾은 꿈빛으로 무기를 강화하고 있어!",
-                    3f);
+                    fallbackDuration);
             }
 
+            // Stage 1의 마무리 연출에 포함되는 내부 요청입니다.
             DreamGameEvents.RequestWeaponUpgrade();
+
+            if (completionDuration > 0f)
+            {
+                yield return new WaitForSeconds(completionDuration);
+            }
+
+            stage1CompletionRoutine = null;
+
+            if (stage1CompletionEventRaised)
+            {
+                yield break;
+            }
+
+            stage1CompletionEventRaised = true;
+            Debug.Log(
+                "[Dreamland] TutorialStage1Director의 Stage1Completed 이벤트를 발생시킵니다.");
+            Stage1Completed?.Invoke();
         }
 
         private void RefreshShootingProgress()

@@ -38723,11 +38723,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7600d16f375cd8e4f9d54cfcc45c8fd9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DreamlandGameFlowController
+  stage1Director: {fileID: 2125966792}
   currentState: 0
   currentStateElapsedTime: 0
   currentStateRemainingTime: 0
   totalElapsedTime: 0
   isRunning: 0
+  enableLegacyTimedAutoAdvance: 0
   stage2Wave1Duration: 15
   stage2Wave2Duration: 3
   stage2FinalDuration: 3
@@ -41527,7 +41529,7 @@ MonoBehaviour:
   requiredHitsPerPlayer: 3
   expectedPlayerCount: 1
   requireBothSynergiesBeforePurification: 0
-  autoStart: 0
+  autoStart: 1
   firstSpawnDelay: 0.8
   waveStartDelay: 2
 --- !u!114 &2125966793
@@ -41552,21 +41554,21 @@ MonoBehaviour:
     spawnInterval: 2.5
     healthMultiplier: 1
     preDelay: 2
-    transitionDelay: 10
+    transitionDelay: 4
     minimumDuration: 0
   - label: "2\uCC28 \uACF5\uACA9"
     enemyCount: 3
     spawnInterval: 2.5
     healthMultiplier: 1.25
     preDelay: 2
-    transitionDelay: 12
+    transitionDelay: 4
     minimumDuration: 0
   - label: "\uCD5C\uC885 \uACF5\uACA9"
     enemyCount: 6
     spawnInterval: 1.8
     healthMultiplier: 1.5
     preDelay: 3
-    transitionDelay: 0
+    transitionDelay: 4
     minimumDuration: 0
   waveStartDelay: 3
   clearSequenceDuration: 3

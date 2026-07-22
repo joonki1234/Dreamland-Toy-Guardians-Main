@@ -1,30 +1,40 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using DreamGuardians;
 
 /// <summary>
-/// Stage 2의 시간별 적 생성을 관리하는 컨트롤러
+/// Stage 2 전체 웨이브 진행을 담당합니다.
 ///
-/// DreamlandGameFlowController의 상태 변경 신호를 받아
-/// Stage2Wave1, Stage2Wave2, Stage2Final에서 적을 생성한다.
+/// DreamlandGameFlowController가 Stage2Wave1 상태로 진입하면 Stage 2를 시작합니다.
+/// 이후 웨이브 전환은 이 컴포넌트 내부의 시간 간격으로 처리합니다.
+/// 이전 웨이브의 적이 남아 있어도 다음 웨이브는 시작되지만,
+/// Stage 2 완료는 마지막 웨이브의 모든 적 생성과 모든 적 정화가 끝난 뒤에만 발생합니다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class Stage2WaveController : MonoBehaviour
 {
     [Header("References")]
-
-    [Tooltip("Stage 2의 시간과 상태를 관리하는 전체 진행 컨트롤러")]
+    [Tooltip("Stage 1 완료 후 Stage 2 시작 신호를 보내는 전체 진행 컨트롤러")]
     [SerializeField]
     private DreamlandGameFlowController gameFlowController;
 
-    [Tooltip("팀원이 만든 기존 적 생성 스크립트")]
+    [Tooltip("Stage 1과 Stage 2에서 함께 사용하는 적 생성기")]
     [SerializeField]
     private DreamEnemySpawner enemySpawner;
 
+    [Tooltip("Stage 2 실패 조건으로 사용할 코어. 비어 있으면 Enemy Spawner의 Target Core를 사용합니다.")]
+    [SerializeField]
+    private CoreState core;
+
+    [Header("Stage 2 시작")]
+    [Tooltip("Stage 2 상태에 진입한 뒤 첫 번째 공격을 시작하기까지의 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float stageStartDelay = 2f;
 
     [Header("Stage 2 첫 번째 공격")]
-
-    [Tooltip("첫 번째 공격에서 생성할 기본 적 수")]
+    [Tooltip("첫 번째 공격에서 생성할 적 수")]
     [Min(1)]
     [SerializeField]
     private int wave1EnemyCount = 6;
@@ -39,10 +49,13 @@ public sealed class Stage2WaveController : MonoBehaviour
     [SerializeField]
     private float wave1HealthMultiplier = 1.5f;
 
+    [Tooltip("첫 번째 공격 스폰을 시작한 뒤 두 번째 공격 준비로 넘어가기까지의 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float wave1ToWave2Delay = 15f;
 
     [Header("Stage 2 두 번째 공격")]
-
-    [Tooltip("두 번째 공격에서 생성할 기본 적 수")]
+    [Tooltip("두 번째 공격에서 생성할 적 수")]
     [Min(1)]
     [SerializeField]
     private int wave2EnemyCount = 8;
@@ -57,10 +70,13 @@ public sealed class Stage2WaveController : MonoBehaviour
     [SerializeField]
     private float wave2HealthMultiplier = 1.8f;
 
+    [Tooltip("두 번째 공격 스폰을 시작한 뒤 최종 공격 준비로 넘어가기까지의 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float wave2ToFinalDelay = 15f;
 
     [Header("Stage 2 최종 공격")]
-
-    [Tooltip("최종 공격에서 생성할 기본 적 수")]
+    [Tooltip("최종 공격에서 생성할 적 수")]
     [Min(1)]
     [SerializeField]
     private int finalWaveEnemyCount = 10;
@@ -75,298 +91,438 @@ public sealed class Stage2WaveController : MonoBehaviour
     [SerializeField]
     private float finalWaveHealthMultiplier = 2.2f;
 
-
-    [Header("생존 적 수에 따른 생성 조절")]
-
-    [Tooltip("현재 생존 적이 이 수 이하라면 예정된 적을 모두 생성한다.")]
-    [Min(0)]
+    [Header("Stage 2 완료")]
+    [Tooltip("마지막 적의 정화가 끝난 뒤 완료 이벤트를 발생시키기 전 대기 시간")]
+    [Min(0f)]
     [SerializeField]
-    private int fullSpawnMaximumAlive = 5;
+    private float completionDelay = 2f;
 
-    [Tooltip("현재 생존 적이 이 수 이하라면 예정된 적의 절반만 생성한다.")]
-    [Min(1)]
-    [SerializeField]
-    private int halfSpawnMaximumAlive = 8;
+    private Coroutine stageRoutine;
+    private int runningSpawnRoutineCount;
+    private bool allWaveSpawnsCompleted;
+    private bool stage2Completed;
+    private bool failed;
 
-    [Tooltip("적이 너무 많을 때 다시 생존 적 수를 확인하는 시간")]
-    [Min(0.1f)]
-    [SerializeField]
-    private float retryInterval = 2f;
+    public bool IsRunning => stageRoutine != null;
+    public bool AllWaveSpawnsCompleted => allWaveSpawnsCompleted;
 
+    /// <summary>
+    /// 마지막 웨이브까지 모든 적 생성이 끝나고,
+    /// 현재 전장에 등장한 모든 적의 정화까지 완료됐을 때 발생합니다.
+    /// </summary>
+    public event Action Stage2Completed;
 
-    // 현재 실행 중인 적 생성 코루틴
-    private Coroutine spawnRoutine;
+    /// <summary>
+    /// Stage 2 진행 중 코어가 파괴됐을 때 발생합니다.
+    /// </summary>
+    public event Action Failed;
 
+    private void Awake()
+    {
+        ResolveReferences();
+    }
 
     private void OnEnable()
     {
-        // 전체 진행 컨트롤러의 상태 변경 이벤트를 받는다.
-        if (gameFlowController != null)
-        {
-            gameFlowController.OnStateChanged += HandleStateChanged;
-        }
+        ResolveReferences();
+        SubscribeEvents();
     }
 
     private void OnDisable()
     {
-        // 오브젝트가 비활성화될 때 이벤트 연결을 해제한다.
+        UnsubscribeEvents();
+        StopStage2Internal();
+    }
+
+    private void ResolveReferences()
+    {
+        if (gameFlowController == null)
+        {
+            gameFlowController =
+                UnityEngine.Object.FindAnyObjectByType<DreamlandGameFlowController>();
+        }
+
+        if (enemySpawner == null)
+        {
+            enemySpawner =
+                UnityEngine.Object.FindAnyObjectByType<DreamEnemySpawner>();
+        }
+
+        if (core == null && enemySpawner != null)
+        {
+            core = enemySpawner.TargetCore;
+        }
+    }
+
+    private void SubscribeEvents()
+    {
+        if (gameFlowController != null)
+        {
+            gameFlowController.OnStateChanged -= HandleStateChanged;
+            gameFlowController.OnStateChanged += HandleStateChanged;
+        }
+
+        if (core != null)
+        {
+            core.CoreDestroyed -= HandleCoreDestroyed;
+            core.CoreDestroyed += HandleCoreDestroyed;
+        }
+    }
+
+    private void UnsubscribeEvents()
+    {
         if (gameFlowController != null)
         {
             gameFlowController.OnStateChanged -= HandleStateChanged;
         }
 
-        StopCurrentSpawnRoutine();
+        if (core != null)
+        {
+            core.CoreDestroyed -= HandleCoreDestroyed;
+        }
     }
 
-    /// <summary>
-    /// 전체 게임 진행 상태가 변경되었을 때 호출된다.
-    /// </summary>
     private void HandleStateChanged(
         DreamlandGameFlowController.GameFlowState newState)
     {
-        // 이전 단계에서 실행 중이던 적 생성 작업을 중지한다.
-        StopCurrentSpawnRoutine();
-
         switch (newState)
         {
             case DreamlandGameFlowController.GameFlowState.Stage2Wave1:
-                StartWave1();
+                BeginStage2();
                 break;
 
             case DreamlandGameFlowController.GameFlowState.Stage2Wave2:
-                StartWave2();
-                break;
-
             case DreamlandGameFlowController.GameFlowState.Stage2Final:
-                StartFinalWave();
+                Debug.LogWarning(
+                    "[Stage2Wave] Stage 2의 내부 웨이브는 이제 " +
+                    "Stage2WaveController가 직접 진행합니다. " +
+                    "GameFlow의 수동 웨이브 상태 변경은 무시합니다.",
+                    this);
                 break;
 
             case DreamlandGameFlowController.GameFlowState.EnemyAbsorption:
-                // 흡수 연출이 시작되면 새로운 일반 적 생성을 중지한다.
-                Debug.Log(
-                    "[Stage2Wave] 적 흡수 단계가 시작되어 새 적 생성을 중지합니다.");
+            case DreamlandGameFlowController.GameFlowState.FullVRTransition:
+            case DreamlandGameFlowController.GameFlowState.BossBattle:
+            case DreamlandGameFlowController.GameFlowState.Ending:
+            case DreamlandGameFlowController.GameFlowState.Finished:
+                if (IsRunning)
+                {
+                    Debug.LogWarning(
+                        "[Stage2Wave] Stage 2가 완료되기 전에 GameFlow 상태가 변경되어 " +
+                        "현재 Stage 2 진행을 중단합니다.",
+                        this);
+                    StopStage2Internal();
+                }
                 break;
         }
     }
 
     /// <summary>
-    /// Stage 2 첫 번째 공격을 시작한다.
+    /// Stage 2 전체 웨이브 진행을 시작합니다.
     /// </summary>
-    private void StartWave1()
+    public void BeginStage2()
     {
-        if (!CanSpawnEnemies())
+        if (stageRoutine != null)
         {
+            Debug.LogWarning(
+                "[Stage2Wave] Stage 2가 이미 진행 중이므로 중복 시작 요청을 무시합니다.",
+                this);
             return;
         }
 
-        spawnRoutine = StartCoroutine(
-            SpawnWaveRoutine(
-                DreamlandGameFlowController.GameFlowState.Stage2Wave1,
-                "Stage 2 첫 번째 공격",
-                wave1EnemyCount,
-                wave1SpawnInterval,
-                wave1HealthMultiplier
-            )
-        );
-    }
-
-    /// <summary>
-    /// Stage 2 두 번째 공격을 시작한다.
-    /// </summary>
-    private void StartWave2()
-    {
-        if (!CanSpawnEnemies())
-        {
-            return;
-        }
-
-        spawnRoutine = StartCoroutine(
-            SpawnWaveRoutine(
-                DreamlandGameFlowController.GameFlowState.Stage2Wave2,
-                "Stage 2 두 번째 공격",
-                wave2EnemyCount,
-                wave2SpawnInterval,
-                wave2HealthMultiplier
-            )
-        );
-    }
-
-    /// <summary>
-    /// Stage 2 최종 공격을 시작한다.
-    /// </summary>
-    private void StartFinalWave()
-    {
-        if (!CanSpawnEnemies())
-        {
-            return;
-        }
-
-        spawnRoutine = StartCoroutine(
-            SpawnWaveRoutine(
-                DreamlandGameFlowController.GameFlowState.Stage2Final,
-                "Stage 2 최종 공격",
-                finalWaveEnemyCount,
-                finalWaveSpawnInterval,
-                finalWaveHealthMultiplier
-            )
-        );
-    }
-
-    /// <summary>
-    /// 적 생성에 필요한 오브젝트가 연결되어 있는지 확인한다.
-    /// </summary>
-    private bool CanSpawnEnemies()
-    {
-        if (gameFlowController == null)
-        {
-            Debug.LogError(
-                "[Stage2Wave] DreamlandGameFlowController가 연결되지 않았습니다.");
-            return false;
-        }
+        ResolveReferences();
 
         if (enemySpawner == null)
         {
             Debug.LogError(
-                "[Stage2Wave] DreamEnemySpawner가 연결되지 않았습니다.");
-            return false;
+                "[Stage2Wave] DreamEnemySpawner가 연결되지 않아 Stage 2를 시작할 수 없습니다.",
+                this);
+            return;
         }
 
-        return true;
+        if (core == null)
+        {
+            core = enemySpawner.TargetCore;
+        }
+
+        if (core != null)
+        {
+            core.CoreDestroyed -= HandleCoreDestroyed;
+            core.CoreDestroyed += HandleCoreDestroyed;
+
+            if (core.IsDestroyed)
+            {
+                Debug.LogError(
+                    "[Stage2Wave] 코어가 이미 파괴된 상태이므로 Stage 2를 시작할 수 없습니다.",
+                    this);
+                return;
+            }
+        }
+
+        runningSpawnRoutineCount = 0;
+        allWaveSpawnsCompleted = false;
+        stage2Completed = false;
+        failed = false;
+
+        stageRoutine = StartCoroutine(RunStage2Routine());
     }
 
-    /// <summary>
-    /// 지정된 공격 단계의 적을 생성한다.
-    /// </summary>
-    private IEnumerator SpawnWaveRoutine(
-        DreamlandGameFlowController.GameFlowState requiredState,
+    private IEnumerator RunStage2Routine()
+    {
+        float stageStartedAt = Time.time;
+
+        Debug.Log(
+            "[Stage2Wave] Stage 2 전체 진행을 시작합니다. " +
+            "웨이브 시작은 시간 기반이고, 완료는 모든 적 처치 기반입니다.",
+            this);
+
+        if (stageStartDelay > 0f)
+        {
+            yield return new WaitForSeconds(stageStartDelay);
+        }
+
+        if (failed)
+        {
+            yield break;
+        }
+
+        StartSpawnRoutine(
+            "Stage 2 첫 번째 공격",
+            wave1EnemyCount,
+            wave1SpawnInterval,
+            wave1HealthMultiplier);
+
+        yield return WaitForNextWaveDelay(
+            wave1ToWave2Delay,
+            "두 번째 공격");
+
+        if (failed)
+        {
+            yield break;
+        }
+
+        StartSpawnRoutine(
+            "Stage 2 두 번째 공격",
+            wave2EnemyCount,
+            wave2SpawnInterval,
+            wave2HealthMultiplier);
+
+        yield return WaitForNextWaveDelay(
+            wave2ToFinalDelay,
+            "최종 공격");
+
+        if (failed)
+        {
+            yield break;
+        }
+
+        StartSpawnRoutine(
+            "Stage 2 최종 공격",
+            finalWaveEnemyCount,
+            finalWaveSpawnInterval,
+            finalWaveHealthMultiplier);
+
+        // 최종 공격을 시작한 시점과 실제 마지막 적이 생성된 시점은 다릅니다.
+        // 모든 분산 스폰 코루틴이 끝날 때까지 기다립니다.
+        while (!failed && runningSpawnRoutineCount > 0)
+        {
+            yield return null;
+        }
+
+        if (failed)
+        {
+            yield break;
+        }
+
+        allWaveSpawnsCompleted = true;
+
+        Debug.Log(
+            "[Stage2Wave] Stage 2의 모든 웨이브 스폰이 완료됐습니다. " +
+            "남아 있는 모든 적이 정화될 때까지 기다립니다.",
+            this);
+
+        while (!failed && enemySpawner.ActiveEnemyCount > 0)
+        {
+            yield return null;
+        }
+
+        if (failed)
+        {
+            yield break;
+        }
+
+        if (completionDelay > 0f)
+        {
+            yield return new WaitForSeconds(completionDelay);
+        }
+
+        CompleteStage2(stageStartedAt);
+    }
+
+    private void StartSpawnRoutine(
         string waveLabel,
-        int plannedEnemyCount,
+        int enemyCount,
         float spawnInterval,
         float healthMultiplier)
     {
-        Debug.Log("[Stage2Wave] " + waveLabel + " 준비");
+        runningSpawnRoutineCount++;
 
-        // 생존 적이 9마리 이상이라면 추가 생성을 잠시 보류한다.
-        while (
-            gameFlowController.CurrentState == requiredState &&
-            enemySpawner.ActiveEnemyCount > halfSpawnMaximumAlive)
-        {
-            Debug.Log(
-                "[Stage2Wave] 현재 생존 적 "
-                + enemySpawner.ActiveEnemyCount
-                + "마리 - 새 적 생성을 잠시 보류합니다.");
-
-            yield return new WaitForSeconds(retryInterval);
-        }
-
-        // 기다리는 동안 다음 상태로 넘어갔다면 적을 생성하지 않는다.
-        if (gameFlowController.CurrentState != requiredState)
-        {
-            spawnRoutine = null;
-            yield break;
-        }
-
-        // 현재 생존 적 수에 따라 실제 생성 수를 계산한다.
-        int spawnCount = CalculateSpawnCount(plannedEnemyCount);
-
-        // 생성할 적이 없다면 종료한다.
-        if (spawnCount <= 0)
-        {
-            Debug.Log(
-                "[Stage2Wave] 현재 생존 적이 많아 새 적을 생성하지 않습니다.");
-
-            spawnRoutine = null;
-            yield break;
-        }
+        StartCoroutine(
+            SpawnWaveRoutine(
+                waveLabel,
+                enemyCount,
+                spawnInterval,
+                healthMultiplier));
 
         Debug.Log(
-            "[Stage2Wave] "
-            + waveLabel
-            + " / 현재 생존 적: "
-            + enemySpawner.ActiveEnemyCount
-            + "마리 / 새로 생성할 적: "
-            + spawnCount
-            + "마리"
-        );
+            "[Stage2Wave] " + waveLabel +
+            " 스폰 시작 / 총 " + enemyCount +
+            "마리 / 생성 간격 " + spawnInterval.ToString("0.0") + "초",
+            this);
+    }
 
-        // 팀원이 만든 DreamEnemySpawner의 생성 기능을 그대로 사용한다.
+    private IEnumerator SpawnWaveRoutine(
+        string waveLabel,
+        int enemyCount,
+        float spawnInterval,
+        float healthMultiplier)
+    {
         yield return enemySpawner.SpawnGroup(
-            spawnCount,
+            enemyCount,
             spawnInterval,
-            healthMultiplier
-        );
+            healthMultiplier);
 
-        Debug.Log("[Stage2Wave] " + waveLabel + " 적 생성 완료");
+        runningSpawnRoutineCount =
+            Mathf.Max(0, runningSpawnRoutineCount - 1);
 
-        spawnRoutine = null;
+        Debug.Log(
+            "[Stage2Wave] " + waveLabel +
+            "의 모든 적 생성 완료. 진행 중인 스폰 코루틴: " +
+            runningSpawnRoutineCount,
+            this);
     }
 
-    /// <summary>
-    /// 현재 생존 적 수에 따라 실제 생성할 적 수를 계산한다.
-    /// </summary>
-    private int CalculateSpawnCount(int plannedEnemyCount)
+    private IEnumerator WaitForNextWaveDelay(
+        float duration,
+        string nextWaveLabel)
     {
-        int aliveCount = enemySpawner.ActiveEnemyCount;
+        float elapsed = 0f;
+        float safeDuration = Mathf.Max(0f, duration);
 
-        // 생존 적이 0~5마리라면 예정된 수를 모두 생성한다.
-        if (aliveCount <= fullSpawnMaximumAlive)
+        while (!failed && elapsed < safeDuration)
         {
-            return plannedEnemyCount;
+            elapsed += Time.deltaTime;
+            yield return null;
         }
 
-        // 생존 적이 6~8마리라면 예정된 수의 절반만 생성한다.
-        if (aliveCount <= halfSpawnMaximumAlive)
+        if (!failed)
         {
-            return Mathf.Max(
-                1,
-                Mathf.CeilToInt(plannedEnemyCount * 0.5f)
-            );
+            Debug.Log(
+                "[Stage2Wave] 이전 공격의 적 생존 여부와 관계없이 " +
+                nextWaveLabel + "을 시작합니다. 현재 생존 적: " +
+                enemySpawner.ActiveEnemyCount + "마리",
+                this);
         }
-
-        // 생존 적이 9마리 이상이면 생성하지 않는다.
-        return 0;
     }
 
-    /// <summary>
-    /// 현재 실행 중인 적 생성 작업을 중지한다.
-    /// </summary>
-    private void StopCurrentSpawnRoutine()
+    private void CompleteStage2(float stageStartedAt)
     {
-        if (spawnRoutine == null)
+        if (failed || stage2Completed)
         {
             return;
         }
 
-        StopCoroutine(spawnRoutine);
-        spawnRoutine = null;
+        if (!allWaveSpawnsCompleted)
+        {
+            Debug.LogWarning(
+                "[Stage2Wave] 모든 웨이브 스폰이 끝나지 않아 완료 요청을 무시했습니다.",
+                this);
+            return;
+        }
+
+        if (enemySpawner.ActiveEnemyCount > 0)
+        {
+            Debug.LogWarning(
+                "[Stage2Wave] 적이 남아 있어 완료 요청을 무시했습니다. 남은 적: " +
+                enemySpawner.ActiveEnemyCount,
+                this);
+            return;
+        }
+
+        stage2Completed = true;
+        stageRoutine = null;
+
+        float elapsed = Time.time - stageStartedAt;
+
+        Debug.Log(
+            "[Stage2Wave] Stage 2 전투 완료: " +
+            elapsed.ToString("0.0") +
+            "초. Stage2Completed 이벤트를 발생시킵니다.",
+            this);
+
+        Stage2Completed?.Invoke();
+    }
+
+    private void HandleCoreDestroyed()
+    {
+        if (stageRoutine == null || failed || stage2Completed)
+        {
+            return;
+        }
+
+        failed = true;
+        StopAllCoroutines();
+
+        stageRoutine = null;
+        runningSpawnRoutineCount = 0;
+        allWaveSpawnsCompleted = false;
+
+        Debug.Log(
+            "[Stage2Wave] 코어가 파괴되어 Stage 2의 스폰과 진행을 중단합니다.",
+            this);
+
+        Failed?.Invoke();
+    }
+
+    private void StopStage2Internal()
+    {
+        if (stageRoutine == null && runningSpawnRoutineCount <= 0)
+        {
+            return;
+        }
+
+        StopAllCoroutines();
+
+        stageRoutine = null;
+        runningSpawnRoutineCount = 0;
+        allWaveSpawnsCompleted = false;
+    }
+
+    [ContextMenu("테스트 - Stage 2 직접 시작")]
+    private void TestBeginStage2()
+    {
+        BeginStage2();
     }
 
     private void OnValidate()
     {
-        // Inspector에서 잘못된 값이 입력되지 않도록 보정한다.
+        stageStartDelay = Mathf.Max(0f, stageStartDelay);
+
         wave1EnemyCount = Mathf.Max(1, wave1EnemyCount);
         wave1SpawnInterval = Mathf.Max(0f, wave1SpawnInterval);
         wave1HealthMultiplier = Mathf.Max(0.1f, wave1HealthMultiplier);
+        wave1ToWave2Delay = Mathf.Max(0f, wave1ToWave2Delay);
 
         wave2EnemyCount = Mathf.Max(1, wave2EnemyCount);
         wave2SpawnInterval = Mathf.Max(0f, wave2SpawnInterval);
         wave2HealthMultiplier = Mathf.Max(0.1f, wave2HealthMultiplier);
+        wave2ToFinalDelay = Mathf.Max(0f, wave2ToFinalDelay);
 
         finalWaveEnemyCount = Mathf.Max(1, finalWaveEnemyCount);
         finalWaveSpawnInterval = Mathf.Max(0f, finalWaveSpawnInterval);
         finalWaveHealthMultiplier =
             Mathf.Max(0.1f, finalWaveHealthMultiplier);
 
-        fullSpawnMaximumAlive = Mathf.Max(
-            0,
-            fullSpawnMaximumAlive
-        );
-
-        halfSpawnMaximumAlive = Mathf.Max(
-            fullSpawnMaximumAlive + 1,
-            halfSpawnMaximumAlive
-        );
-
-        retryInterval = Mathf.Max(0.1f, retryInterval);
+        completionDelay = Mathf.Max(0f, completionDelay);
     }
 }
