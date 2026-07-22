@@ -63,7 +63,6 @@ namespace DreamGuardians
             Vector3 destination = useAttackDestination
                 ? attackDestination
                 : targetCore.transform.position;
-            destination.y = transform.position.y;
 
             Vector3 toDestination = destination - transform.position;
             float distance = toDestination.magnitude;
@@ -77,7 +76,6 @@ namespace DreamGuardians
             }
 
             Vector3 toCore = targetCore.transform.position - transform.position;
-            toCore.y = 0f;
             RotateTowards(toCore.normalized);
 
             if (Time.time >= nextAttackTime)

@@ -213,7 +213,6 @@ namespace DreamGuardians
             outwardDirection = Quaternion.Euler(0f, spread, 0f) * outwardDirection;
 
             Vector3 destination = corePosition + outwardDirection * attackRingRadius;
-            destination.y = spawnPosition.y;
             return destination;
         }
 
@@ -320,15 +319,35 @@ namespace DreamGuardians
 
         private Transform GetNextSpawnPoint()
         {
+            // 삭제된 스폰 포인트를 목록에서 제거한다.
             spawnPoints.RemoveAll(point => point == null);
+
             if (spawnPoints.Count == 0)
             {
                 return null;
             }
 
-            Transform result = spawnPoints[nextSpawnPointIndex % spawnPoints.Count];
-            nextSpawnPointIndex = (nextSpawnPointIndex + 1) % spawnPoints.Count;
-            return result;
+            // 등록된 스폰 포인트 수만큼 확인한다.
+            // 현재 활성화된 포탈 아래의 스폰 포인트만 사용한다.
+            for (int i = 0; i < spawnPoints.Count; i++)
+            {
+                int index = nextSpawnPointIndex % spawnPoints.Count;
+                Transform candidate = spawnPoints[index];
+
+                nextSpawnPointIndex =
+                    (nextSpawnPointIndex + 1) % spawnPoints.Count;
+
+                if (candidate != null &&
+                    candidate.gameObject.activeInHierarchy)
+                {
+                    return candidate;
+                }
+            }
+
+            Debug.LogWarning(
+                "[DreamEnemySpawner] 현재 활성화된 스폰 포인트가 없습니다.");
+
+            return null;
         }
 
         private static T GetOrAdd<T>(GameObject target) where T : Component
