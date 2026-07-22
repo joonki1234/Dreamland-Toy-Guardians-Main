@@ -13370,7 +13370,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 497963369}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -13587,7 +13587,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &536914735
 Transform:
   m_ObjectHideFlags: 0
@@ -13616,7 +13616,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 1140903254}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
@@ -13705,7 +13705,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &543872342
 Transform:
   m_ObjectHideFlags: 0
@@ -13734,7 +13734,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 666368347}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
@@ -18452,7 +18452,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &841516576
 Transform:
   m_ObjectHideFlags: 0
@@ -18481,7 +18481,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 937973891}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
@@ -23621,7 +23621,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1151218597
 Transform:
   m_ObjectHideFlags: 0
@@ -23650,7 +23650,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 797776129}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
@@ -27910,7 +27910,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1437840787
 Transform:
   m_ObjectHideFlags: 0
@@ -27939,7 +27939,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 805344585}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
@@ -41493,7 +41493,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1735948264
 Transform:
   m_ObjectHideFlags: 0
@@ -41522,7 +41522,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 709482100}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
@@ -41667,7 +41667,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1743295922
 Transform:
   m_ObjectHideFlags: 0
@@ -41696,7 +41696,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 1700529074}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
@@ -46454,7 +46454,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &2055191278
 Transform:
   m_ObjectHideFlags: 0
@@ -46483,7 +46483,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9985143733a1a8f41862bc7c77de449d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
-  portalVisualTarget: {fileID: 0}
+  portalVisualTarget: {fileID: 58077667}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   mediumScale: {x: 2, y: 1.3, z: 1}
   largeScale: {x: 4, y: 1.9, z: 1}
