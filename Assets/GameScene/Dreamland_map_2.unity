@@ -1015,7 +1015,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: bdc85f637a63a7a4ba38cf3c0a17df98, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1899,7 +1899,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -5924,7 +5924,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 60cc3c07650e6c447b4a28512dad9844, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -12132,7 +12132,7 @@ Transform:
   m_GameObject: {fileID: 434970877}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0.2, y: 0.45, z: 0.18}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -12177,7 +12177,7 @@ Light:
   m_Enabled: 0
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0, b: 1, a: 1}
+  m_Color: {r: 0.2509804, g: 0.8784314, b: 1, a: 1}
   m_Intensity: 20
   m_Range: 100
   m_SpotAngle: 30
@@ -14850,7 +14850,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 975f39bd024bb824990302eff7e92d8f, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -29008,16 +29008,28 @@ PrefabInstance:
     m_TransformParent: {fileID: 173257298}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.58
+      value: -0.219
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.2061198
+      value: 1.397
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -1.643
+      value: -1.106
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
       propertyPath: m_LocalRotation.w
@@ -29046,6 +29058,14 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: -7480193447843102446, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.106
+      objectReference: {fileID: 0}
+    - target: {fileID: -4526126851487802209, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 19b356156119e734fb7a25ff0020c0b9, type: 3}
       propertyPath: m_Name
@@ -38885,18 +38905,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Stage2WaveController
   gameFlowController: {fileID: 1926243287}
   enemySpawner: {fileID: 2125966794}
+  core: {fileID: 0}
+  stageStartDelay: 2
   wave1EnemyCount: 6
   wave1SpawnInterval: 1.5
   wave1HealthMultiplier: 1.5
+  wave1ToWave2Delay: 15
   wave2EnemyCount: 8
   wave2SpawnInterval: 1.2
   wave2HealthMultiplier: 1.8
+  wave2ToFinalDelay: 15
   finalWaveEnemyCount: 10
   finalWaveSpawnInterval: 1
   finalWaveHealthMultiplier: 2.2
-  fullSpawnMaximumAlive: 5
-  halfSpawnMaximumAlive: 8
-  retryInterval: 2
+  completionDelay: 2
 --- !u!4 &1928394509 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}
