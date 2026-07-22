@@ -21057,6 +21057,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1015469102}
   - component: {fileID: 1015469103}
+  - component: {fileID: 1015469104}
   m_Layer: 0
   m_Name: DreamlandTransitionController
   m_TagString: Untagged
@@ -21086,7 +21087,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1015469101}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 95e6e904d57975e44bc8a47a92446b7d, type: 3}
   m_Name: 
@@ -21095,6 +21096,37 @@ MonoBehaviour:
   interiorDream: {fileID: 1008938018}
   finalDreamland: {fileID: 1132296213}
   portalEffects: {fileID: 0}
+--- !u!114 &1015469104
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015469101}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 390faa5f6c7c0ff4fb3987185a86302c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamlandTransitionController
+  gameFlowController: {fileID: 1926243287}
+  missionUI: {fileID: 2125966795}
+  realityWorld: {fileID: 460540199}
+  interiorDream: {fileID: 1008938018}
+  finalDreamland: {fileID: 1132296213}
+  portalEffects: {fileID: 392132403}
+  enemyAbsorptionDuration: 3
+  portalPulseAmount: 0.12
+  absorptionTitle: DREAM ENERGY CONVERGENCE
+  absorptionSubtitle: "\uB0A8\uC740 \uAFC8\uC758 \uAE30\uC6B4\uC774 \uD558\uB098\uB85C
+    \uBAA8\uC785\uB2C8\uB2E4"
+  absorptionMessage: "\uAC80\uC740 \uAE30\uC6B4\uC774 \uADE0\uC5F4\uB85C \uBE68\uB824
+    \uB4E4\uC5B4\uAC00\uACE0 \uC788\uC5B4. \uACE7 \uC644\uC804\uD55C \uAFC8\uB098\uB77C\uAC00
+    \uC5F4\uB9B4 \uAC70\uC57C!"
+  fullVRTransitionDelay: 1.5
+  postTransitionHold: 1
+  transitionTitle: DREAMLAND OPEN
+  transitionSubtitle: "\uD604\uC2E4\uC758 \uACBD\uACC4\uAC00 \uC0AC\uB77C\uC9D1\uB2C8\uB2E4"
+  applyInitialStateOnStart: 1
 --- !u!1001 &1021028729
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -38823,6 +38855,9 @@ GameObject:
   - component: {fileID: 1926243286}
   - component: {fileID: 1926243287}
   - component: {fileID: 1926243288}
+  - component: {fileID: 1926243289}
+  - component: {fileID: 1926243291}
+  - component: {fileID: 1926243290}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -38858,19 +38893,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DreamlandGameFlowController
   stage1Director: {fileID: 2125966792}
+  stage2Director: {fileID: 1926243289}
+  transitionController: {fileID: 1015469104}
+  finalBossDirector: {fileID: 1926243291}
+  endingDirector: {fileID: 1926243290}
   currentState: 0
   currentStateElapsedTime: 0
   currentStateRemainingTime: 0
   totalElapsedTime: 0
   isRunning: 0
-  enableLegacyTimedAutoAdvance: 0
-  stage2Wave1Duration: 15
-  stage2Wave2Duration: 3
-  stage2FinalDuration: 3
-  enemyAbsorptionDuration: 3
-  fullVRTransitionDuration: 3
-  bossBattleDuration: 3
-  endingDuration: 3
 --- !u!114 &1926243288
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -38885,18 +38916,125 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Stage2WaveController
   gameFlowController: {fileID: 1926243287}
   enemySpawner: {fileID: 2125966794}
+  core: {fileID: 2019763646}
+  stageStartDelay: 2
   wave1EnemyCount: 6
   wave1SpawnInterval: 1.5
   wave1HealthMultiplier: 1.5
+  wave1ToWave2Delay: 15
   wave2EnemyCount: 8
   wave2SpawnInterval: 1.2
   wave2HealthMultiplier: 1.8
+  wave2ToFinalDelay: 15
   finalWaveEnemyCount: 10
   finalWaveSpawnInterval: 1
   finalWaveHealthMultiplier: 2.2
-  fullSpawnMaximumAlive: 5
-  halfSpawnMaximumAlive: 8
-  retryInterval: 2
+--- !u!114 &1926243289
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926243285}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5d49bbb5483c6a4797a637732363cfb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Stage2Director
+  waveController: {fileID: 1926243288}
+  missionUI: {fileID: 2125966795}
+  stageStartTitle: STAGE 2 START
+  stageStartSubtitle: "\uD655\uC7A5\uB418\uB294 \uAFC8\uC758 \uADE0\uC5F4\uC744 \uB9C9\uC544\uB77C"
+  stageObjective: "Stage 2 \xB7 \uCF54\uC5B4\uB97C \uC9C0\uD0A4\uBA70 \uBAA8\uB4E0
+    \uC545\uBABD\uC744 \uC815\uD654\uD558\uB77C"
+  stageStartBannerDuration: 2
+  firstWaveTitle: "1\uCC28 \uCE68\uC2DD"
+  secondWaveTitle: "2\uCC28 \uCE68\uC2DD"
+  finalWaveTitle: FINAL ATTACK
+  finalPhaseTitle: FINAL PHASE
+  finalPhaseSubtitle: "\uB0A8\uC740 \uC545\uBABD\uC744 \uBAA8\uB450 \uC815\uD654\uD558\uB77C"
+  waveBannerDuration: 1.5
+  progressRefreshInterval: 0.2
+  clearTitle: STAGE 2 CLEAR
+  clearSubtitle: "\uAFC8\uC758 \uADE0\uC5F4\uC774 \uC57D\uD574\uC84C\uC2B5\uB2C8\uB2E4"
+  clearSpeaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
+  clearMessage: "\uD574\uB0C8\uC5B4! \uB0A8\uC740 \uAFC8\uBE5B\uC774 \uD558\uB098\uB85C
+    \uBAA8\uC774\uBA70 \uC0C8\uB85C\uC6B4 \uAE38\uC744 \uC5F4\uACE0 \uC788\uC5B4!"
+  clearBannerDuration: 3
+  clearDialogueDuration: 3
+  failedTitle: MISSION FAILED
+  failedSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4\uAC00 \uBB34\uB108\uC84C\uC2B5\uB2C8\uB2E4"
+  failedBannerDuration: 3
+  currentState: 0
+--- !u!114 &1926243290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926243285}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56729fc72a240814fa421adee2309381, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EndingDirector
+  gameFlowController: {fileID: 1926243287}
+  missionUI: {fileID: 2125966795}
+  endingTitle: DREAM RESTORED
+  endingSubtitle: "\uAFC8\uB098\uB77C\uC5D0 \uB2E4\uC2DC \uBE5B\uC774 \uB3CC\uC544\uC654\uC2B5\uB2C8\uB2E4"
+  speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
+  firstMessage: "\uBAA8\uB450\uC758 \uC6A9\uAE30 \uB355\uBD84\uC5D0 \uC545\uBABD\uC774
+    \uC0AC\uB77C\uC84C\uC5B4. \uC815\uB9D0 \uACE0\uB9C8\uC6CC!"
+  secondMessage: "\uD604\uC2E4\uB85C \uB3CC\uC544\uAC00\uB354\uB77C\uB3C4 \uC624\uB298\uC758
+    \uAFC8\uACFC \uD798\uC744 \uC78A\uC9C0 \uB9D0\uC544 \uC918."
+  finalTitle: THE END
+  finalSubtitle: Dream Guardians
+  openingBannerDuration: 3
+  firstDialogueDuration: 3
+  secondDialogueDuration: 3
+  finalBannerDuration: 4
+  currentState: 0
+--- !u!114 &1926243291
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1926243285}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e08082db2b5540744b83dd620354b3af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FinalBossDirector
+  gameFlowController: {fileID: 1926243287}
+  missionUI: {fileID: 2125966795}
+  core: {fileID: 2019763646}
+  bossPrefab: {fileID: 0}
+  bossSpawnPoint: {fileID: 0}
+  createPrototypeBossWhenPrefabMissing: 1
+  fallbackSpawnDistance: 12
+  prototypeBossScale: {x: 2.5, y: 2.5, z: 2.5}
+  bossMaxHealth: 100
+  bossCoreDamage: 20
+  bossAttackInterval: 2.5
+  firstAttackDelay: 4
+  introTitle: FINAL BOSS
+  introSubtitle: "\uC545\uBABD\uC758 \uADFC\uC6D0\uC744 \uC815\uD654\uD558\uB77C"
+  objectiveText: "\uCD5C\uC885 \uBCF4\uC2A4\uB97C \uC4F0\uB7EC\uB728\uB9AC\uACE0
+    \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uB77C"
+  introSpeaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
+  introMessage: "\uC800 \uAC80\uC740 \uD615\uCCB4\uAC00 \uBAA8\uB4E0 \uC545\uBABD\uC758
+    \uADFC\uC6D0\uC774\uC57C. \uD568\uAED8 \uB05D\uB0B4\uC790!"
+  defeatedTitle: BOSS DEFEATED
+  defeatedSubtitle: "\uC545\uBABD\uC758 \uADFC\uC6D0\uC774 \uC815\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4"
+  defeatedMessage: "\uD574\uB0C8\uC5B4! \uAFC8\uB098\uB77C\uC758 \uBE5B\uC774 \uB2E4\uC2DC
+    \uB3CC\uC544\uC624\uACE0 \uC788\uC5B4!"
+  failedTitle: MISSION FAILED
+  failedSubtitle: "\uCD5C\uC885 \uC804\uD22C\uC5D0\uC11C \uCF54\uC5B4\uAC00 \uBB34\uB108\uC84C\uC2B5\uB2C8\uB2E4"
+  introDuration: 3
+  defeatDuration: 3
+  defeatVisualDuration: 1.5
+  currentState: 0
 --- !u!4 &1928394509 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2305184995288488474, guid: 1524e5f41144e22418f0c1b72be84974, type: 3}

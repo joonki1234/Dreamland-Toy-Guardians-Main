@@ -1,21 +1,31 @@
 using System;
 using System.Collections;
-using UnityEngine;
 using DreamGuardians;
+using UnityEngine;
 
 /// <summary>
-/// Stage 2 전체 웨이브 진행을 담당합니다.
+/// Stage 2의 전투 웨이브만 담당합니다.
 ///
-/// DreamlandGameFlowController가 Stage2Wave1 상태로 진입하면 Stage 2를 시작합니다.
-/// 이후 웨이브 전환은 이 컴포넌트 내부의 시간 간격으로 처리합니다.
-/// 이전 웨이브의 적이 남아 있어도 다음 웨이브는 시작되지만,
-/// Stage 2 완료는 마지막 웨이브의 모든 적 생성과 모든 적 정화가 끝난 뒤에만 발생합니다.
+/// - 다음 웨이브 시작: 시간 기반
+/// - 적 생성: 일정 간격의 분산 스폰
+/// - 전투 완료: 마지막 웨이브의 모든 적 생성 완료 + 등장한 모든 적 정화
+/// - 실패: 코어 파괴
+///
+/// 시작/웨이브/전투 완료 이벤트를 Stage2Director에 전달하며,
+/// UI와 Stage 2 최종 완료 연출은 직접 처리하지 않습니다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class Stage2WaveController : MonoBehaviour
 {
+    public enum Stage2WavePhase
+    {
+        First,
+        Second,
+        Final
+    }
+
     [Header("References")]
-    [Tooltip("Stage 1 완료 후 Stage 2 시작 신호를 보내는 전체 진행 컨트롤러")]
+    [Tooltip("Stage 1 완료 후 Stage 2 시작 상태를 보내는 전체 진행 컨트롤러")]
     [SerializeField]
     private DreamlandGameFlowController gameFlowController;
 
@@ -28,89 +38,108 @@ public sealed class Stage2WaveController : MonoBehaviour
     private CoreState core;
 
     [Header("Stage 2 시작")]
-    [Tooltip("Stage 2 상태에 진입한 뒤 첫 번째 공격을 시작하기까지의 시간")]
+    [Tooltip("Stage 2 상태 진입 후 첫 번째 공격을 시작하기까지의 시간")]
     [Min(0f)]
     [SerializeField]
     private float stageStartDelay = 2f;
 
     [Header("Stage 2 첫 번째 공격")]
-    [Tooltip("첫 번째 공격에서 생성할 적 수")]
     [Min(1)]
     [SerializeField]
     private int wave1EnemyCount = 6;
 
-    [Tooltip("첫 번째 공격의 적 생성 간격")]
     [Min(0f)]
     [SerializeField]
     private float wave1SpawnInterval = 1.5f;
 
-    [Tooltip("첫 번째 공격 적의 체력 배율")]
     [Min(0.1f)]
     [SerializeField]
     private float wave1HealthMultiplier = 1.5f;
 
-    [Tooltip("첫 번째 공격 스폰을 시작한 뒤 두 번째 공격 준비로 넘어가기까지의 시간")]
+    [Tooltip("첫 번째 공격 스폰 시작 후 두 번째 공격을 시작하기까지의 시간")]
     [Min(0f)]
     [SerializeField]
     private float wave1ToWave2Delay = 15f;
 
     [Header("Stage 2 두 번째 공격")]
-    [Tooltip("두 번째 공격에서 생성할 적 수")]
     [Min(1)]
     [SerializeField]
     private int wave2EnemyCount = 8;
 
-    [Tooltip("두 번째 공격의 적 생성 간격")]
     [Min(0f)]
     [SerializeField]
     private float wave2SpawnInterval = 1.2f;
 
-    [Tooltip("두 번째 공격 적의 체력 배율")]
     [Min(0.1f)]
     [SerializeField]
     private float wave2HealthMultiplier = 1.8f;
 
-    [Tooltip("두 번째 공격 스폰을 시작한 뒤 최종 공격 준비로 넘어가기까지의 시간")]
+    [Tooltip("두 번째 공격 스폰 시작 후 최종 공격을 시작하기까지의 시간")]
     [Min(0f)]
     [SerializeField]
     private float wave2ToFinalDelay = 15f;
 
     [Header("Stage 2 최종 공격")]
-    [Tooltip("최종 공격에서 생성할 적 수")]
     [Min(1)]
     [SerializeField]
     private int finalWaveEnemyCount = 10;
 
-    [Tooltip("최종 공격의 적 생성 간격")]
     [Min(0f)]
     [SerializeField]
     private float finalWaveSpawnInterval = 1f;
 
-    [Tooltip("최종 공격 적의 체력 배율")]
     [Min(0.1f)]
     [SerializeField]
     private float finalWaveHealthMultiplier = 2.2f;
 
-    [Header("Stage 2 완료")]
-    [Tooltip("마지막 적의 정화가 끝난 뒤 완료 이벤트를 발생시키기 전 대기 시간")]
-    [Min(0f)]
-    [SerializeField]
-    private float completionDelay = 2f;
-
     private Coroutine stageRoutine;
     private int runningSpawnRoutineCount;
     private bool allWaveSpawnsCompleted;
-    private bool stage2Completed;
+    private bool combatCompleted;
     private bool failed;
 
     public bool IsRunning => stageRoutine != null;
-    public bool AllWaveSpawnsCompleted => allWaveSpawnsCompleted;
+    public bool AreAllWaveSpawnsCompleted => allWaveSpawnsCompleted;
+    public bool HasFailed => failed;
+    public int ActiveEnemyCount =>
+        enemySpawner != null ? enemySpawner.ActiveEnemyCount : 0;
 
     /// <summary>
-    /// 마지막 웨이브까지 모든 적 생성이 끝나고,
-    /// 현재 전장에 등장한 모든 적의 정화까지 완료됐을 때 발생합니다.
+    /// Stage 2 전체 전투 진행이 시작될 때 발생합니다.
     /// </summary>
-    public event Action Stage2Completed;
+    public event Action Stage2Started;
+
+    /// <summary>
+    /// 각 웨이브의 분산 스폰이 시작되는 순간 발생합니다.
+    /// </summary>
+    public event Action<Stage2WavePhase, int> WaveStarted;
+
+    /// <summary>
+    /// 특정 웨이브의 모든 적 생성이 끝났을 때 발생합니다.
+    /// </summary>
+    public event Action<Stage2WavePhase> WaveSpawnCompleted;
+
+    /// <summary>
+    /// 마지막 웨이브를 포함한 모든 분산 스폰이 끝났을 때 발생합니다.
+    /// 아직 적이 남아 있을 수 있습니다.
+    /// </summary>
+    public event Action AllWaveSpawnsCompleted;
+
+    /// <summary>
+    /// 모든 웨이브 스폰과 모든 적 정화가 끝났을 때 발생하는 내부 전투 완료 신호입니다.
+    /// 전체 진행 컨트롤러는 이 이벤트를 직접 받지 않고 Stage2Director.Stage2Completed를 받습니다.
+    /// </summary>
+    public event Action CombatCompleted;
+
+    /// <summary>
+    /// 이전 테스트 코드와의 임시 호환용 별칭입니다.
+    /// 새 코드는 CombatCompleted를 사용합니다.
+    /// </summary>
+    public event Action Stage2Completed
+    {
+        add => CombatCompleted += value;
+        remove => CombatCompleted -= value;
+    }
 
     /// <summary>
     /// Stage 2 진행 중 코어가 파괴됐을 때 발생합니다.
@@ -194,9 +223,8 @@ public sealed class Stage2WaveController : MonoBehaviour
             case DreamlandGameFlowController.GameFlowState.Stage2Wave2:
             case DreamlandGameFlowController.GameFlowState.Stage2Final:
                 Debug.LogWarning(
-                    "[Stage2Wave] Stage 2의 내부 웨이브는 이제 " +
-                    "Stage2WaveController가 직접 진행합니다. " +
-                    "GameFlow의 수동 웨이브 상태 변경은 무시합니다.",
+                    "[Stage2Wave] Stage 2 내부 웨이브는 " +
+                    "Stage2WaveController가 직접 진행하므로 수동 상태 변경을 무시합니다.",
                     this);
                 break;
 
@@ -208,8 +236,8 @@ public sealed class Stage2WaveController : MonoBehaviour
                 if (IsRunning)
                 {
                     Debug.LogWarning(
-                        "[Stage2Wave] Stage 2가 완료되기 전에 GameFlow 상태가 변경되어 " +
-                        "현재 Stage 2 진행을 중단합니다.",
+                        "[Stage2Wave] Stage 2 전투 완료 전에 전체 상태가 변경되어 " +
+                        "현재 전투 진행을 중단합니다.",
                         this);
                     StopStage2Internal();
                 }
@@ -253,7 +281,7 @@ public sealed class Stage2WaveController : MonoBehaviour
             if (core.IsDestroyed)
             {
                 Debug.LogError(
-                    "[Stage2Wave] 코어가 이미 파괴된 상태이므로 Stage 2를 시작할 수 없습니다.",
+                    "[Stage2Wave] 코어가 이미 파괴되어 Stage 2를 시작할 수 없습니다.",
                     this);
                 return;
             }
@@ -261,7 +289,7 @@ public sealed class Stage2WaveController : MonoBehaviour
 
         runningSpawnRoutineCount = 0;
         allWaveSpawnsCompleted = false;
-        stage2Completed = false;
+        combatCompleted = false;
         failed = false;
 
         stageRoutine = StartCoroutine(RunStage2Routine());
@@ -272,9 +300,11 @@ public sealed class Stage2WaveController : MonoBehaviour
         float stageStartedAt = Time.time;
 
         Debug.Log(
-            "[Stage2Wave] Stage 2 전체 진행을 시작합니다. " +
-            "웨이브 시작은 시간 기반이고, 완료는 모든 적 처치 기반입니다.",
+            "[Stage2Wave] Stage 2 전투를 시작합니다. " +
+            "웨이브 시작은 시간 기반, 완료는 모든 적 정화 기반입니다.",
             this);
+
+        Stage2Started?.Invoke();
 
         if (stageStartDelay > 0f)
         {
@@ -287,6 +317,7 @@ public sealed class Stage2WaveController : MonoBehaviour
         }
 
         StartSpawnRoutine(
+            Stage2WavePhase.First,
             "Stage 2 첫 번째 공격",
             wave1EnemyCount,
             wave1SpawnInterval,
@@ -302,6 +333,7 @@ public sealed class Stage2WaveController : MonoBehaviour
         }
 
         StartSpawnRoutine(
+            Stage2WavePhase.Second,
             "Stage 2 두 번째 공격",
             wave2EnemyCount,
             wave2SpawnInterval,
@@ -317,13 +349,12 @@ public sealed class Stage2WaveController : MonoBehaviour
         }
 
         StartSpawnRoutine(
+            Stage2WavePhase.Final,
             "Stage 2 최종 공격",
             finalWaveEnemyCount,
             finalWaveSpawnInterval,
             finalWaveHealthMultiplier);
 
-        // 최종 공격을 시작한 시점과 실제 마지막 적이 생성된 시점은 다릅니다.
-        // 모든 분산 스폰 코루틴이 끝날 때까지 기다립니다.
         while (!failed && runningSpawnRoutineCount > 0)
         {
             yield return null;
@@ -341,6 +372,8 @@ public sealed class Stage2WaveController : MonoBehaviour
             "남아 있는 모든 적이 정화될 때까지 기다립니다.",
             this);
 
+        AllWaveSpawnsCompleted?.Invoke();
+
         while (!failed && enemySpawner.ActiveEnemyCount > 0)
         {
             yield return null;
@@ -351,15 +384,11 @@ public sealed class Stage2WaveController : MonoBehaviour
             yield break;
         }
 
-        if (completionDelay > 0f)
-        {
-            yield return new WaitForSeconds(completionDelay);
-        }
-
-        CompleteStage2(stageStartedAt);
+        CompleteCombat(stageStartedAt);
     }
 
     private void StartSpawnRoutine(
+        Stage2WavePhase phase,
         string waveLabel,
         int enemyCount,
         float spawnInterval,
@@ -367,8 +396,11 @@ public sealed class Stage2WaveController : MonoBehaviour
     {
         runningSpawnRoutineCount++;
 
+        WaveStarted?.Invoke(phase, enemyCount);
+
         StartCoroutine(
             SpawnWaveRoutine(
+                phase,
                 waveLabel,
                 enemyCount,
                 spawnInterval,
@@ -382,6 +414,7 @@ public sealed class Stage2WaveController : MonoBehaviour
     }
 
     private IEnumerator SpawnWaveRoutine(
+        Stage2WavePhase phase,
         string waveLabel,
         int enemyCount,
         float spawnInterval,
@@ -400,6 +433,8 @@ public sealed class Stage2WaveController : MonoBehaviour
             "의 모든 적 생성 완료. 진행 중인 스폰 코루틴: " +
             runningSpawnRoutineCount,
             this);
+
+        WaveSpawnCompleted?.Invoke(phase);
     }
 
     private IEnumerator WaitForNextWaveDelay(
@@ -425,9 +460,9 @@ public sealed class Stage2WaveController : MonoBehaviour
         }
     }
 
-    private void CompleteStage2(float stageStartedAt)
+    private void CompleteCombat(float stageStartedAt)
     {
-        if (failed || stage2Completed)
+        if (failed || combatCompleted)
         {
             return;
         }
@@ -435,7 +470,7 @@ public sealed class Stage2WaveController : MonoBehaviour
         if (!allWaveSpawnsCompleted)
         {
             Debug.LogWarning(
-                "[Stage2Wave] 모든 웨이브 스폰이 끝나지 않아 완료 요청을 무시했습니다.",
+                "[Stage2Wave] 모든 웨이브 스폰이 끝나지 않아 전투 완료 요청을 무시했습니다.",
                 this);
             return;
         }
@@ -443,13 +478,13 @@ public sealed class Stage2WaveController : MonoBehaviour
         if (enemySpawner.ActiveEnemyCount > 0)
         {
             Debug.LogWarning(
-                "[Stage2Wave] 적이 남아 있어 완료 요청을 무시했습니다. 남은 적: " +
+                "[Stage2Wave] 적이 남아 있어 전투 완료 요청을 무시했습니다. 남은 적: " +
                 enemySpawner.ActiveEnemyCount,
                 this);
             return;
         }
 
-        stage2Completed = true;
+        combatCompleted = true;
         stageRoutine = null;
 
         float elapsed = Time.time - stageStartedAt;
@@ -457,15 +492,15 @@ public sealed class Stage2WaveController : MonoBehaviour
         Debug.Log(
             "[Stage2Wave] Stage 2 전투 완료: " +
             elapsed.ToString("0.0") +
-            "초. Stage2Completed 이벤트를 발생시킵니다.",
+            "초. CombatCompleted 이벤트를 발생시킵니다.",
             this);
 
-        Stage2Completed?.Invoke();
+        CombatCompleted?.Invoke();
     }
 
     private void HandleCoreDestroyed()
     {
-        if (stageRoutine == null || failed || stage2Completed)
+        if (stageRoutine == null || failed || combatCompleted)
         {
             return;
         }
@@ -520,9 +555,6 @@ public sealed class Stage2WaveController : MonoBehaviour
 
         finalWaveEnemyCount = Mathf.Max(1, finalWaveEnemyCount);
         finalWaveSpawnInterval = Mathf.Max(0f, finalWaveSpawnInterval);
-        finalWaveHealthMultiplier =
-            Mathf.Max(0.1f, finalWaveHealthMultiplier);
-
-        completionDelay = Mathf.Max(0f, completionDelay);
+        finalWaveHealthMultiplier = Mathf.Max(0.1f, finalWaveHealthMultiplier);
     }
 }
