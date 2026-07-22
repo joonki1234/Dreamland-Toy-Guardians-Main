@@ -12,6 +12,10 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 {
     [Header("진행 시스템 연결")]
 
+    [Tooltip("Stage 1 진행을 관리하는 컨트롤러")]
+    [SerializeField]
+    private Stage1WaveController stage1WaveController;
+
     [Tooltip("Stage 2의 내부 공격 진행을 관리하는 컨트롤러")]
     [SerializeField]
     private Stage2WaveController stage2WaveController;
@@ -61,9 +65,17 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
     private void OnEnable()
     {
+
+
         // Stage 1에서 사용 중인 기존 환경 변화 이벤트를 받는다.
         DreamGameEvents.EnvironmentPhaseRequested +=
             HandleStage1EnvironmentPhase;
+
+        // Stage 1이 실제로 시작될 때 첫 포탈을 켠다.
+        if (stage1WaveController != null)
+        {
+            stage1WaveController.Started += ApplyStage1FirstAttack;
+        }
 
         // Stage 2 내부 웨이브 시작 이벤트를 받는다.
         if (stage2WaveController != null)
@@ -84,6 +96,11 @@ public sealed class EnemyPortalStageController : MonoBehaviour
     {
         DreamGameEvents.EnvironmentPhaseRequested -=
             HandleStage1EnvironmentPhase;
+
+        if (stage1WaveController != null)
+        {
+            stage1WaveController.Started -= ApplyStage1FirstAttack;
+        }
 
         if (stage2WaveController != null)
         {
