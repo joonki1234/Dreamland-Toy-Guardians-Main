@@ -25,25 +25,29 @@ public class PlayerJobController : MonoBehaviour
     public GameObject weaponChef;
     public GameObject weaponBuilder;
 
+    [Header("건설자(Builder) 흙 생성 세팅")]
+    public GameObject dirtPrefab;        // 방금 만든 DirtBlock 프리팹 연결용
+    public Transform shovelFirePoint;    // Weapon_Builder 하위의 FirePoint 연결용
+    public float throwForce = 5f;        // 흙이 튀어나가는 힘
+
     private void Start()
     {
-        // 1. 게임 시작 시 하이얼라키에서 현재 켜져 있는(activeSelf) 모델을 감지해서 currentJob에 반영합니다.
+        // 1. 하이얼라키에서 현재 켜져 있는 모델 감지
         DetectActiveJobFromHierarchy();
 
-        // 2. 해당 직업의 모델과 무기를 완벽하게 세팅합니다.
+        // 2. 해당 직업의 모델과 무기 세팅 적용
         ApplyJobSettings(currentJob);
     }
 
     private void Update()
     {
-        // 공격 키 입력 (마우스 좌클릭)
+        // 마우스 좌클릭 시 공격
         if (Input.GetButtonDown("Fire1"))
         {
             Attack();
         }
     }
 
-    // 하이얼라키에 켜져 있는 모델링을 자동으로 찾아내는 함수
     private void DetectActiveJobFromHierarchy()
     {
         if (modelPolice != null && modelPolice.activeSelf) currentJob = PlayerJob.Police;
@@ -59,19 +63,43 @@ public class PlayerJobController : MonoBehaviour
             case PlayerJob.Police:
                 Debug.Log("경찰: Sci-Fi Pistol 발사!");
                 break;
+
             case PlayerJob.Firefighter:
                 Debug.Log("소방관: LaserBeam 발사!");
                 break;
+
             case PlayerJob.Chef:
                 Debug.Log("요리사: 뒤집기 공격!");
                 break;
+
             case PlayerJob.Builder:
                 Debug.Log("건설자: 삽질/흙 퍼기 공격!");
+                SpawnDirt(); // 흙 덩어리 생성 함수 호출
                 break;
         }
     }
 
-    // 외부(UI/로비)나 시작 시 직업을 적용해주는 함수
+    // 흙 덩어리를 생성하고 앞으로 튕겨내는 함수
+    private void SpawnDirt()
+    {
+        if (dirtPrefab != null && shovelFirePoint != null)
+        {
+            // FirePoint 위치에 흙 프리팹 복사 생성
+            GameObject dirt = Instantiate(dirtPrefab, shovelFirePoint.position, shovelFirePoint.rotation);
+
+            // 생성된 흙에 물리적 힘을 가해 전방+위쪽으로 살짝 날려줌
+            Rigidbody dirtRb = dirt.GetComponent<Rigidbody>();
+            if (dirtRb != null)
+            {
+                dirtRb.AddForce(shovelFirePoint.forward * throwForce + Vector3.up * 2f, ForceMode.Impulse);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("Builder 흙 생성 실패: Dirt Prefab 또는 Shovel FirePoint가 인스펙터에 연결되지 않았습니다!");
+        }
+    }
+
     public void ApplyJobSettings(PlayerJob job)
     {
         currentJob = job;
