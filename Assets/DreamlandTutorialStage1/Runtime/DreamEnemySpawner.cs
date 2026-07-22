@@ -213,6 +213,7 @@ namespace DreamGuardians
             outwardDirection = Quaternion.Euler(0f, spread, 0f) * outwardDirection;
 
             Vector3 destination = corePosition + outwardDirection * attackRingRadius;
+            destination.y = spawnPosition.y;
             return destination;
         }
 
@@ -231,7 +232,15 @@ namespace DreamGuardians
 
             FloorRiftMarker rift = GetOrAdd<FloorRiftMarker>(spawnPoint.gameObject);
             EnemySpawnRise rise = GetOrAdd<EnemySpawnRise>(enemyObject);
-            rise.Begin(finalPosition, riseDepth, riseDuration, mover, rift, false);
+            rise.Begin(
+                finalPosition,
+                riseDepth,
+                riseDuration,
+                mover,
+                rift,
+                enableMoverAfterRise: false,
+                usePortalDirection: false
+            );
         }
 
         private void StartRiftSpawn(
@@ -248,7 +257,18 @@ namespace DreamGuardians
 
             FloorRiftMarker rift = GetOrAdd<FloorRiftMarker>(spawnPoint.gameObject);
             EnemySpawnRise rise = GetOrAdd<EnemySpawnRise>(enemyObject);
-            rise.Begin(finalPosition, riseDepth, riseDuration, mover, rift);
+            Vector3 portalForward = spawnPoint.forward;
+
+            rise.Begin(
+                finalPosition,
+                riseDepth,
+                riseDuration,
+                mover,
+                rift,
+                enableMoverAfterRise: true,
+                usePortalDirection: true,
+                portalForward: portalForward
+            );
         }
 
         private static void MakeTutorialEnemyHighlyVisible(GameObject enemyObject)
@@ -317,38 +337,38 @@ namespace DreamGuardians
             }
         }
 
-        private Transform GetNextSpawnPoint()
+      private Transform GetNextSpawnPoint()
+{
+    // 삭제된 스폰 포인트를 목록에서 제거한다.
+    spawnPoints.RemoveAll(point => point == null);
+
+    if (spawnPoints.Count == 0)
+    {
+        return null;
+    }
+
+    // 등록된 스폰 포인트 수만큼 확인한다.
+    // 현재 활성화된 포탈 아래의 스폰 포인트만 사용한다.
+    for (int i = 0; i < spawnPoints.Count; i++)
+    {
+        int index = nextSpawnPointIndex % spawnPoints.Count;
+        Transform candidate = spawnPoints[index];
+
+        nextSpawnPointIndex =
+            (nextSpawnPointIndex + 1) % spawnPoints.Count;
+
+        if (candidate != null &&
+            candidate.gameObject.activeInHierarchy)
         {
-            // 삭제된 스폰 포인트를 목록에서 제거한다.
-            spawnPoints.RemoveAll(point => point == null);
-
-            if (spawnPoints.Count == 0)
-            {
-                return null;
-            }
-
-            // 등록된 스폰 포인트 수만큼 확인한다.
-            // 현재 활성화된 포탈 아래의 스폰 포인트만 사용한다.
-            for (int i = 0; i < spawnPoints.Count; i++)
-            {
-                int index = nextSpawnPointIndex % spawnPoints.Count;
-                Transform candidate = spawnPoints[index];
-
-                nextSpawnPointIndex =
-                    (nextSpawnPointIndex + 1) % spawnPoints.Count;
-
-                if (candidate != null &&
-                    candidate.gameObject.activeInHierarchy)
-                {
-                    return candidate;
-                }
-            }
-
-            Debug.LogWarning(
-                "[DreamEnemySpawner] 현재 활성화된 스폰 포인트가 없습니다.");
-
-            return null;
+            return candidate;
         }
+    }
+
+    Debug.LogWarning(
+        "[DreamEnemySpawner] 현재 활성화된 스폰 포인트가 없습니다.");
+
+    return null;
+}
 
         private static T GetOrAdd<T>(GameObject target) where T : Component
         {
