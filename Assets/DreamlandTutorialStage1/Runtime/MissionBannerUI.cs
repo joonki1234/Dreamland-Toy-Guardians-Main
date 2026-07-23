@@ -1,4 +1,5 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -7,13 +8,29 @@ namespace DreamGuardians
     [DisallowMultipleComponent]
     public sealed class MissionBannerUI : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] private Camera uiCamera;
+
+        [Header("Custom Banner (Optional)")]
+        [Tooltip("씬에 배치한 미션 배너의 루트 오브젝트")]
+        [SerializeField] private GameObject customBannerRoot;
+
+        [Tooltip("커스텀 배너의 제목 TMP 텍스트")]
+        [SerializeField] private TMP_Text customBannerTitle;
+
+        [Tooltip("커스텀 배너의 설명 TMP 텍스트")]
+        [SerializeField] private TMP_Text customBannerSubtitle;
+
+        [Header("Timing")]
         [SerializeField, Min(0.2f)] private float defaultBannerDuration = 2f;
 
         private Canvas canvas;
-        private GameObject bannerPanel;
-        private Text bannerTitle;
-        private Text bannerSubtitle;
+
+        // 커스텀 배너가 연결되지 않았을 때만 사용하는 기존 임시 배너
+        private GameObject fallbackBannerPanel;
+        private Text fallbackBannerTitle;
+        private Text fallbackBannerSubtitle;
+
         private Text dialogueText;
         private Text objectiveText;
         private Text progressText;
@@ -23,9 +40,19 @@ namespace DreamGuardians
         private Coroutine synergyRoutine;
         private static Font runtimeFont;
 
+        private bool HasCustomBanner =>
+            customBannerRoot != null &&
+            customBannerTitle != null &&
+            customBannerSubtitle != null;
+
         private void Awake()
         {
             EnsureUI();
+
+            if (customBannerRoot != null)
+            {
+                customBannerRoot.SetActive(false);
+            }
         }
 
         private void OnEnable()
@@ -105,11 +132,27 @@ namespace DreamGuardians
 
         private IEnumerator BannerRoutine(string title, string subtitle, float duration)
         {
-            bannerTitle.text = title ?? string.Empty;
-            bannerSubtitle.text = subtitle ?? string.Empty;
-            bannerPanel.SetActive(true);
-            yield return new WaitForSeconds(Mathf.Max(0.1f, duration));
-            bannerPanel.SetActive(false);
+            if (HasCustomBanner)
+            {
+                customBannerTitle.text = title ?? string.Empty;
+                customBannerSubtitle.text = subtitle ?? string.Empty;
+                customBannerRoot.SetActive(true);
+
+                yield return new WaitForSeconds(Mathf.Max(0.1f, duration));
+
+                customBannerRoot.SetActive(false);
+            }
+            else
+            {
+                fallbackBannerTitle.text = title ?? string.Empty;
+                fallbackBannerSubtitle.text = subtitle ?? string.Empty;
+                fallbackBannerPanel.SetActive(true);
+
+                yield return new WaitForSeconds(Mathf.Max(0.1f, duration));
+
+                fallbackBannerPanel.SetActive(false);
+            }
+
             bannerRoutine = null;
         }
 
@@ -170,33 +213,37 @@ namespace DreamGuardians
 
             RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
 
-            bannerPanel = CreatePanel(
-                "BannerPanel",
-                canvasRect,
-                new Vector2(0.5f, 0.58f),
-                new Vector2(720f, 190f),
-                new Color(0.02f, 0.04f, 0.10f, 0.84f));
+            // 커스텀 배너가 없을 때만 기존 임시 배너 생성
+            if (!HasCustomBanner)
+            {
+                fallbackBannerPanel = CreatePanel(
+                    "BannerPanel",
+                    canvasRect,
+                    new Vector2(0.5f, 0.58f),
+                    new Vector2(720f, 190f),
+                    new Color(0.02f, 0.04f, 0.10f, 0.84f));
 
-            RectTransform bannerRect = bannerPanel.GetComponent<RectTransform>();
-            bannerTitle = CreateText(
-                "BannerTitle",
-                bannerRect,
-                new Vector2(0.5f, 0.64f),
-                new Vector2(680f, 82f),
-                52,
-                TextAnchor.MiddleCenter,
-                FontStyle.Bold);
+                RectTransform bannerRect = fallbackBannerPanel.GetComponent<RectTransform>();
+                fallbackBannerTitle = CreateText(
+                    "BannerTitle",
+                    bannerRect,
+                    new Vector2(0.5f, 0.64f),
+                    new Vector2(680f, 82f),
+                    52,
+                    TextAnchor.MiddleCenter,
+                    FontStyle.Bold);
 
-            bannerSubtitle = CreateText(
-                "BannerSubtitle",
-                bannerRect,
-                new Vector2(0.5f, 0.25f),
-                new Vector2(680f, 52f),
-                26,
-                TextAnchor.MiddleCenter,
-                FontStyle.Normal);
+                fallbackBannerSubtitle = CreateText(
+                    "BannerSubtitle",
+                    bannerRect,
+                    new Vector2(0.5f, 0.25f),
+                    new Vector2(680f, 52f),
+                    26,
+                    TextAnchor.MiddleCenter,
+                    FontStyle.Normal);
 
-            bannerPanel.SetActive(false);
+                fallbackBannerPanel.SetActive(false);
+            }
 
             dialogueText = CreateText(
                 "DialogueText",
@@ -323,7 +370,6 @@ namespace DreamGuardians
             text.raycastTarget = false;
             return text;
         }
-
 
         private static Font GetRuntimeFont()
         {
