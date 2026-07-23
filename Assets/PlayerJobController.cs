@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public enum PlayerJob
 {
@@ -25,25 +26,31 @@ public class PlayerJobController : MonoBehaviour
     public GameObject weaponChef;
     public GameObject weaponBuilder;
 
+    [Header("건설자(Builder) 흙 발사 세팅")]
+    public GameObject dirtPrefab;             // 흙 클러스터 메인 프리팹
+    public Transform shovelFirePoint;         // FirePoint 위치
+    public ParticleSystem dirtParticleSystem; // 흙 먼지/빛 파티클
+    public Light dirtFlashLight;              // 흙 빛(섬광) 조명
+    public float throwForce = 32f;            // 먼 거리로 발사하는 강한 힘
+    public float builderCooldown = 0.5f;      // 쿨타임 (0.5초)
+
+    private float lastAttackTime = -999f;
+    private bool isSwinging = false;
+
     private void Start()
     {
-        // 1. 게임 시작 시 하이얼라키에서 현재 켜져 있는(activeSelf) 모델을 감지해서 currentJob에 반영합니다.
         DetectActiveJobFromHierarchy();
-
-        // 2. 해당 직업의 모델과 무기를 완벽하게 세팅합니다.
         ApplyJobSettings(currentJob);
     }
 
     private void Update()
     {
-        // 공격 키 입력 (마우스 좌클릭)
         if (Input.GetButtonDown("Fire1"))
         {
             Attack();
         }
     }
 
-    // 하이얼라키에 켜져 있는 모델링을 자동으로 찾아내는 함수
     private void DetectActiveJobFromHierarchy()
     {
         if (modelPolice != null && modelPolice.activeSelf) currentJob = PlayerJob.Police;
@@ -54,24 +61,127 @@ public class PlayerJobController : MonoBehaviour
 
     public void Attack()
     {
+        if (Time.time < lastAttackTime + builderCooldown) return;
+
         switch (currentJob)
         {
             case PlayerJob.Police:
-                Debug.Log("경찰: Sci-Fi Pistol 발사!");
+                lastAttackTime = Time.time;
                 break;
+
             case PlayerJob.Firefighter:
-                Debug.Log("소방관: LaserBeam 발사!");
+                lastAttackTime = Time.time;
                 break;
+
             case PlayerJob.Chef:
-                Debug.Log("요리사: 뒤집기 공격!");
+                lastAttackTime = Time.time;
                 break;
+
             case PlayerJob.Builder:
-                Debug.Log("건설자: 삽질/흙 퍼기 공격!");
+                lastAttackTime = Time.time;
+                if (weaponBuilder != null && !isSwinging)
+                {
+                    StartCoroutine(ShovelScoopRoutine());
+                }
                 break;
         }
     }
 
-    // 외부(UI/로비)나 시작 시 직업을 적용해주는 함수
+    private IEnumerator ShovelScoopRoutine()
+    {
+        isSwinging = true;
+
+        Transform targetTransform = weaponBuilder.transform;
+        Transform shovelChild = weaponBuilder.transform.Find("Shovel_001");
+        if (shovelChild != null) targetTransform = shovelChild;
+
+        Vector3 origPos = targetTransform.localPosition;
+        Vector3 origEuler = targetTransform.localEulerAngles;
+
+        Vector3 downPos = origPos + new Vector3(0f, -0.2f, -0.1f);
+        Vector3 downEuler = origEuler + new Vector3(35f, 0f, 0f);
+
+        Vector3 upPos = origPos + new Vector3(0f, 0.2f, 0.15f);
+        Vector3 upEuler = origEuler + new Vector3(-25f, 0f, 0f);
+
+        float elapsed = 0f;
+        float durationDownToUp = 0.14f;
+        bool hasFired = false;
+
+        while (elapsed < durationDownToUp)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / durationDownToUp;
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            targetTransform.localPosition = Vector3.Lerp(downPos, upPos, smoothT);
+            targetTransform.localEulerAngles = new Vector3(
+                Mathf.LerpAngle(downEuler.x, upEuler.x, smoothT),
+                origEuler.y,
+                origEuler.z
+            );
+
+            if (!hasFired && t >= 0.65f)
+            {
+                SpawnDirtCluster();
+                hasFired = true;
+            }
+
+            yield return null;
+        }
+
+        if (!hasFired) SpawnDirtCluster();
+
+        elapsed = 0f;
+        float durationReturn = 0.16f;
+
+        while (elapsed < durationReturn)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / durationReturn;
+
+            targetTransform.localPosition = Vector3.Lerp(upPos, origPos, t);
+            targetTransform.localEulerAngles = new Vector3(
+                Mathf.LerpAngle(upEuler.x, origEuler.x, t),
+                origEuler.y,
+                origEuler.z
+            );
+
+            yield return null;
+        }
+
+        targetTransform.localPosition = origPos;
+        targetTransform.localEulerAngles = origEuler;
+
+        isSwinging = false;
+    }
+
+    // 메인 탄환 1개를 쏘아 보내는 함수 (공중에서 폭죽처럼 분열하는 탄환)
+    private void SpawnDirtCluster()
+    {
+        if (dirtParticleSystem != null) dirtParticleSystem.Play();
+        if (dirtFlashLight != null) StartCoroutine(FlashDirtLight());
+
+        if (dirtPrefab != null && shovelFirePoint != null)
+        {
+            GameObject mainDirt = Instantiate(dirtPrefab, shovelFirePoint.position, shovelFirePoint.rotation);
+
+            Rigidbody dirtRb = mainDirt.GetComponent<Rigidbody>();
+            if (dirtRb != null)
+            {
+                Vector3 throwDirection = shovelFirePoint.forward * throwForce + Vector3.up * 4f;
+                dirtRb.AddForce(throwDirection, ForceMode.Impulse);
+            }
+        }
+    }
+
+    private IEnumerator FlashDirtLight()
+    {
+        dirtFlashLight.enabled = true;
+        yield return new WaitForSeconds(0.1f);
+        dirtFlashLight.enabled = false;
+    }
+
     public void ApplyJobSettings(PlayerJob job)
     {
         currentJob = job;
@@ -83,17 +193,14 @@ public class PlayerJobController : MonoBehaviour
                 if (modelPolice) modelPolice.SetActive(true);
                 if (weaponPolice) weaponPolice.SetActive(true);
                 break;
-
             case PlayerJob.Firefighter:
                 if (modelFirefighter) modelFirefighter.SetActive(true);
                 if (weaponFirefighter) weaponFirefighter.SetActive(true);
                 break;
-
             case PlayerJob.Chef:
                 if (modelChef) modelChef.SetActive(true);
                 if (weaponChef) weaponChef.SetActive(true);
                 break;
-
             case PlayerJob.Builder:
                 if (modelBuilder) modelBuilder.SetActive(true);
                 if (weaponBuilder) weaponBuilder.SetActive(true);

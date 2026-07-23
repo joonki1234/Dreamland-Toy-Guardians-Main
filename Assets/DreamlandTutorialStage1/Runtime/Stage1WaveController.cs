@@ -67,6 +67,9 @@ namespace DreamGuardians
         /// </summary>
         public event Action Completed;
 
+        // Stage 1이 실제로 시작되는 순간 발생
+        public event Action Started;
+
         public event Action Failed;
 
         private void Awake()
@@ -186,6 +189,9 @@ namespace DreamGuardians
             }
 
             EnsureDefaultGroups();
+
+            // Stage 1 시작을 다른 연출 시스템에 알린다.
+            Started?.Invoke();
 
             failed = false;
             combatCompleted = false;

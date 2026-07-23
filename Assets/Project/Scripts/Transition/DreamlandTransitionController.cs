@@ -20,6 +20,9 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     [SerializeField]
     private MissionBannerUI missionUI;
 
+    [SerializeField]
+    private DreamSkyTransitionController skyTransitionController;
+
     [Header("World Groups")]
     [SerializeField]
     private GameObject realityWorld;
@@ -133,6 +136,12 @@ public sealed class DreamlandTransitionController : MonoBehaviour
                 UnityEngine.Object.FindAnyObjectByType<MissionBannerUI>();
         }
 
+        if (skyTransitionController == null)
+        {
+            skyTransitionController =
+                UnityEngine.Object.FindAnyObjectByType<DreamSkyTransitionController>();
+        }
+
         realityWorld ??= FindSceneObject("03_REALITY_WORLD");
         interiorDream ??= FindSceneObject("04_INTERIOR_DREAM");
         finalDreamland ??= FindSceneObject("05_FINAL_DREAMLAND");
@@ -206,13 +215,15 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
+
             float normalized = duration <= 0f
                 ? 1f
                 : Mathf.Clamp01(elapsed / duration);
 
             if (portalEffects != null)
             {
-                float pulse = 1f +
+                float pulse =
+                    1f +
                     Mathf.Sin(normalized * Mathf.PI * 6f) *
                     Mathf.Max(0f, portalPulseAmount);
 
@@ -251,10 +262,19 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     private IEnumerator FullVRTransitionRoutine()
     {
         missionUI?.ClearPersistentText();
+
         missionUI?.ShowBanner(
             transitionTitle,
             transitionSubtitle,
-            Mathf.Max(0.1f, fullVRTransitionDelay + postTransitionHold));
+            Mathf.Max(
+                0.1f,
+                fullVRTransitionDelay + postTransitionHold));
+
+        /*
+         * 파란 가상 하늘에서 분홍빛 꿈나라 하늘로
+         * 천천히 전환을 시작합니다.
+         */
+        skyTransitionController?.TransitionToPinkSky();
 
         if (fullVRTransitionDelay > 0f)
         {
@@ -293,7 +313,9 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         SetActiveSafe(finalDreamland, false);
         SetActiveSafe(portalEffects, false);
 
-        Debug.Log("[DreamTransition] 현실 시작 상태를 적용했습니다.", this);
+        Debug.Log(
+            "[DreamTransition] 현실 시작 상태를 적용했습니다.",
+            this);
     }
 
     [ContextMenu("테스트 - Stage 2 포탈 상태 적용")]
@@ -304,7 +326,15 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         SetActiveSafe(finalDreamland, false);
         SetActiveSafe(portalEffects, true);
 
-        Debug.Log("[DreamTransition] Stage 2 포탈 확장 상태를 적용했습니다.", this);
+        /*
+         * 가상 세계의 경계가 열리면서
+         * 기본 파란 하늘을 적용합니다.
+         */
+        skyTransitionController?.ApplyBlueSkyImmediately();
+
+        Debug.Log(
+            "[DreamTransition] Stage 2 포탈 확장 상태를 적용했습니다.",
+            this);
     }
 
     [ContextMenu("테스트 - 완전 꿈나라 상태 적용")]
@@ -315,7 +345,12 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         SetActiveSafe(finalDreamland, true);
         SetActiveSafe(portalEffects, false);
 
-        Debug.Log("[DreamTransition] 완전한 꿈나라 상태를 적용했습니다.", this);
+        // 테스트 메뉴로 실행해도 분홍 하늘 전환이 보이게 한다.
+        skyTransitionController?.TransitionToPinkSky();
+
+        Debug.Log(
+            "[DreamTransition] 완전한 꿈나라 상태를 적용했습니다.",
+            this);
     }
 
     private void StopTransitionRoutine()
@@ -333,7 +368,8 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     {
         if (portalEffects != null)
         {
-            portalBaseScale = portalEffects.transform.localScale;
+            portalBaseScale =
+                portalEffects.transform.localScale;
         }
     }
 
@@ -341,19 +377,24 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     {
         if (portalEffects != null)
         {
-            portalEffects.transform.localScale = portalBaseScale;
+            portalEffects.transform.localScale =
+                portalBaseScale;
         }
     }
 
-    private static void SetActiveSafe(GameObject target, bool active)
+    private static void SetActiveSafe(
+        GameObject target,
+        bool active)
     {
-        if (target != null && target.activeSelf != active)
+        if (target != null &&
+            target.activeSelf != active)
         {
             target.SetActive(active);
         }
     }
 
-    private static GameObject FindSceneObject(string objectName)
+    private static GameObject FindSceneObject(
+        string objectName)
     {
         Transform[] transforms =
             UnityEngine.Object.FindObjectsByType<Transform>(
@@ -362,7 +403,8 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
         foreach (Transform candidate in transforms)
         {
-            if (candidate != null && candidate.name == objectName)
+            if (candidate != null &&
+                candidate.name == objectName)
             {
                 return candidate.gameObject;
             }
@@ -373,9 +415,16 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
     private void OnValidate()
     {
-        enemyAbsorptionDuration = Mathf.Max(0f, enemyAbsorptionDuration);
-        portalPulseAmount = Mathf.Max(0f, portalPulseAmount);
-        fullVRTransitionDelay = Mathf.Max(0f, fullVRTransitionDelay);
-        postTransitionHold = Mathf.Max(0f, postTransitionHold);
+        enemyAbsorptionDuration =
+            Mathf.Max(0f, enemyAbsorptionDuration);
+
+        portalPulseAmount =
+            Mathf.Max(0f, portalPulseAmount);
+
+        fullVRTransitionDelay =
+            Mathf.Max(0f, fullVRTransitionDelay);
+
+        postTransitionHold =
+            Mathf.Max(0f, postTransitionHold);
     }
 }
