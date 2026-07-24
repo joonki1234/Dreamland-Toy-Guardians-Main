@@ -70,7 +70,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: d426ce6fb4f4e43b8b04981d9dbe437c, type: 2}
+  - {fileID: 2100000, guid: cceb840ebeffc4340a35fcae3806430b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -169,5 +169,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DirtMainCluster
   subDirtPrefab: {fileID: 6378157156313051141}
   subShardCount: 8
-  explosionForce: 12
-  fuseTime: 0.35
+  splitTime: 0.22
+  spreadAmount: 2.2
