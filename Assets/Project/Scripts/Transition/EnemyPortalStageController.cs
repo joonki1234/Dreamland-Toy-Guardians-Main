@@ -3,9 +3,13 @@ using DreamGuardians;
 
 /// <summary>
 /// Stage 1과 Stage 2의 공격 진행에 따라
-/// 적 포탈의 개수와 크기를 관리한다.
+/// 적 포탈 A~D의 개수와 크기를 관리한다.
 ///
-/// 기존 이벤트를 받아 포탈 연출만 변경한다.
+/// Stage 1에서는 포탈 A와 B를 순차적으로 사용하고,
+/// Stage 2에서는 포탈 C와 D를 추가한다.
+///
+/// 포탈 E~H는 보스전 등 이후 콘텐츠를 위해 참조를 유지하지만,
+/// 현재 Stage 1과 Stage 2에서는 활성화하지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class EnemyPortalStageController : MonoBehaviour
@@ -21,7 +25,7 @@ public sealed class EnemyPortalStageController : MonoBehaviour
     private Stage2WaveController stage2WaveController;
 
 
-    [Header("적 포탈 A~H")]
+    [Header("Stage 1~2 사용 포탈 A~D")]
 
     [Tooltip("첫 번째 적 포탈")]
     [SerializeField]
@@ -39,45 +43,46 @@ public sealed class EnemyPortalStageController : MonoBehaviour
     [SerializeField]
     private EnemyPortalGrowthController portalD;
 
-    [Tooltip("다섯 번째 적 포탈")]
+
+    [Header("보류 포탈 E~H")]
+
+    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalE;
 
-    [Tooltip("여섯 번째 적 포탈")]
+    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalF;
 
-    [Tooltip("일곱 번째 적 포탈")]
+    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalG;
 
-    [Tooltip("여덟 번째 적 포탈")]
+    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalH;
 
 
     [Header("시작 설정")]
 
-    [Tooltip("Play 시작 시 Stage 1 첫 공격 상태인 포탈 1개를 적용한다.")]
+    [Tooltip("Play 시작 시 Stage 1 첫 공격 상태를 바로 적용한다.")]
     [SerializeField]
     private bool applyStage1StartOnPlay = true;
 
 
     private void OnEnable()
     {
-
-
-        // Stage 1에서 사용 중인 기존 환경 변화 이벤트를 받는다.
+        // Stage 1 공격 종료 후 전달되는 환경 변화 신호를 받는다.
         DreamGameEvents.EnvironmentPhaseRequested +=
             HandleStage1EnvironmentPhase;
 
-        // Stage 1이 실제로 시작될 때 첫 포탈을 켠다.
+        // Stage 1이 실제로 시작될 때 첫 포탈 상태를 적용한다.
         if (stage1WaveController != null)
         {
             stage1WaveController.Started += ApplyStage1FirstAttack;
         }
 
-        // Stage 2 내부 웨이브 시작 이벤트를 받는다.
+        // Stage 2의 각 웨이브 시작 신호를 받는다.
         if (stage2WaveController != null)
         {
             stage2WaveController.WaveStarted += HandleStage2WaveStarted;
@@ -108,11 +113,12 @@ public sealed class EnemyPortalStageController : MonoBehaviour
         }
     }
 
+
     /// <summary>
     /// Stage 1의 공격 종료 후 전달되는 환경 단계 신호를 받는다.
     ///
-    /// 1단계: 첫 번째 공격 종료 후 포탈 2개
-    /// 2단계: 두 번째 공격 종료 후 포탈 4개
+    /// 1단계: 포탈 B 추가
+    /// 2단계: 포탈 A와 B의 크기만 증가
     /// </summary>
     private void HandleStage1EnvironmentPhase(int phaseIndex)
     {
@@ -127,6 +133,7 @@ public sealed class EnemyPortalStageController : MonoBehaviour
                 break;
         }
     }
+
 
     /// <summary>
     /// Stage 2의 각 공격이 시작될 때 호출된다.
@@ -151,6 +158,7 @@ public sealed class EnemyPortalStageController : MonoBehaviour
         }
     }
 
+
     /// <summary>
     /// Stage 1 첫 번째 공격:
     /// 포탈 A 하나만 작은 크기로 표시한다.
@@ -158,142 +166,142 @@ public sealed class EnemyPortalStageController : MonoBehaviour
     [ContextMenu("테스트 - Stage 1 첫 공격")]
     public void ApplyStage1FirstAttack()
     {
-        SetPortalActive(portalA, true);
-        SetPortalActive(portalB, false);
-        SetPortalActive(portalC, false);
-        SetPortalActive(portalD, false);
-        SetPortalActive(portalE, false);
-        SetPortalActive(portalF, false);
-        SetPortalActive(portalG, false);
-        SetPortalActive(portalH, false);
+        SetActivePortalCount(1);
 
         portalA?.ApplySmallPortal();
 
-        Debug.Log("[PortalStage] Stage 1 첫 공격: 포탈 1개");
+        Debug.Log(
+            "[PortalStage] Stage 1 첫 공격: 포탈 A 활성화");
     }
+
 
     /// <summary>
     /// Stage 1 두 번째 공격:
-    /// 포탈 A와 B를 표시한다.
+    /// 포탈 B를 추가하여 A와 B를 표시한다.
     /// </summary>
     [ContextMenu("테스트 - Stage 1 두 번째 공격")]
     public void ApplyStage1SecondAttack()
     {
-        SetPortalActive(portalA, true);
-        SetPortalActive(portalB, true);
-        SetPortalActive(portalC, false);
-        SetPortalActive(portalD, false);
-        SetPortalActive(portalE, false);
-        SetPortalActive(portalF, false);
-        SetPortalActive(portalG, false);
-        SetPortalActive(portalH, false);
+        SetActivePortalCount(2);
 
         portalA?.ApplyMediumPortal();
         portalB?.ApplySmallPortal();
 
-        Debug.Log("[PortalStage] Stage 1 두 번째 공격: 포탈 2개");
+        Debug.Log(
+            "[PortalStage] Stage 1 두 번째 공격: 포탈 A, B 활성화");
     }
+
 
     /// <summary>
     /// Stage 1 최종 공격:
-    /// 포탈 A~D 총 4개를 표시한다.
+    /// 새로운 포탈은 추가하지 않고
+    /// 포탈 A와 B의 크기만 증가시킨다.
     /// </summary>
     [ContextMenu("테스트 - Stage 1 최종 공격")]
     public void ApplyStage1FinalAttack()
     {
-        SetPortalActive(portalA, true);
-        SetPortalActive(portalB, true);
-        SetPortalActive(portalC, true);
-        SetPortalActive(portalD, true);
-        SetPortalActive(portalE, false);
-        SetPortalActive(portalF, false);
-        SetPortalActive(portalG, false);
-        SetPortalActive(portalH, false);
+        SetActivePortalCount(2);
 
-        portalA?.ApplyMediumPortal();
+        portalA?.ApplyLargePortal();
         portalB?.ApplyMediumPortal();
-        portalC?.ApplySmallPortal();
-        portalD?.ApplySmallPortal();
 
-        Debug.Log("[PortalStage] Stage 1 최종 공격: 포탈 4개");
+        Debug.Log(
+            "[PortalStage] Stage 1 최종 공격: 포탈 A, B 유지 및 성장");
     }
+
 
     /// <summary>
     /// Stage 2 첫 번째 공격:
-    /// 포탈 A~E 총 5개를 표시한다.
+    /// 포탈 C를 추가하여 A~C 총 3개를 표시한다.
     /// </summary>
     [ContextMenu("테스트 - Stage 2 첫 공격")]
     public void ApplyStage2FirstAttack()
     {
-        SetFirstPortalCount(5);
+        SetActivePortalCount(3);
 
         portalA?.ApplyLargePortal();
         portalB?.ApplyLargePortal();
-        portalC?.ApplyMediumPortal();
-        portalD?.ApplyMediumPortal();
-        portalE?.ApplySmallPortal();
+        portalC?.ApplySmallPortal();
 
-        Debug.Log("[PortalStage] Stage 2 첫 공격: 포탈 5개");
+        Debug.Log(
+            "[PortalStage] Stage 2 첫 공격: 포탈 C 추가, 총 3개");
     }
+
 
     /// <summary>
     /// Stage 2 두 번째 공격:
-    /// 포탈 A~F 총 6개를 표시한다.
+    /// 포탈 D를 추가하여 A~D 총 4개를 표시한다.
     /// </summary>
     [ContextMenu("테스트 - Stage 2 두 번째 공격")]
     public void ApplyStage2SecondAttack()
     {
-        SetFirstPortalCount(6);
+        SetActivePortalCount(4);
 
         portalA?.ApplyLargePortal();
         portalB?.ApplyLargePortal();
-        portalC?.ApplyLargePortal();
-        portalD?.ApplyLargePortal();
-        portalE?.ApplyMediumPortal();
-        portalF?.ApplySmallPortal();
+        portalC?.ApplyMediumPortal();
+        portalD?.ApplySmallPortal();
 
-        Debug.Log("[PortalStage] Stage 2 두 번째 공격: 포탈 6개");
+        Debug.Log(
+            "[PortalStage] Stage 2 두 번째 공격: 포탈 D 추가, 총 4개");
     }
+
 
     /// <summary>
     /// Stage 2 최종 공격:
-    /// 포탈 A~H 총 8개를 표시하고,
-    /// 크기를 불규칙하게 섞어 종말 직전의 균열 상태를 표현한다.
+    /// 포탈 A~D를 유지하고 크기를 최종 단계로 증가시킨다.
+    ///
+    /// 포탈 E~H는 활성화하지 않는다.
     /// </summary>
     [ContextMenu("테스트 - Stage 2 최종 공격")]
     public void ApplyStage2FinalAttack()
     {
-        SetFirstPortalCount(8);
+        SetActivePortalCount(4);
 
         portalA?.ApplyFinalPortal();
         portalB?.ApplyLargePortal();
         portalC?.ApplyFinalPortal();
-        portalD?.ApplyMediumPortal();
-        portalE?.ApplyLargePortal();
-        portalF?.ApplyFinalPortal();
-        portalG?.ApplySmallPortal();
-        portalH?.ApplyLargePortal();
+        portalD?.ApplyLargePortal();
 
-        Debug.Log("[PortalStage] Stage 2 최종 공격: 포탈 8개");
+        Debug.Log(
+            "[PortalStage] Stage 2 최종 공격: 포탈 A~D 유지 및 최종 성장");
     }
 
+
     /// <summary>
-    /// A부터 지정된 개수만큼 포탈을 활성화한다.
+    /// 포탈 A부터 지정된 개수만큼 활성화한다.
+    ///
+    /// 현재 Stage 1과 Stage 2에서는 최대 4개까지만 사용한다.
+    /// 포탈 E~H는 항상 비활성화한다.
     /// </summary>
-    private void SetFirstPortalCount(int count)
+    private void SetActivePortalCount(int count)
     {
-        SetPortalActive(portalA, count >= 1);
-        SetPortalActive(portalB, count >= 2);
-        SetPortalActive(portalC, count >= 3);
-        SetPortalActive(portalD, count >= 4);
-        SetPortalActive(portalE, count >= 5);
-        SetPortalActive(portalF, count >= 6);
-        SetPortalActive(portalG, count >= 7);
-        SetPortalActive(portalH, count >= 8);
+        int clampedCount = Mathf.Clamp(count, 0, 4);
+
+        SetPortalActive(portalA, clampedCount >= 1);
+        SetPortalActive(portalB, clampedCount >= 2);
+        SetPortalActive(portalC, clampedCount >= 3);
+        SetPortalActive(portalD, clampedCount >= 4);
+
+        DisableReservedPortals();
     }
 
+
     /// <summary>
-    /// 포탈 컨트롤러가 붙은 오브젝트를 켜거나 끈다.
+    /// 현재 보류 중인 포탈 E~H를 모두 비활성화한다.
+    /// 참조와 게임 오브젝트는 삭제하지 않는다.
+    /// </summary>
+    private void DisableReservedPortals()
+    {
+        SetPortalActive(portalE, false);
+        SetPortalActive(portalF, false);
+        SetPortalActive(portalG, false);
+        SetPortalActive(portalH, false);
+    }
+
+
+    /// <summary>
+    /// 포탈 컨트롤러가 붙은 게임 오브젝트를 켜거나 끈다.
     /// </summary>
     private void SetPortalActive(
         EnemyPortalGrowthController portal,
