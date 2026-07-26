@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 88403379099774137}
   - component: {fileID: -3883145407857547968}
   - component: {fileID: -4514035505357307342}
+  - component: {fileID: -4293582479687565371}
   m_Layer: 0
   m_Name: DirtBlock
   m_TagString: Untagged
@@ -123,7 +124,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6378157156313051141}
   serializedVersion: 5
-  m_Mass: 1
+  m_Mass: 3
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
@@ -141,7 +142,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
 --- !u!114 &-3883145407857547968
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -154,7 +155,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25e5d09973c2e4cdca91e3bf83944c33, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DirtProjectile
-  damagePerShard: 8
+  mudSplatPrefab: {fileID: 6874483687604971407, guid: 3745d4488e31a470d9cf0cf5d4b0f103, type: 3}
+  destroyDelay: 10
 --- !u!114 &-4514035505357307342
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -162,7 +164,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6378157156313051141}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4f334554317234dfda34115414f1edcf, type: 3}
   m_Name: 
@@ -171,3 +173,24 @@ MonoBehaviour:
   subShardCount: 8
   splitTime: 0.22
   spreadAmount: 2.2
+--- !u!135 &-4293582479687565371
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6378157156313051141}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.5
+  m_Center: {x: 0, y: 0, z: 0}

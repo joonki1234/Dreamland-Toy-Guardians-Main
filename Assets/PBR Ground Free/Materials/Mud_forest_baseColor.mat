@@ -10,21 +10,28 @@ Material:
   m_Name: Mud_forest_baseColor
   m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
   m_Parent: {fileID: 2100000, guid: cceb840ebeffc4340a35fcae3806430b, type: 2}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ModifiedSerializedProperties: 16
+  m_ValidKeywords:
+  - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 3000
   stringTagMap:
-    RenderType: Opaque
+    RenderType: Transparent
   disabledShaderPasses:
   - MOTIONVECTORS
+  - DepthOnly
+  - SHADOWCASTER
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 6475b9c13402f4567bc997d617cc00e2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _BumpMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -38,7 +45,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 3f24b311153434aed806d09b6893d22f, type: 3}
+        m_Texture: {fileID: 2800000, guid: 6475b9c13402f4567bc997d617cc00e2, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -55,10 +62,14 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Smoothness: 0.11
+    - _DstBlend: 10
+    - _DstBlendAlpha: 10
+    - _Smoothness: 0.01
+    - _Surface: 1
+    - _ZWrite: 0
     m_Colors:
-    - _BaseColor: {r: 1, g: 0.7859636, b: 0.25943398, a: 1}
-    - _Color: {r: 1, g: 0.7859636, b: 0.25943395, a: 1}
+    - _BaseColor: {r: 0.5450981, g: 0.2705882, b: 0.07450981, a: 1}
+    - _Color: {r: 0.54509807, g: 0.27058816, b: 0.07450979, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &3813850466571383330
