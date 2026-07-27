@@ -15846,7 +15846,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &536914735
 Transform:
   m_ObjectHideFlags: 0
@@ -15856,7 +15856,7 @@ Transform:
   m_GameObject: {fileID: 536914734}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -15}
+  m_LocalPosition: {x: 0, y: 0, z: -25}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -15877,6 +15877,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 1140903254}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 1
   mediumScale: {x: 2, y: 1.3, z: 1}
@@ -16113,6 +16116,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 666368347}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 0.5
   mediumScale: {x: 2, y: 1.3, z: 1}
@@ -20111,7 +20117,7 @@ Transform:
   m_GameObject: {fileID: 841516575}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: 0, y: 0, z: 15}
+  m_LocalPosition: {x: 0, y: 0, z: 25}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -20132,6 +20138,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 937973891}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 1
   mediumScale: {x: 2, y: 1.3, z: 1}
@@ -24397,7 +24406,7 @@ Transform:
   m_GameObject: {fileID: 1151218596}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: -0, w: -0.7071068}
-  m_LocalPosition: {x: 15, y: 0, z: 0}
+  m_LocalPosition: {x: 25, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -24418,6 +24427,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 797776129}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 1
   mediumScale: {x: 2, y: 1.3, z: 1}
@@ -28206,6 +28218,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 805344585}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 0.5
   mediumScale: {x: 2, y: 1.3, z: 1}
@@ -31107,6 +31122,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 709482100}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 0.5
   mediumScale: {x: 2, y: 1.3, z: 1}
@@ -31237,6 +31255,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 1700529074}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 0.5
   mediumScale: {x: 2, y: 1.3, z: 1}
@@ -32815,6 +32836,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DreamlandGameFlowController
   stage1Director: {fileID: 2125966792}
+  stage1WaveController: {fileID: 2125966793}
   stage2Director: {fileID: 1926243289}
   transitionController: {fileID: 1015469104}
   finalBossDirector: {fileID: 1926243291}
@@ -32840,6 +32862,7 @@ MonoBehaviour:
   enemySpawner: {fileID: 2125966794}
   core: {fileID: 2019763646}
   stageStartDelay: 2
+  portalAppearanceDelay: 1.6
   wave1EnemyCount: 6
   wave1SpawnInterval: 1.5
   wave1HealthMultiplier: 1.5
@@ -43779,7 +43802,7 @@ Transform:
   m_GameObject: {fileID: 2055191277}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -15, y: 0, z: 0}
+  m_LocalPosition: {x: -25, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -43800,6 +43823,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPortalGrowthController
   portalVisualTarget: {fileID: 58077667}
+  appearOnEnable: 1
+  appearanceDuration: 1.5
+  appearanceStartScale: {x: 0.05, y: 0.05, z: 0.05}
   smallScale: {x: 0.7, y: 0.8, z: 1}
   smallLocalY: 1
   mediumScale: {x: 2, y: 1.3, z: 1}

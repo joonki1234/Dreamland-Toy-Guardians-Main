@@ -28,9 +28,13 @@ namespace DreamGuardians
 
         [Header("Scene References")]
         [SerializeField] private CoreState targetCore;
-        [SerializeField] private List<Transform> spawnPoints = new List<Transform>();
+        [SerializeField]
+        private List<Transform> spawnPoints =
+            new List<Transform>();
 
-        private readonly HashSet<EnemyPurification> activeEnemies = new HashSet<EnemyPurification>();
+        private readonly HashSet<EnemyPurification> activeEnemies =
+            new HashSet<EnemyPurification>();
+
         private int nextSpawnPointIndex;
         private int spawnedCombatEnemyCount;
 
@@ -49,16 +53,19 @@ namespace DreamGuardians
         {
             enemyPrefab = prefab;
             targetCore = core;
+
             spawnPoints.Clear();
 
-            if (points != null)
+            if (points == null)
             {
-                foreach (Transform point in points)
+                return;
+            }
+
+            foreach (Transform point in points)
+            {
+                if (point != null)
                 {
-                    if (point != null)
-                    {
-                        spawnPoints.Add(point);
-                    }
+                    spawnPoints.Add(point);
                 }
             }
         }
@@ -75,12 +82,17 @@ namespace DreamGuardians
             attackSlotSpreadAngle = 12f;
             coreDamage = 10f;
             attackInterval = 1.5f;
+
             useFloorRift = true;
             enemyGroundOffset = 0.8f;
             riseDepth = 0.9f;
             riseDuration = 1.25f;
         }
 
+        /// <summary>
+        /// 웨이브가 시작되는 순간 활성화된 스폰 포인트를 고정하고
+        /// 해당 웨이브가 끝날 때까지 그 목록만 사용합니다.
+        /// </summary>
         public IEnumerator SpawnGroup(
             int enemyCount,
             float spawnInterval,
@@ -89,13 +101,65 @@ namespace DreamGuardians
             int safeCount = Mathf.Max(0, enemyCount);
             float safeInterval = Mathf.Max(0f, spawnInterval);
 
+            List<Transform> waveSpawnPoints =
+                GetActiveSpawnPointsSnapshot();
+
+            if (waveSpawnPoints.Count == 0)
+            {
+                Debug.LogWarning(
+                    "[DreamEnemySpawner] 웨이브 시작 시 " +
+                    "활성화된 스폰 포인트가 없습니다.",
+                    this);
+            }
+            else
+            {
+                Debug.Log(
+                    "[DreamEnemySpawner] 이번 웨이브에서 사용할 " +
+                    "스폰 포인트를 고정했습니다. 개수: " +
+                    waveSpawnPoints.Count,
+                    this);
+            }
+
+            int waveSpawnIndex = 0;
+
             for (int i = 0; i < safeCount; i++)
             {
-                SpawnCombatEnemy(healthMultiplier);
+                Transform selectedSpawnPoint = null;
 
-                if (safeInterval > 0f && i < safeCount - 1)
+                if (waveSpawnPoints.Count > 0)
                 {
-                    yield return new WaitForSeconds(safeInterval);
+                    int pointIndex =
+                        waveSpawnIndex % waveSpawnPoints.Count;
+
+                    selectedSpawnPoint =
+                        waveSpawnPoints[pointIndex];
+
+                    waveSpawnIndex++;
+                }
+
+                // 웨이브 중 포탈이 강제로 꺼진 경우를 대비합니다.
+                if (selectedSpawnPoint != null &&
+                    !selectedSpawnPoint.gameObject.activeInHierarchy)
+                {
+                    Debug.LogWarning(
+                        "[DreamEnemySpawner] 웨이브에 저장된 스폰 포인트가 " +
+                        "비활성화되어 현재 활성 포인트를 다시 찾습니다: " +
+                        selectedSpawnPoint.name,
+                        selectedSpawnPoint);
+
+                    selectedSpawnPoint =
+                        GetNextSpawnPoint();
+                }
+
+                SpawnCombatEnemyAtPoint(
+                    selectedSpawnPoint,
+                    healthMultiplier);
+
+                if (safeInterval > 0f &&
+                    i < safeCount - 1)
+                {
+                    yield return new WaitForSeconds(
+                        safeInterval);
                 }
                 else
                 {
@@ -104,29 +168,146 @@ namespace DreamGuardians
             }
         }
 
-        public EnemyHealth SpawnCombatEnemy(float healthMultiplier = 1f)
+        private List<Transform> GetActiveSpawnPointsSnapshot()
         {
-            Transform spawnPoint = GetNextSpawnPoint();
-            Vector3 position = spawnPoint != null
-                ? spawnPoint.position + Vector3.up * enemyGroundOffset
-                : transform.position + transform.forward * 10f + Vector3.up * enemyGroundOffset;
-            Quaternion rotation = spawnPoint != null
-                ? spawnPoint.rotation
-                : transform.rotation;
+            spawnPoints.RemoveAll(point => point == null);
 
-            return SpawnEnemy(position, rotation, false, healthMultiplier, spawnPoint);
+            List<Transform> activePoints =
+                new List<Transform>();
+
+            foreach (Transform point in spawnPoints)
+            {
+                if (point != null &&
+                    point.gameObject.activeInHierarchy)
+                {
+                    activePoints.Add(point);
+                }
+            }
+
+            return activePoints;
         }
 
-        public EnemyHealth SpawnTutorialEnemy(Transform tutorialSpawnPoint)
+        private EnemyHealth SpawnCombatEnemyAtPoint(
+            Transform spawnPoint,
+            float healthMultiplier)
         {
-            Vector3 position = tutorialSpawnPoint != null
-                ? tutorialSpawnPoint.position + Vector3.up * enemyGroundOffset
-                : transform.position + transform.forward * 9f + Vector3.up * enemyGroundOffset;
-            Quaternion rotation = tutorialSpawnPoint != null
-                ? tutorialSpawnPoint.rotation
-                : transform.rotation;
+            Vector3 position;
+            Quaternion rotation;
 
-            return SpawnEnemy(position, rotation, true, 1f, tutorialSpawnPoint);
+            if (spawnPoint != null)
+            {
+                position =
+                    spawnPoint.position +
+                    Vector3.up * enemyGroundOffset;
+
+                rotation = spawnPoint.rotation;
+            }
+            else
+            {
+                position =
+                    transform.position +
+                    transform.forward * 10f +
+                    Vector3.up * enemyGroundOffset;
+
+                rotation = transform.rotation;
+            }
+
+            return SpawnEnemy(
+                position,
+                rotation,
+                false,
+                healthMultiplier,
+                spawnPoint);
+        }
+
+        public EnemyHealth SpawnCombatEnemy(
+            float healthMultiplier = 1f)
+        {
+            Transform spawnPoint =
+                GetNextSpawnPoint();
+
+            Vector3 position =
+                spawnPoint != null
+                    ? spawnPoint.position +
+                      Vector3.up * enemyGroundOffset
+                    : transform.position +
+                      transform.forward * 10f +
+                      Vector3.up * enemyGroundOffset;
+
+            Quaternion rotation =
+                spawnPoint != null
+                    ? spawnPoint.rotation
+                    : transform.rotation;
+
+            return SpawnEnemy(
+                position,
+                rotation,
+                false,
+                healthMultiplier,
+                spawnPoint);
+        }
+
+        public EnemyHealth SpawnTutorialEnemy(
+            Transform tutorialSpawnPoint)
+        {
+            Vector3 position =
+                tutorialSpawnPoint != null
+                    ? tutorialSpawnPoint.position +
+                      Vector3.up * enemyGroundOffset
+                    : transform.position +
+                      transform.forward * 9f +
+                      Vector3.up * enemyGroundOffset;
+
+            Quaternion rotation =
+                tutorialSpawnPoint != null
+                    ? tutorialSpawnPoint.rotation
+                    : transform.rotation;
+
+            return SpawnEnemy(
+                position,
+                rotation,
+                true,
+                1f,
+                tutorialSpawnPoint);
+        }
+
+        /// <summary>
+        /// 테스트 스킵 시 튜토리얼 몹을 즉시 제거합니다.
+        ///
+        /// 단순히 Destroy만 하면 activeEnemies에 정보가 남아
+        /// Stage 1 완료 판정이 막힐 수 있으므로 목록에서도 제거합니다.
+        /// </summary>
+        public void DespawnEnemyImmediately(
+            EnemyHealth enemy)
+        {
+            if (enemy == null)
+            {
+                return;
+            }
+
+            EnemyPurification purification =
+                enemy.GetComponent<EnemyPurification>();
+
+            if (purification != null)
+            {
+                purification.Completed -=
+                    HandlePurificationCompleted;
+
+                activeEnemies.Remove(
+                    purification);
+            }
+
+            Destroy(enemy.gameObject);
+
+            if (activeEnemies.Count == 0)
+            {
+                AllEnemiesCleared?.Invoke();
+            }
+
+            Debug.Log(
+                "[DreamEnemySpawner] 테스트 진행을 위해 " +
+                "적을 즉시 제거했습니다.",
+                this);
         }
 
         private EnemyHealth SpawnEnemy(
@@ -140,83 +321,171 @@ namespace DreamGuardians
 
             if (enemyPrefab != null)
             {
-                enemyObject = Instantiate(enemyPrefab, position, rotation);
+                enemyObject =
+                    Instantiate(
+                        enemyPrefab,
+                        position,
+                        rotation);
             }
             else
             {
-                enemyObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                enemyObject.transform.SetPositionAndRotation(position, rotation);
-                enemyObject.transform.localScale = new Vector3(0.8f, 1.6f, 0.8f);
+                enemyObject =
+                    GameObject.CreatePrimitive(
+                        PrimitiveType.Cube);
+
+                enemyObject.transform.SetPositionAndRotation(
+                    position,
+                    rotation);
+
+                enemyObject.transform.localScale =
+                    new Vector3(
+                        0.8f,
+                        1.6f,
+                        0.8f);
             }
 
-            enemyObject.name = tutorialEnemy
-                ? "TutorialEnemy"
-                : "WaveEnemy";
+            enemyObject.name =
+                tutorialEnemy
+                    ? "TutorialEnemy"
+                    : "WaveEnemy";
 
             if (tutorialEnemy)
             {
-                MakeTutorialEnemyHighlyVisible(enemyObject);
+                MakeTutorialEnemyHighlyVisible(
+                    enemyObject);
             }
 
-            EnemyHealth health = GetOrAdd<EnemyHealth>(enemyObject);
-            GetOrAdd<RoleSynergyTracker>(enemyObject);
-            GetOrAdd<EnemyWorldHealthBar>(enemyObject);
+            EnemyHealth health =
+                GetOrAdd<EnemyHealth>(
+                    enemyObject);
 
-            EnemyCoreMover mover = GetOrAdd<EnemyCoreMover>(enemyObject);
+            GetOrAdd<RoleSynergyTracker>(
+                enemyObject);
+
+            GetOrAdd<EnemyWorldHealthBar>(
+                enemyObject);
+
+            EnemyCoreMover mover =
+                GetOrAdd<EnemyCoreMover>(
+                    enemyObject);
+
             if (tutorialEnemy)
             {
-                // The first tutorial target is intentionally stationary.
-                mover.Configure(targetCore, 0f, 0f, attackInterval);
+                mover.Configure(
+                    targetCore,
+                    0f,
+                    0f,
+                    attackInterval);
+
                 mover.enabled = false;
-                StartTutorialRiftSpawn(enemyObject, mover, spawnPoint, position);
+
+                StartTutorialRiftSpawn(
+                    enemyObject,
+                    mover,
+                    spawnPoint,
+                    position);
             }
             else
             {
-                Vector3 attackDestination = CalculateAttackDestination(position);
-                mover.Configure(targetCore, attackDestination, moveSpeed, coreDamage, attackInterval);
-                StartRiftSpawn(enemyObject, mover, spawnPoint, position);
+                Vector3 attackDestination =
+                    CalculateAttackDestination(
+                        position);
+
+                mover.Configure(
+                    targetCore,
+                    attackDestination,
+                    moveSpeed,
+                    coreDamage,
+                    attackInterval);
+
+                StartRiftSpawn(
+                    enemyObject,
+                    mover,
+                    spawnPoint,
+                    position);
             }
 
-            EnemyPurification purification = GetOrAdd<EnemyPurification>(enemyObject);
-            purification.Configure(targetCore, energyRewardPerEnemy);
-            purification.Completed += HandlePurificationCompleted;
+            EnemyPurification purification =
+                GetOrAdd<EnemyPurification>(
+                    enemyObject);
 
-            float configuredHealth = baseEnemyHealth * Mathf.Max(0.1f, healthMultiplier);
-            health.Configure(configuredHealth, !tutorialEnemy);
+            purification.Configure(
+                targetCore,
+                energyRewardPerEnemy);
 
-            activeEnemies.Add(purification);
-            EnemySpawned?.Invoke(health);
+            purification.Completed +=
+                HandlePurificationCompleted;
+
+            float configuredHealth =
+                baseEnemyHealth *
+                Mathf.Max(
+                    0.1f,
+                    healthMultiplier);
+
+            health.Configure(
+                configuredHealth,
+                !tutorialEnemy);
+
+            activeEnemies.Add(
+                purification);
+
+            EnemySpawned?.Invoke(
+                health);
+
             return health;
         }
 
-        private Vector3 CalculateAttackDestination(Vector3 spawnPosition)
+        private Vector3 CalculateAttackDestination(
+            Vector3 spawnPosition)
         {
             if (targetCore == null)
             {
                 return spawnPosition;
             }
 
-            Vector3 corePosition = targetCore.transform.position;
-            Vector3 outwardDirection = spawnPosition - corePosition;
+            Vector3 corePosition =
+                targetCore.transform.position;
+
+            Vector3 outwardDirection =
+                spawnPosition - corePosition;
+
             outwardDirection.y = 0f;
 
-            if (outwardDirection.sqrMagnitude <= 0.0001f)
+            if (outwardDirection.sqrMagnitude <=
+                0.0001f)
             {
-                outwardDirection = Vector3.forward;
+                outwardDirection =
+                    Vector3.forward;
             }
 
             outwardDirection.Normalize();
 
-            int spreadIndex = spawnedCombatEnemyCount % 3 - 1;
-            spawnedCombatEnemyCount++;
-            float spread = spreadIndex * attackSlotSpreadAngle;
-            outwardDirection = Quaternion.Euler(0f, spread, 0f) * outwardDirection;
+            int spreadIndex =
+                spawnedCombatEnemyCount % 3 - 1;
 
-            Vector3 destination = corePosition + outwardDirection * attackRingRadius;
-            destination.y = spawnPosition.y;
+            spawnedCombatEnemyCount++;
+
+            float spread =
+                spreadIndex *
+                attackSlotSpreadAngle;
+
+            outwardDirection =
+                Quaternion.Euler(
+                    0f,
+                    spread,
+                    0f) *
+                outwardDirection;
+
+            Vector3 destination =
+                corePosition +
+                outwardDirection *
+                attackRingRadius;
+
+            destination.y =
+                spawnPosition.y;
+
             return destination;
         }
-
 
         private void StartTutorialRiftSpawn(
             GameObject enemyObject,
@@ -224,14 +493,22 @@ namespace DreamGuardians
             Transform spawnPoint,
             Vector3 finalPosition)
         {
-            if (!useFloorRift || spawnPoint == null)
+            if (!useFloorRift ||
+                spawnPoint == null ||
+                !spawnPoint.gameObject.activeInHierarchy)
             {
                 mover.enabled = false;
                 return;
             }
 
-            FloorRiftMarker rift = GetOrAdd<FloorRiftMarker>(spawnPoint.gameObject);
-            EnemySpawnRise rise = GetOrAdd<EnemySpawnRise>(enemyObject);
+            FloorRiftMarker rift =
+                GetOrAdd<FloorRiftMarker>(
+                    spawnPoint.gameObject);
+
+            EnemySpawnRise rise =
+                GetOrAdd<EnemySpawnRise>(
+                    enemyObject);
+
             rise.Begin(
                 finalPosition,
                 riseDepth,
@@ -239,8 +516,7 @@ namespace DreamGuardians
                 mover,
                 rift,
                 enableMoverAfterRise: false,
-                usePortalDirection: false
-            );
+                usePortalDirection: false);
         }
 
         private void StartRiftSpawn(
@@ -249,15 +525,35 @@ namespace DreamGuardians
             Transform spawnPoint,
             Vector3 finalPosition)
         {
-            if (!useFloorRift || spawnPoint == null)
+            if (!useFloorRift ||
+                spawnPoint == null ||
+                !spawnPoint.gameObject.activeInHierarchy)
             {
                 mover.enabled = true;
+
+                if (spawnPoint != null &&
+                    !spawnPoint.gameObject.activeInHierarchy)
+                {
+                    Debug.LogWarning(
+                        "[DreamEnemySpawner] 비활성 스폰 포인트에서 " +
+                        "등장 연출을 실행하지 않습니다: " +
+                        spawnPoint.name,
+                        spawnPoint);
+                }
+
                 return;
             }
 
-            FloorRiftMarker rift = GetOrAdd<FloorRiftMarker>(spawnPoint.gameObject);
-            EnemySpawnRise rise = GetOrAdd<EnemySpawnRise>(enemyObject);
-            Vector3 portalForward = spawnPoint.forward;
+            FloorRiftMarker rift =
+                GetOrAdd<FloorRiftMarker>(
+                    spawnPoint.gameObject);
+
+            EnemySpawnRise rise =
+                GetOrAdd<EnemySpawnRise>(
+                    enemyObject);
+
+            Vector3 portalForward =
+                spawnPoint.forward;
 
             rise.Begin(
                 finalPosition,
@@ -267,69 +563,103 @@ namespace DreamGuardians
                 rift,
                 enableMoverAfterRise: true,
                 usePortalDirection: true,
-                portalForward: portalForward
-            );
+                portalForward: portalForward);
         }
 
-        private static void MakeTutorialEnemyHighlyVisible(GameObject enemyObject)
+        private static void MakeTutorialEnemyHighlyVisible(
+            GameObject enemyObject)
         {
             if (enemyObject == null)
             {
                 return;
             }
 
-            enemyObject.transform.localScale = Vector3.one * 1.5f;
+            enemyObject.transform.localScale =
+                Vector3.one * 1.5f;
 
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-            shader ??= Shader.Find("Unlit/Color");
-            shader ??= Shader.Find("Standard");
+            Shader shader =
+                Shader.Find(
+                    "Universal Render Pipeline/Unlit");
+
+            shader ??=
+                Shader.Find("Unlit/Color");
+
+            shader ??=
+                Shader.Find("Standard");
 
             if (shader == null)
             {
                 return;
             }
 
-            Color visibleColor = new Color(1f, 0.08f, 0.65f, 1f);
-            Material material = new Material(shader)
-            {
-                name = "TutorialEnemy_Visible_Runtime",
-                color = visibleColor
-            };
+            Color visibleColor =
+                new Color(
+                    1f,
+                    0.08f,
+                    0.65f,
+                    1f);
+
+            Material material =
+                new Material(shader)
+                {
+                    name =
+                        "TutorialEnemy_Visible_Runtime",
+
+                    color =
+                        visibleColor
+                };
 
             if (material.HasProperty("_BaseColor"))
             {
-                material.SetColor("_BaseColor", visibleColor);
+                material.SetColor(
+                    "_BaseColor",
+                    visibleColor);
             }
 
             if (material.HasProperty("_EmissionColor"))
             {
                 material.EnableKeyword("_EMISSION");
-                material.SetColor("_EmissionColor", visibleColor * 2f);
+
+                material.SetColor(
+                    "_EmissionColor",
+                    visibleColor * 2f);
             }
 
-            foreach (Renderer targetRenderer in enemyObject.GetComponentsInChildren<Renderer>(true))
+            foreach (
+                Renderer targetRenderer
+                in enemyObject
+                    .GetComponentsInChildren<Renderer>(true))
             {
                 if (targetRenderer == null)
                 {
                     continue;
                 }
 
-                targetRenderer.sharedMaterial = material;
-                targetRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                targetRenderer.sharedMaterial =
+                    material;
+
+                targetRenderer.shadowCastingMode =
+                    UnityEngine.Rendering
+                        .ShadowCastingMode.Off;
+
                 targetRenderer.receiveShadows = false;
                 targetRenderer.enabled = true;
             }
         }
 
-        private void HandlePurificationCompleted(EnemyPurification purification)
+        private void HandlePurificationCompleted(
+            EnemyPurification purification)
         {
             if (purification == null)
             {
                 return;
             }
 
-            purification.Completed -= HandlePurificationCompleted;
-            activeEnemies.Remove(purification);
+            purification.Completed -=
+                HandlePurificationCompleted;
+
+            activeEnemies.Remove(
+                purification);
 
             if (activeEnemies.Count == 0)
             {
@@ -337,57 +667,99 @@ namespace DreamGuardians
             }
         }
 
-      private Transform GetNextSpawnPoint()
-{
-    // 삭제된 스폰 포인트를 목록에서 제거한다.
-    spawnPoints.RemoveAll(point => point == null);
-
-    if (spawnPoints.Count == 0)
-    {
-        return null;
-    }
-
-    // 등록된 스폰 포인트 수만큼 확인한다.
-    // 현재 활성화된 포탈 아래의 스폰 포인트만 사용한다.
-    for (int i = 0; i < spawnPoints.Count; i++)
-    {
-        int index = nextSpawnPointIndex % spawnPoints.Count;
-        Transform candidate = spawnPoints[index];
-
-        nextSpawnPointIndex =
-            (nextSpawnPointIndex + 1) % spawnPoints.Count;
-
-        if (candidate != null &&
-            candidate.gameObject.activeInHierarchy)
+        private Transform GetNextSpawnPoint()
         {
-            return candidate;
+            spawnPoints.RemoveAll(
+                point => point == null);
+
+            if (spawnPoints.Count == 0)
+            {
+                return null;
+            }
+
+            for (int i = 0;
+                 i < spawnPoints.Count;
+                 i++)
+            {
+                int index =
+                    nextSpawnPointIndex %
+                    spawnPoints.Count;
+
+                Transform candidate =
+                    spawnPoints[index];
+
+                nextSpawnPointIndex =
+                    (nextSpawnPointIndex + 1) %
+                    spawnPoints.Count;
+
+                if (candidate != null &&
+                    candidate.gameObject.activeInHierarchy)
+                {
+                    return candidate;
+                }
+            }
+
+            Debug.LogWarning(
+                "[DreamEnemySpawner] 현재 활성화된 " +
+                "스폰 포인트가 없습니다.",
+                this);
+
+            return null;
         }
-    }
 
-    Debug.LogWarning(
-        "[DreamEnemySpawner] 현재 활성화된 스폰 포인트가 없습니다.");
-
-    return null;
-}
-
-        private static T GetOrAdd<T>(GameObject target) where T : Component
+        private static T GetOrAdd<T>(
+            GameObject target)
+            where T : Component
         {
-            T component = target.GetComponent<T>();
-            return component != null ? component : target.AddComponent<T>();
+            T component =
+                target.GetComponent<T>();
+
+            return component != null
+                ? component
+                : target.AddComponent<T>();
         }
 
         private void OnValidate()
         {
-            baseEnemyHealth = Mathf.Max(1f, baseEnemyHealth);
-            energyRewardPerEnemy = Mathf.Max(0f, energyRewardPerEnemy);
-            moveSpeed = Mathf.Max(0f, moveSpeed);
-            attackRingRadius = Mathf.Max(0.5f, attackRingRadius);
-            attackSlotSpreadAngle = Mathf.Max(0f, attackSlotSpreadAngle);
-            coreDamage = Mathf.Max(0f, coreDamage);
-            attackInterval = Mathf.Max(0.1f, attackInterval);
-            enemyGroundOffset = Mathf.Max(0f, enemyGroundOffset);
-            riseDepth = Mathf.Max(0f, riseDepth);
-            riseDuration = Mathf.Max(0.05f, riseDuration);
+            baseEnemyHealth =
+                Mathf.Max(1f, baseEnemyHealth);
+
+            energyRewardPerEnemy =
+                Mathf.Max(0f, energyRewardPerEnemy);
+
+            moveSpeed =
+                Mathf.Max(0f, moveSpeed);
+
+            attackRingRadius =
+                Mathf.Max(0.5f, attackRingRadius);
+
+            attackSlotSpreadAngle =
+                Mathf.Max(0f, attackSlotSpreadAngle);
+
+            coreDamage =
+                Mathf.Max(0f, coreDamage);
+
+            attackInterval =
+                Mathf.Max(0.1f, attackInterval);
+
+            enemyGroundOffset =
+                Mathf.Max(0f, enemyGroundOffset);
+
+            riseDepth =
+                Mathf.Max(0f, riseDepth);
+
+            riseDuration =
+                Mathf.Max(0.05f, riseDuration);
+        }
+
+        public void SpawnOneEnemyAfterPortal()
+        {
+            SpawnCombatEnemy(1f);
+
+            Debug.Log(
+                "[DreamEnemySpawner] 포탈 등장 완료 후 " +
+                "적 1마리 생성",
+                this);
         }
     }
 }
