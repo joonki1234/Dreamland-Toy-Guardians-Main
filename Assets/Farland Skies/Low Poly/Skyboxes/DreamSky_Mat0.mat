@@ -45,7 +45,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BottomExponent: 0.01
+    - _BottomExponent: 1
     - _CloudsHeight: 0
     - _CloudsRotation: 0
     - _Exponent: 1
@@ -56,9 +56,9 @@ Material:
     - _StarsTwinklingSpeed: 10
     - _SunHalo: 1
     - _SunSize: 0.75
-    - _TopExponent: 0.01
+    - _TopExponent: 1
     m_Colors:
-    - _BottomColor: {r: 0, g: 0.57465494, b: 1, a: 1}
+    - _BottomColor: {r: 0.016868481, g: 0, b: 0.47794116, a: 1}
     - _CloudsTint: {r: 0.50799215, g: 0.48885787, b: 0.7656204, a: 1}
     - _MiddleColor: {r: 1, g: 0.61764705, b: 0.9578093, a: 1}
     - _MoonTint: {r: 0.491, g: 0.53774476, b: 1, a: 1}
