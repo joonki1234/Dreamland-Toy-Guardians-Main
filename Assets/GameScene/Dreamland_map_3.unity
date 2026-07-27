@@ -20242,7 +20242,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FPSController
   moveSpeed: 5
   mouseSensitivity: 2
-  playerBoundaryShield: {fileID: 0}
+  playerBoundaryShield: {fileID: 1591977905}
   boundaryPadding: 0.5
 --- !u!136 &853646954
 CapsuleCollider:
