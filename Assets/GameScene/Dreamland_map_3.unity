@@ -16266,6 +16266,7 @@ MonoBehaviour:
   coreRevealDuration: 1.2
   delayBeforeCore: 0.25
   delayBeforeRoad0: 0.2
+  road0CompletionHold: 0.55
   hideOnStart: 1
   playAutomaticallyOnStart: 0
 --- !u!1001 &514616448
@@ -46471,6 +46472,7 @@ MonoBehaviour:
   missionUI: {fileID: 2125966795}
   tutorialSpawnPoint: {fileID: 1215213847}
   dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
+  allyPortalCoreRevealController: {fileID: 507189367}
   requiredHitsPerPlayer: 3
   expectedPlayerCount: 1
   requireBothSynergiesBeforePurification: 0
