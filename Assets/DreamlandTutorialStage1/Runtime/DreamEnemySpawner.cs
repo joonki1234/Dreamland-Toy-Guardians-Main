@@ -404,6 +404,15 @@ namespace DreamGuardians
                     spawnPoint,
                     position);
             }
+            // 프리팹 연결 상태와 관계없이 생성된 적에
+            // 걷기 동작을 강제로 추가하고 초기화합니다.
+            ToyRobotMotion robotMotion =
+                GetOrAdd<ToyRobotMotion>(
+                    enemyObject);
+
+            robotMotion.enabled = true;
+            robotMotion.ForceInitialize();
+
 
             EnemyPurification purification =
                 GetOrAdd<EnemyPurification>(
