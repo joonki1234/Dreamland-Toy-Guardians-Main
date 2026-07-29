@@ -1,95 +1,138 @@
+using System.Collections;
 using UnityEngine;
 using DreamGuardians;
 
 /// <summary>
-/// Stage 1과 Stage 2의 공격 진행에 따라
-/// 적 포탈 A~D의 개수와 크기를 관리합니다.
+/// Stage 1:
 ///
-/// 각 포탈이 실제 공격에 처음 사용될 때
-/// 해당 방향의 꿈나라 길도 함께 등장시킵니다.
+/// 준비 단계 0
+/// → Portal A
+/// → Road_1
 ///
-/// 포탈과 길 연결:
-/// Portal A → Road_1
-/// Portal B → Road_2
-/// Portal C → Road_3
-/// Portal D → Road_4
+/// 준비 단계 1
+/// → Portal B
+/// → Road_2
+/// → 적 스폰 허용
 ///
-/// Road_0은 아군 포탈과 코어 등장 연출이 완료된 뒤
-/// AllyPortalCoreRevealController에서 처리합니다.
+/// 준비 단계 2
+/// → Portal C
+/// → Road_3
+/// → 적 스폰 허용
+///
+/// 준비 단계 3
+/// → Portal D
+/// → Road_4
+/// → 적 스폰 허용
+///
+/// Stage 2:
+///
+/// 첫 공격 시작
+/// → Part_1
+///
+/// 첫 공격 스폰 완료
+/// → Part_2
+///
+/// 두 번째 공격 시작
+/// → Part_3
+///
+/// 두 번째 공격 스폰 완료
+/// → Part_4
+///
+/// 최종 공격 시작
+/// → fence
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class EnemyPortalStageController : MonoBehaviour
 {
     [Header("진행 시스템 연결")]
 
-    [Tooltip("Stage 1 진행을 관리하는 컨트롤러")]
     [SerializeField]
     private Stage1WaveController stage1WaveController;
 
-    [Tooltip("Stage 2의 내부 공격 진행을 관리하는 컨트롤러")]
     [SerializeField]
     private Stage2WaveController stage2WaveController;
 
-    [Tooltip("꿈나라 길 등장 연출을 관리하는 컨트롤러")]
     [SerializeField]
     private DreamRoadRevealController roadRevealController;
+
+    [SerializeField]
+    private DreamWorldRevealController worldRevealController;
 
 
     [Header("Stage 1~2 사용 포탈 A~D")]
 
-    [Tooltip("첫 번째 적 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalA;
 
-    [Tooltip("두 번째 적 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalB;
 
-    [Tooltip("세 번째 적 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalC;
 
-    [Tooltip("네 번째 적 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalD;
 
 
     [Header("보류 포탈 E~H")]
 
-    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalE;
 
-    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalF;
 
-    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalG;
 
-    [Tooltip("현재는 사용하지 않으며, 이후 보스전 등에 사용할 수 있는 포탈")]
     [SerializeField]
     private EnemyPortalGrowthController portalH;
+
+
+    [Header("포탈 → 길 → 적 타이밍")]
+
+    [Tooltip(
+        "포탈을 활성화한 뒤 길이 나오기 시작할 때까지의 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float portalToRoadDelay = 0.9f;
+
+    [Tooltip(
+        "길 등장 함수를 실행한 뒤 길이 완성되기를 기다리는 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float roadRevealWaitDuration = 1.5f;
+
+    [Tooltip(
+        "길이 완성된 뒤 Stage1WaveController에 " +
+        "적 스폰 준비 완료를 보내기 전 추가 대기 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float roadToEnemyDelay = 0.5f;
 
 
     [Header("시작 설정")]
 
     [Tooltip(
-        "Play 시작 시 포탈 A의 기본 상태만 미리 적용합니다. " +
-        "Road_1은 Stage 1이 실제로 시작될 때 등장합니다.")]
+        "Play 시작 즉시 Portal A를 표시하는 개발용 옵션입니다. " +
+        "현재 정상 진행에서는 체크 해제합니다.")]
     [SerializeField]
-    private bool applyStage1StartOnPlay = true;
+    private bool applyStage1StartOnPlay = false;
 
 
-    /*
-     * 같은 진행 신호가 중복으로 들어오더라도
-     * 이미 나타난 길을 다시 연출하지 않기 위한 값입니다.
-     */
+    private Coroutine stage1PreparationRoutine;
+
     private bool road1Revealed;
     private bool road2Revealed;
     private bool road3Revealed;
     private bool road4Revealed;
+
+    private bool part1Revealed;
+    private bool part2Revealed;
+    private bool part3Revealed;
+    private bool part4Revealed;
+
+    private bool fenceRevealed;
 
 
     private void Awake()
@@ -97,329 +140,398 @@ public sealed class EnemyPortalStageController : MonoBehaviour
         ResolveReferences();
     }
 
+
     private void OnEnable()
     {
         ResolveReferences();
-
-        /*
-         * Stage 1 공격 사이에 발생하는
-         * 환경 변화 신호를 받습니다.
-         */
-        DreamGameEvents.EnvironmentPhaseRequested +=
-            HandleStage1EnvironmentPhase;
-
-        /*
-         * Stage 1이 실제로 시작됐을 때
-         * 포탈 A와 Road_1을 적용합니다.
-         */
-        if (stage1WaveController != null)
-        {
-            stage1WaveController.Started +=
-                HandleStage1Started;
-        }
-
-        /*
-         * Stage 2의 각 웨이브 시작 신호를 받습니다.
-         */
-        if (stage2WaveController != null)
-        {
-            stage2WaveController.WaveStarted +=
-                HandleStage2WaveStarted;
-        }
+        SubscribeEvents();
     }
+
 
     private void Start()
     {
         if (applyStage1StartOnPlay)
         {
-            /*
-             * 게임 시작 시에는 포탈 A의 상태만 준비합니다.
-             *
-             * 아직 Stage 1이 실제로 시작된 것은 아니므로
-             * Road_1은 여기서 등장시키지 않습니다.
-             */
-            ApplyStage1FirstAttack();
+            ApplyStage1PortalState(0);
         }
     }
+
 
     private void OnDisable()
     {
-        DreamGameEvents.EnvironmentPhaseRequested -=
-            HandleStage1EnvironmentPhase;
+        UnsubscribeEvents();
 
-        if (stage1WaveController != null)
+        if (stage1PreparationRoutine != null)
         {
-            stage1WaveController.Started -=
-                HandleStage1Started;
-        }
+            StopCoroutine(
+                stage1PreparationRoutine);
 
-        if (stage2WaveController != null)
-        {
-            stage2WaveController.WaveStarted -=
-                HandleStage2WaveStarted;
+            stage1PreparationRoutine = null;
         }
     }
 
 
-    /// <summary>
-    /// Inspector 참조가 비어 있을 경우
-    /// 씬에서 길 컨트롤러를 자동으로 찾습니다.
-    /// </summary>
     private void ResolveReferences()
     {
+        if (stage1WaveController == null)
+        {
+            stage1WaveController =
+                UnityEngine.Object.FindAnyObjectByType
+                    <Stage1WaveController>();
+        }
+
+        if (stage2WaveController == null)
+        {
+            stage2WaveController =
+                UnityEngine.Object.FindAnyObjectByType
+                    <Stage2WaveController>();
+        }
+
         if (roadRevealController == null)
         {
             roadRevealController =
                 UnityEngine.Object.FindAnyObjectByType
                     <DreamRoadRevealController>();
         }
-    }
 
-
-    /// <summary>
-    /// Stage 1이 실제로 시작될 때 호출됩니다.
-    ///
-    /// 포탈 A의 상태를 적용하고
-    /// Portal A에서 중앙으로 이어지는 Road_1을 등장시킵니다.
-    /// </summary>
-    private void HandleStage1Started()
-    {
-        ApplyStage1FirstAttack();
-        RevealRoad1Once();
-    }
-
-
-    /// <summary>
-    /// Stage 1의 공격 사이에서 전달되는
-    /// 환경 변화 신호를 받습니다.
-    ///
-    /// 1단계:
-    /// 포탈 B 추가 및 Road_2 등장
-    ///
-    /// 2단계:
-    /// 새로운 포탈 없이 A와 B 크기만 증가
-    /// </summary>
-    private void HandleStage1EnvironmentPhase(
-        int phaseIndex)
-    {
-        switch (phaseIndex)
+        if (worldRevealController == null)
         {
-            case 1:
-                ApplyStage1SecondAttack();
-                RevealRoad2Once();
+            worldRevealController =
+                UnityEngine.Object.FindAnyObjectByType
+                    <DreamWorldRevealController>();
+        }
+    }
+
+
+    private void SubscribeEvents()
+    {
+        if (stage1WaveController != null)
+        {
+            stage1WaveController.EnvironmentPreparationRequested -=
+                HandleStage1PreparationRequested;
+
+            stage1WaveController.EnvironmentPreparationRequested +=
+                HandleStage1PreparationRequested;
+        }
+
+
+        if (stage2WaveController != null)
+        {
+            stage2WaveController.WaveStarted -=
+                HandleStage2WaveStarted;
+
+            stage2WaveController.WaveStarted +=
+                HandleStage2WaveStarted;
+
+
+            stage2WaveController.WaveSpawnCompleted -=
+                HandleStage2WaveSpawnCompleted;
+
+            stage2WaveController.WaveSpawnCompleted +=
+                HandleStage2WaveSpawnCompleted;
+        }
+    }
+
+
+    private void UnsubscribeEvents()
+    {
+        if (stage1WaveController != null)
+        {
+            stage1WaveController.EnvironmentPreparationRequested -=
+                HandleStage1PreparationRequested;
+        }
+
+
+        if (stage2WaveController != null)
+        {
+            stage2WaveController.WaveStarted -=
+                HandleStage2WaveStarted;
+
+            stage2WaveController.WaveSpawnCompleted -=
+                HandleStage2WaveSpawnCompleted;
+        }
+    }
+
+
+    // =========================================================
+    // Stage 1
+    // =========================================================
+
+    private void HandleStage1PreparationRequested(
+        int preparationStep)
+    {
+        if (stage1PreparationRoutine != null)
+        {
+            StopCoroutine(
+                stage1PreparationRoutine);
+        }
+
+        stage1PreparationRoutine =
+            StartCoroutine(
+                RunStage1Preparation(
+                    preparationStep));
+    }
+
+
+    /// <summary>
+    /// 반드시 다음 순서로 실행합니다.
+    ///
+    /// 1. 포탈 활성화
+    /// 2. 포탈 등장 대기
+    /// 3. 길 등장
+    /// 4. 길 완성 대기
+    /// 5. 적 스폰 허용
+    /// </summary>
+    private IEnumerator RunStage1Preparation(
+        int preparationStep)
+    {
+        Debug.Log(
+            $"[PortalStage] Stage 1 준비 단계 {preparationStep} 시작.",
+            this);
+
+
+        /*
+         * 1. 포탈 활성화 및 크기 적용
+         */
+        ApplyStage1PortalState(
+            preparationStep);
+
+
+        /*
+         * 2. 포탈이 먼저 보이는 시간을 확보
+         */
+        if (portalToRoadDelay > 0f)
+        {
+            yield return new WaitForSeconds(
+                portalToRoadDelay);
+        }
+
+
+        /*
+         * 3. 해당 포탈에서 길 생성
+         */
+        RevealStage1Road(
+            preparationStep);
+
+
+        /*
+         * 4. 길 연출이 충분히 완료될 때까지 대기
+         */
+        if (roadRevealWaitDuration > 0f)
+        {
+            yield return new WaitForSeconds(
+                roadRevealWaitDuration);
+        }
+
+
+        /*
+         * 5. 길이 완성된 화면을 잠깐 보여준 뒤
+         * 적 스폰을 허용
+         */
+        if (roadToEnemyDelay > 0f)
+        {
+            yield return new WaitForSeconds(
+                roadToEnemyDelay);
+        }
+
+
+        stage1WaveController?.
+            NotifyEnvironmentPreparationCompleted(
+                preparationStep);
+
+
+        Debug.Log(
+            $"[PortalStage] Stage 1 준비 단계 {preparationStep} 완료. " +
+            "이제 적 스폰을 시작할 수 있습니다.",
+            this);
+
+
+        stage1PreparationRoutine = null;
+    }
+
+
+    private void ApplyStage1PortalState(
+        int preparationStep)
+    {
+        switch (preparationStep)
+        {
+            /*
+             * Stage 1 시작:
+             * Portal A
+             */
+            case 0:
+                SetActivePortalCount(1);
+
+                portalA?.ApplySmallPortal();
+
+                Debug.Log(
+                    "[PortalStage] Portal A 등장",
+                    this);
                 break;
 
+
+            /*
+             * Stage 1 1차 공격:
+             * Portal B 추가
+             */
+            case 1:
+                SetActivePortalCount(2);
+
+                portalA?.ApplyMediumPortal();
+                portalB?.ApplySmallPortal();
+
+                Debug.Log(
+                    "[PortalStage] Portal B 등장",
+                    this);
+                break;
+
+
+            /*
+             * Stage 1 2차 공격:
+             * Portal C 추가
+             */
             case 2:
-                ApplyStage1FinalAttack();
+                SetActivePortalCount(3);
+
+                portalA?.ApplyMediumPortal();
+                portalB?.ApplyMediumPortal();
+                portalC?.ApplySmallPortal();
+
+                Debug.Log(
+                    "[PortalStage] Portal C 등장",
+                    this);
+                break;
+
+
+            /*
+             * Stage 1 최종 공격:
+             * Portal D 추가
+             */
+            case 3:
+                SetActivePortalCount(4);
+
+                portalA?.ApplyLargePortal();
+                portalB?.ApplyLargePortal();
+                portalC?.ApplyMediumPortal();
+                portalD?.ApplySmallPortal();
+
+                Debug.Log(
+                    "[PortalStage] Portal D 등장",
+                    this);
+                break;
+
+
+            default:
+                Debug.LogWarning(
+                    $"[PortalStage] 알 수 없는 Stage 1 준비 단계: " +
+                    preparationStep,
+                    this);
                 break;
         }
     }
 
 
-    /// <summary>
-    /// Stage 2의 각 공격이 시작될 때 호출됩니다.
-    /// </summary>
+    private void RevealStage1Road(
+        int preparationStep)
+    {
+        switch (preparationStep)
+        {
+            case 0:
+                RevealRoad1Once();
+                break;
+
+            case 1:
+                RevealRoad2Once();
+                break;
+
+            case 2:
+                RevealRoad3Once();
+                break;
+
+            case 3:
+                RevealRoad4Once();
+                break;
+
+            default:
+                Debug.LogWarning(
+                    $"[PortalStage] 준비 단계 {preparationStep}에 " +
+                    "대응하는 길이 없습니다.",
+                    this);
+                break;
+        }
+    }
+
+
+    // =========================================================
+    // Stage 2
+    // =========================================================
+
     private void HandleStage2WaveStarted(
         Stage2WaveController.Stage2WavePhase phase,
         int enemyCount)
     {
         switch (phase)
         {
-            case Stage2WaveController
-                .Stage2WavePhase.First:
-
-                ApplyStage2FirstAttack();
-                RevealRoad3Once();
+            case Stage2WaveController.Stage2WavePhase.First:
+                /*
+                 * 길과 포탈은 이미 Stage 1에서 완성됐습니다.
+                 * Stage 2부터는 마을 침식만 진행합니다.
+                 */
+                RevealPart1Once();
                 break;
 
-            case Stage2WaveController
-                .Stage2WavePhase.Second:
 
-                ApplyStage2SecondAttack();
-                RevealRoad4Once();
+            case Stage2WaveController.Stage2WavePhase.Second:
+                RevealPart3Once();
                 break;
 
-            case Stage2WaveController
-                .Stage2WavePhase.Final:
 
-                ApplyStage2FinalAttack();
+            case Stage2WaveController.Stage2WavePhase.Final:
+                RevealFenceOnce();
+                break;
+        }
+
+
+        Debug.Log(
+            $"[PortalStage] Stage 2 {phase} 시작 처리. " +
+            $"예정 적 수: {enemyCount}",
+            this);
+    }
+
+
+    private void HandleStage2WaveSpawnCompleted(
+        Stage2WaveController.Stage2WavePhase phase)
+    {
+        switch (phase)
+        {
+            case Stage2WaveController.Stage2WavePhase.First:
+                RevealPart2Once();
+                break;
+
+
+            case Stage2WaveController.Stage2WavePhase.Second:
+                RevealPart4Once();
+                break;
+
+
+            case Stage2WaveController.Stage2WavePhase.Final:
+                /*
+                 * FinalProps 오브젝트가 없으므로
+                 * 여기서는 추가 오브젝트를 등장시키지 않습니다.
+                 */
+                Debug.Log(
+                    "[PortalStage] Stage 2 최종 공격 스폰 완료. " +
+                    "FinalProps가 없어 추가 침식은 실행하지 않습니다.",
+                    this);
                 break;
         }
     }
 
 
-    /// <summary>
-    /// Stage 1 첫 번째 공격:
-    /// 포탈 A 하나만 작은 크기로 표시합니다.
-    /// </summary>
-    [ContextMenu("테스트 - Stage 1 첫 공격")]
-    public void ApplyStage1FirstAttack()
-    {
-        SetActivePortalCount(1);
+    // =========================================================
+    // Road
+    // =========================================================
 
-        portalA?.ApplySmallPortal();
-
-        Debug.Log(
-            "[PortalStage] Stage 1 첫 공격: " +
-            "포탈 A 활성화",
-            this);
-    }
-
-
-    /// <summary>
-    /// Stage 1 두 번째 공격:
-    /// 포탈 B를 추가하여 A와 B를 표시합니다.
-    /// </summary>
-    [ContextMenu("테스트 - Stage 1 두 번째 공격")]
-    public void ApplyStage1SecondAttack()
-    {
-        SetActivePortalCount(2);
-
-        portalA?.ApplyMediumPortal();
-        portalB?.ApplySmallPortal();
-
-        Debug.Log(
-            "[PortalStage] Stage 1 두 번째 공격: " +
-            "포탈 A, B 활성화",
-            this);
-    }
-
-
-    /// <summary>
-    /// Stage 1 최종 공격:
-    /// 새로운 포탈은 추가하지 않고
-    /// 포탈 A와 B의 크기만 증가시킵니다.
-    /// </summary>
-    [ContextMenu("테스트 - Stage 1 최종 공격")]
-    public void ApplyStage1FinalAttack()
-    {
-        SetActivePortalCount(2);
-
-        portalA?.ApplyLargePortal();
-        portalB?.ApplyMediumPortal();
-
-        Debug.Log(
-            "[PortalStage] Stage 1 최종 공격: " +
-            "포탈 A, B 유지 및 성장",
-            this);
-    }
-
-
-    /// <summary>
-    /// Stage 2 첫 번째 공격:
-    /// 포탈 C를 추가하여 A~C 총 3개를 표시합니다.
-    /// </summary>
-    [ContextMenu("테스트 - Stage 2 첫 공격")]
-    public void ApplyStage2FirstAttack()
-    {
-        SetActivePortalCount(3);
-
-        portalA?.ApplyLargePortal();
-        portalB?.ApplyLargePortal();
-        portalC?.ApplySmallPortal();
-
-        Debug.Log(
-            "[PortalStage] Stage 2 첫 공격: " +
-            "포탈 C 추가, 총 3개",
-            this);
-    }
-
-
-    /// <summary>
-    /// Stage 2 두 번째 공격:
-    /// 포탈 D를 추가하여 A~D 총 4개를 표시합니다.
-    /// </summary>
-    [ContextMenu("테스트 - Stage 2 두 번째 공격")]
-    public void ApplyStage2SecondAttack()
-    {
-        SetActivePortalCount(4);
-
-        portalA?.ApplyLargePortal();
-        portalB?.ApplyLargePortal();
-        portalC?.ApplyMediumPortal();
-        portalD?.ApplySmallPortal();
-
-        Debug.Log(
-            "[PortalStage] Stage 2 두 번째 공격: " +
-            "포탈 D 추가, 총 4개",
-            this);
-    }
-
-
-    /// <summary>
-    /// Stage 2 최종 공격:
-    /// 포탈 A~D를 유지하고 크기를 최종 단계로 증가시킵니다.
-    ///
-    /// 포탈 E~H는 활성화하지 않습니다.
-    /// </summary>
-    [ContextMenu("테스트 - Stage 2 최종 공격")]
-    public void ApplyStage2FinalAttack()
-    {
-        SetActivePortalCount(4);
-
-        portalA?.ApplyFinalPortal();
-        portalB?.ApplyLargePortal();
-        portalC?.ApplyFinalPortal();
-        portalD?.ApplyLargePortal();
-
-        Debug.Log(
-            "[PortalStage] Stage 2 최종 공격: " +
-            "포탈 A~D 유지 및 최종 성장",
-            this);
-    }
-
-
-    /// <summary>
-    /// 테스트용:
-    /// 현재 Stage 1 첫 포탈과 Road_1을 함께 적용합니다.
-    /// </summary>
-    [ContextMenu("테스트 - 포탈 A와 Road 1")]
-    private void TestPortalAAndRoad1()
-    {
-        ApplyStage1FirstAttack();
-        RevealRoad1Once();
-    }
-
-
-    /// <summary>
-    /// 테스트용:
-    /// 현재 Stage 1 두 번째 포탈과 Road_2를 함께 적용합니다.
-    /// </summary>
-    [ContextMenu("테스트 - 포탈 B와 Road 2")]
-    private void TestPortalBAndRoad2()
-    {
-        ApplyStage1SecondAttack();
-        RevealRoad2Once();
-    }
-
-
-    /// <summary>
-    /// 테스트용:
-    /// 현재 Stage 2 첫 포탈과 Road_3을 함께 적용합니다.
-    /// </summary>
-    [ContextMenu("테스트 - 포탈 C와 Road 3")]
-    private void TestPortalCAndRoad3()
-    {
-        ApplyStage2FirstAttack();
-        RevealRoad3Once();
-    }
-
-
-    /// <summary>
-    /// 테스트용:
-    /// 현재 Stage 2 두 번째 포탈과 Road_4를 함께 적용합니다.
-    /// </summary>
-    [ContextMenu("테스트 - 포탈 D와 Road 4")]
-    private void TestPortalDAndRoad4()
-    {
-        ApplyStage2SecondAttack();
-        RevealRoad4Once();
-    }
-
-
-    /// <summary>
-    /// Road_1을 처음 한 번만 등장시킵니다.
-    /// </summary>
     private void RevealRoad1Once()
     {
         if (road1Revealed)
@@ -432,14 +544,11 @@ public sealed class EnemyPortalStageController : MonoBehaviour
         roadRevealController?.RevealRoad1();
 
         Debug.Log(
-            "[PortalStage] 포탈 A 방향 Road_1 등장",
+            "[PortalStage] Portal A에서 Road_1 생성",
             this);
     }
 
 
-    /// <summary>
-    /// Road_2를 처음 한 번만 등장시킵니다.
-    /// </summary>
     private void RevealRoad2Once()
     {
         if (road2Revealed)
@@ -452,14 +561,11 @@ public sealed class EnemyPortalStageController : MonoBehaviour
         roadRevealController?.RevealRoad2();
 
         Debug.Log(
-            "[PortalStage] 포탈 B 방향 Road_2 등장",
+            "[PortalStage] Portal B에서 Road_2 생성",
             this);
     }
 
 
-    /// <summary>
-    /// Road_3을 처음 한 번만 등장시킵니다.
-    /// </summary>
     private void RevealRoad3Once()
     {
         if (road3Revealed)
@@ -472,14 +578,11 @@ public sealed class EnemyPortalStageController : MonoBehaviour
         roadRevealController?.RevealRoad3();
 
         Debug.Log(
-            "[PortalStage] 포탈 C 방향 Road_3 등장",
+            "[PortalStage] Portal C에서 Road_3 생성",
             this);
     }
 
 
-    /// <summary>
-    /// Road_4를 처음 한 번만 등장시킵니다.
-    /// </summary>
     private void RevealRoad4Once()
     {
         if (road4Revealed)
@@ -492,66 +595,150 @@ public sealed class EnemyPortalStageController : MonoBehaviour
         roadRevealController?.RevealRoad4();
 
         Debug.Log(
-            "[PortalStage] 포탈 D 방향 Road_4 등장",
+            "[PortalStage] Portal D에서 Road_4 생성",
             this);
     }
 
 
-    /// <summary>
-    /// 포탈 A부터 지정된 개수만큼 활성화합니다.
-    ///
-    /// 현재 Stage 1과 Stage 2에서는
-    /// 최대 4개까지만 사용합니다.
-    ///
-    /// 포탈 E~H는 항상 비활성화합니다.
-    /// </summary>
+    // =========================================================
+    // Village
+    // =========================================================
+
+    private void RevealPart1Once()
+    {
+        if (part1Revealed)
+        {
+            return;
+        }
+
+        part1Revealed = true;
+
+        worldRevealController?.RevealPart1();
+
+        Debug.Log(
+            "[PortalStage] Stage 2 첫 침식: Part_1",
+            this);
+    }
+
+
+    private void RevealPart2Once()
+    {
+        if (part2Revealed)
+        {
+            return;
+        }
+
+        part2Revealed = true;
+
+        worldRevealController?.RevealPart2();
+
+        Debug.Log(
+            "[PortalStage] Stage 2 두 번째 침식: Part_2",
+            this);
+    }
+
+
+    private void RevealPart3Once()
+    {
+        if (part3Revealed)
+        {
+            return;
+        }
+
+        part3Revealed = true;
+
+        worldRevealController?.RevealPart3();
+
+        Debug.Log(
+            "[PortalStage] Stage 2 세 번째 침식: Part_3",
+            this);
+    }
+
+
+    private void RevealPart4Once()
+    {
+        if (part4Revealed)
+        {
+            return;
+        }
+
+        part4Revealed = true;
+
+        worldRevealController?.RevealPart4();
+
+        Debug.Log(
+            "[PortalStage] Stage 2 네 번째 침식: Part_4",
+            this);
+    }
+
+
+    private void RevealFenceOnce()
+    {
+        if (fenceRevealed)
+        {
+            return;
+        }
+
+        fenceRevealed = true;
+
+        worldRevealController?.RevealFence();
+
+        Debug.Log(
+            "[PortalStage] Stage 2 최종 침식: fence",
+            this);
+    }
+
+
+    // =========================================================
+    // Portal
+    // =========================================================
+
     private void SetActivePortalCount(
         int count)
     {
-        int clampedCount =
+        int safeCount =
             Mathf.Clamp(
                 count,
                 0,
                 4);
 
+
         SetPortalActive(
             portalA,
-            clampedCount >= 1);
+            safeCount >= 1);
 
         SetPortalActive(
             portalB,
-            clampedCount >= 2);
+            safeCount >= 2);
 
         SetPortalActive(
             portalC,
-            clampedCount >= 3);
+            safeCount >= 3);
 
         SetPortalActive(
             portalD,
-            clampedCount >= 4);
+            safeCount >= 4);
 
-        DisableReservedPortals();
+
+        SetPortalActive(
+            portalE,
+            false);
+
+        SetPortalActive(
+            portalF,
+            false);
+
+        SetPortalActive(
+            portalG,
+            false);
+
+        SetPortalActive(
+            portalH,
+            false);
     }
 
 
-    /// <summary>
-    /// 현재 보류 중인 포탈 E~H를 모두 비활성화합니다.
-    /// 참조와 게임 오브젝트는 삭제하지 않습니다.
-    /// </summary>
-    private void DisableReservedPortals()
-    {
-        SetPortalActive(portalE, false);
-        SetPortalActive(portalF, false);
-        SetPortalActive(portalG, false);
-        SetPortalActive(portalH, false);
-    }
-
-
-    /// <summary>
-    /// 포탈 컨트롤러가 붙은 게임 오브젝트를
-    /// 켜거나 끕니다.
-    /// </summary>
-    private void SetPortalActive(
+    private static void SetPortalActive(
         EnemyPortalGrowthController portal,
         bool active)
     {
@@ -560,6 +747,26 @@ public sealed class EnemyPortalStageController : MonoBehaviour
             return;
         }
 
-        portal.gameObject.SetActive(active);
+        portal.gameObject.SetActive(
+            active);
+    }
+
+
+    private void OnValidate()
+    {
+        portalToRoadDelay =
+            Mathf.Max(
+                0f,
+                portalToRoadDelay);
+
+        roadRevealWaitDuration =
+            Mathf.Max(
+                0f,
+                roadRevealWaitDuration);
+
+        roadToEnemyDelay =
+            Mathf.Max(
+                0f,
+                roadToEnemyDelay);
     }
 }

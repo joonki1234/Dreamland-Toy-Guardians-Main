@@ -60,7 +60,7 @@ Material:
     m_Colors:
     - _BottomColor: {r: 0.016868481, g: 0, b: 0.47794116, a: 1}
     - _CloudsTint: {r: 0.50799215, g: 0.48885787, b: 0.7656204, a: 1}
-    - _MiddleColor: {r: 1, g: 0.61764705, b: 0.9578093, a: 1}
+    - _MiddleColor: {r: 0.2784314, g: 0.6431373, b: 1, a: 1}
     - _MoonTint: {r: 0.491, g: 0.53774476, b: 1, a: 1}
     - _SkyBottomColor: {r: 0.016868481, g: 0, b: 0.47794116, a: 0}
     - _SkyColor: {r: 0.03529412, g: 0.41960788, b: 0.59607846, a: 1}

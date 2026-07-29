@@ -1,23 +1,33 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using DreamGuardians;
 using UnityEngine;
 
 /// <summary>
-/// Stage 2 이후의 적 흡수 연출과
-/// 현실/MR 표현에서 완전한 꿈나라 표현으로의
-/// 시각 전환을 담당합니다.
+/// 현실 상태에서 완전한 꿈나라 상태로 전환하는 연출을 담당합니다.
 ///
-/// 꿈나라 길은 04_INTERIOR_DREAM과 분리된
-/// 04_DREAM_ROAD 아래에서 별도로 관리합니다.
+/// 진행 순서:
 ///
-/// 게임 시작 시:
-/// - 현실 표현 활성화
-/// - 내부 꿈나라 비활성화
-/// - 길 부모는 활성화
-/// - 실제 Road_0~4는 DreamRoadRevealController가 숨김
-/// - 최종 꿈나라 비활성화
-/// - 포탈 전환 효과 비활성화
+/// 게임 시작 / Stage 1
+/// - 현실 오브젝트 활성화
+/// - 꿈나라 바닥 비활성화
+/// - 하늘 비활성화
+///
+/// Stage 2
+/// - 파란 하늘 활성화
+/// - Part_1~4, fence 순차 등장
+/// - 꿈나라 바닥은 계속 비활성화
+///
+/// Full VR Transition
+/// - 분홍 하늘 전환
+/// - 꿈나라 바닥 등장
+/// - 성 등장
+/// - 외곽 나무 등장
+/// - 완료 이벤트 발생
+///
+/// BossBattle
+/// - 완성된 꿈나라 상태 유지
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class DreamlandTransitionController : MonoBehaviour
@@ -32,36 +42,50 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     [SerializeField]
     private MissionBannerUI missionUI;
 
-    [Tooltip("파란 하늘에서 분홍빛 꿈나라 하늘로 전환하는 컨트롤러")]
+    [Tooltip("하늘 전환을 담당하는 컨트롤러")]
     [SerializeField]
     private DreamSkyTransitionController skyTransitionController;
 
 
     [Header("World Groups")]
 
-    [Tooltip("03_REALITY_WORLD 오브젝트")]
+    [Tooltip("03_REALITY_WORLD")]
     [SerializeField]
     private GameObject realityWorld;
 
     [Tooltip(
-        "04_INTERIOR_DREAM 오브젝트. " +
-        "DreamFloor, DreamSkyDome, DreamLighting, DreamDust가 들어갑니다.")]
+        "기존 04_INTERIOR_DREAM입니다. " +
+        "삭제했다면 None으로 둬도 됩니다.")]
     [SerializeField]
     private GameObject interiorDream;
 
-    [Tooltip(
-        "04_DREAM_ROAD 오브젝트. " +
-        "DreamRoad와 Road_0~4가 들어갑니다.")]
+    [Tooltip("04_DREAM_ROAD")]
     [SerializeField]
     private GameObject dreamRoadRoot;
 
-    [Tooltip("05_FINAL_DREAMLAND 오브젝트")]
+    [Tooltip("05_FINAL_DREAMLAND")]
     [SerializeField]
     private GameObject finalDreamland;
 
-    [Tooltip("06_PORTAL_EFFECTS 오브젝트")]
+    [Tooltip("06_PORTAL_EFFECTS")]
     [SerializeField]
     private GameObject portalEffects;
+
+
+    [Header("Full VR Reveal Objects")]
+
+    [Tooltip(
+        "05_FINAL_DREAMLAND 아래로 이동한 DreamFloor")]
+    [SerializeField]
+    private Transform dreamFloor;
+
+    [Tooltip("05_FINAL_DREAMLAND 아래의 CastleScene")]
+    [SerializeField]
+    private Transform castleScene;
+
+    [Tooltip("05_FINAL_DREAMLAND 아래의 Tree_Border")]
+    [SerializeField]
+    private Transform treeBorder;
 
 
     [Header("적 흡수 연출")]
@@ -93,12 +117,24 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
     [Header("완전 꿈나라 전환")]
 
-    [Tooltip("하늘 전환 시작 후 꿈나라 오브젝트를 켜기까지의 시간")]
+    [Tooltip(
+        "분홍빛 하늘 전환을 시작한 뒤 " +
+        "바닥 연출을 시작하기 전 대기 시간")]
     [Min(0f)]
     [SerializeField]
     private float fullVRTransitionDelay = 1.5f;
 
-    [Tooltip("전체 꿈나라 적용 후 다음 상태로 넘어가기 전 대기 시간")]
+    [Tooltip("바닥 완료 후 성이 등장하기 전 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float floorToCastleDelay = 0.2f;
+
+    [Tooltip("성 완료 후 나무가 등장하기 전 시간")]
+    [Min(0f)]
+    [SerializeField]
+    private float castleToTreeDelay = 0.2f;
+
+    [Tooltip("모든 연출 후 보스전 진입 전 대기 시간")]
     [Min(0f)]
     [SerializeField]
     private float postTransitionHold = 1f;
@@ -112,36 +148,141 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         "현실의 경계가 사라집니다";
 
 
+    [Header("바닥 등장 연출")]
+
+    [Tooltip("바닥이 원래 위치보다 아래에서 시작하는 거리")]
+    [Min(0f)]
+    [SerializeField]
+    private float floorStartYOffset = 0.7f;
+
+    [Tooltip("바닥의 시작 크기")]
+    [Range(0.01f, 1f)]
+    [SerializeField]
+    private float floorStartScaleMultiplier = 0.92f;
+
+    [Tooltip("바닥이 순간적으로 도달하는 최대 크기")]
+    [Min(1f)]
+    [SerializeField]
+    private float floorOvershootScaleMultiplier = 1.02f;
+
+    [Tooltip("바닥 등장 시간")]
+    [Min(0.01f)]
+    [SerializeField]
+    private float floorRevealDuration = 0.55f;
+
+
+    [Header("성 등장 연출")]
+
+    [Tooltip("성이 원래 위치보다 아래에서 시작하는 거리")]
+    [Min(0f)]
+    [SerializeField]
+    private float castleStartYOffset = 1.2f;
+
+    [Tooltip("성의 시작 크기")]
+    [Range(0.01f, 1f)]
+    [SerializeField]
+    private float castleStartScaleMultiplier = 0.7f;
+
+    [Tooltip("성이 순간적으로 도달하는 최대 크기")]
+    [Min(1f)]
+    [SerializeField]
+    private float castleOvershootScaleMultiplier = 1.04f;
+
+    [Tooltip("성 등장 시간")]
+    [Min(0.01f)]
+    [SerializeField]
+    private float castleRevealDuration = 0.65f;
+
+
+    [Header("나무 등장 연출")]
+
+    [Tooltip("나무가 원래 위치보다 아래에서 시작하는 거리")]
+    [Min(0f)]
+    [SerializeField]
+    private float treeStartYOffset = 0.8f;
+
+    [Tooltip("나무의 시작 크기")]
+    [Range(0.01f, 1f)]
+    [SerializeField]
+    private float treeStartScaleMultiplier = 0.65f;
+
+    [Tooltip("나무가 순간적으로 도달하는 최대 크기")]
+    [Min(1f)]
+    [SerializeField]
+    private float treeOvershootScaleMultiplier = 1.03f;
+
+    [Tooltip("나무 한 개의 등장 시간")]
+    [Min(0.01f)]
+    [SerializeField]
+    private float treeRevealDuration = 0.45f;
+
+    [Tooltip("다음 나무가 등장하는 간격")]
+    [Min(0f)]
+    [SerializeField]
+    private float delayBetweenTrees = 0.025f;
+
+
     [Header("Start State")]
 
-    [Tooltip("게임 시작 시 현실 시작 상태를 자동으로 적용합니다.")]
+    [Tooltip("게임 시작 시 현실 상태를 자동 적용합니다.")]
     [SerializeField]
     private bool applyInitialStateOnStart = true;
 
 
     private Coroutine transitionRoutine;
 
-    private Vector3 portalBaseScale =
-        Vector3.one;
+    private Vector3 portalBaseScale = Vector3.one;
 
     private bool absorptionEventRaised;
     private bool fullVREventRaised;
+
+    private TransformState dreamFloorOriginalState;
+    private TransformState castleOriginalState;
+
+    private readonly Dictionary<Transform, TransformState>
+        treeOriginalStates =
+            new Dictionary<Transform, TransformState>();
 
 
     public event Action EnemyAbsorptionCompleted;
     public event Action FullVRTransitionCompleted;
 
 
+    private sealed class TransformState
+    {
+        public Vector3 LocalPosition;
+        public Vector3 LocalScale;
+
+        public TransformState(
+            Vector3 localPosition,
+            Vector3 localScale)
+        {
+            LocalPosition = localPosition;
+            LocalScale = localScale;
+        }
+    }
+
+
     private void Awake()
     {
         ResolveReferences();
         CapturePortalBaseScale();
+        CaptureRevealObjectStates();
+
+        /*
+         * Awake에서 먼저 꺼 둡니다.
+         *
+         * DreamFloor가 05_FINAL_DREAMLAND 아래에 있으므로
+         * 부모가 켜져도 Full VR 전환 전까지 나타나지 않습니다.
+         */
+        HideFullVRObjectsImmediately();
     }
 
 
     private void OnEnable()
     {
         ResolveReferences();
+        CaptureRevealObjectStates();
 
         if (gameFlowController != null)
         {
@@ -184,10 +325,6 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// Inspector 참조가 비어 있는 경우
-    /// 씬의 오브젝트 이름을 기준으로 자동 탐색합니다.
-    /// </summary>
     private void ResolveReferences()
     {
         if (gameFlowController == null)
@@ -225,13 +362,65 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
         portalEffects ??=
             FindSceneObject("06_PORTAL_EFFECTS");
+
+        dreamFloor ??=
+            FindSceneTransform("DreamFloor");
+
+        castleScene ??=
+            FindSceneTransform("CastleScene");
+
+        treeBorder ??=
+            FindSceneTransform("Tree_Border");
     }
 
 
-    /// <summary>
-    /// 전체 게임 진행 상태가 변경됐을 때
-    /// 해당 상태에 맞는 월드 표현을 적용합니다.
-    /// </summary>
+    private void CaptureRevealObjectStates()
+    {
+        if (dreamFloor != null &&
+            dreamFloorOriginalState == null)
+        {
+            dreamFloorOriginalState =
+                new TransformState(
+                    dreamFloor.localPosition,
+                    dreamFloor.localScale);
+        }
+
+        if (castleScene != null &&
+            castleOriginalState == null)
+        {
+            castleOriginalState =
+                new TransformState(
+                    castleScene.localPosition,
+                    castleScene.localScale);
+        }
+
+        if (treeBorder == null)
+        {
+            return;
+        }
+
+        for (int i = 0;
+             i < treeBorder.childCount;
+             i++)
+        {
+            Transform tree =
+                treeBorder.GetChild(i);
+
+            if (tree == null ||
+                treeOriginalStates.ContainsKey(tree))
+            {
+                continue;
+            }
+
+            treeOriginalStates.Add(
+                tree,
+                new TransformState(
+                    tree.localPosition,
+                    tree.localScale));
+        }
+    }
+
+
     private void HandleStateChanged(
         DreamlandGameFlowController.GameFlowState newState)
     {
@@ -285,9 +474,6 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// 적 흡수 연출을 시작합니다.
-    /// </summary>
     private void BeginEnemyAbsorption()
     {
         StopTransitionRoutine();
@@ -300,10 +486,6 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// 남은 적 에너지가 포탈에 모이는 동안
-    /// 포탈을 반복해서 확대·축소합니다.
-    /// </summary>
     private IEnumerator EnemyAbsorptionRoutine()
     {
         ApplyStage2PortalState();
@@ -377,17 +559,13 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         absorptionEventRaised = true;
 
         Debug.Log(
-            "[DreamTransition] 적 흡수 연출 완료. " +
-            "EnemyAbsorptionCompleted 이벤트를 발생시킵니다.",
+            "[DreamTransition] 적 흡수 연출 완료",
             this);
 
         EnemyAbsorptionCompleted?.Invoke();
     }
 
 
-    /// <summary>
-    /// 완전한 꿈나라 전환 연출을 시작합니다.
-    /// </summary>
     private void BeginFullVRTransition()
     {
         StopTransitionRoutine();
@@ -400,37 +578,105 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// 하늘을 분홍빛 꿈나라 하늘로 변경한 후
-    /// 내부 꿈나라와 최종 꿈나라를 표시합니다.
-    /// </summary>
     private IEnumerator FullVRTransitionRoutine()
     {
         missionUI?.ClearPersistentText();
+
+        float bannerDuration =
+            fullVRTransitionDelay +
+            floorRevealDuration +
+            floorToCastleDelay +
+            castleRevealDuration +
+            castleToTreeDelay +
+            CalculateTreeSequenceDuration() +
+            postTransitionHold;
 
         missionUI?.ShowBanner(
             transitionTitle,
             transitionSubtitle,
             Mathf.Max(
                 0.1f,
-                fullVRTransitionDelay +
-                postTransitionHold));
+                bannerDuration));
+
 
         /*
-         * 파란 가상 하늘에서
-         * 분홍빛 꿈나라 하늘로 전환을 시작합니다.
+         * 1. 분홍 하늘 전환 시작
          */
         skyTransitionController?.
             TransitionToPinkSky();
 
+
+        /*
+         * 2. 하늘이 변하는 모습을 먼저 보여줍니다.
+         */
         if (fullVRTransitionDelay > 0f)
         {
             yield return new WaitForSeconds(
                 fullVRTransitionDelay);
         }
 
-        ApplyFullDreamlandState();
 
+        /*
+         * 3. 현실을 제거하고 꿈나라 부모 활성화
+         */
+        PrepareFullDreamlandRevealState();
+
+
+        /*
+         * 4. DreamFloor 등장
+         */
+        if (dreamFloor != null &&
+            dreamFloorOriginalState != null)
+        {
+            yield return RevealSingleTransformRoutine(
+                dreamFloor,
+                dreamFloorOriginalState,
+                floorStartYOffset,
+                floorStartScaleMultiplier,
+                floorOvershootScaleMultiplier,
+                floorRevealDuration);
+        }
+
+
+        if (floorToCastleDelay > 0f)
+        {
+            yield return new WaitForSeconds(
+                floorToCastleDelay);
+        }
+
+
+        /*
+         * 5. 성 등장
+         */
+        if (castleScene != null &&
+            castleOriginalState != null)
+        {
+            yield return RevealSingleTransformRoutine(
+                castleScene,
+                castleOriginalState,
+                castleStartYOffset,
+                castleStartScaleMultiplier,
+                castleOvershootScaleMultiplier,
+                castleRevealDuration);
+        }
+
+
+        if (castleToTreeDelay > 0f)
+        {
+            yield return new WaitForSeconds(
+                castleToTreeDelay);
+        }
+
+
+        /*
+         * 6. 외곽 나무 등장
+         */
+        yield return RevealTreeBorderRoutine();
+
+
+        /*
+         * 7. 완성된 꿈나라 잠시 유지
+         */
         if (postTransitionHold > 0f)
         {
             yield return new WaitForSeconds(
@@ -447,53 +693,331 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         fullVREventRaised = true;
 
         Debug.Log(
-            "[DreamTransition] 전체 꿈나라 상태 적용 완료. " +
-            "FullVRTransitionCompleted 이벤트를 발생시킵니다.",
+            "[DreamTransition] 완전 꿈나라 전환 완료",
             this);
 
         FullVRTransitionCompleted?.Invoke();
     }
 
 
-    /// <summary>
-    /// 게임의 현실 시작 상태를 적용합니다.
-    ///
-    /// 04_DREAM_ROAD 부모는 활성화하지만,
-    /// 실제 Road_0~4는 DreamRoadRevealController가
-    /// 게임 시작 시 모두 숨깁니다.
-    ///
-    /// 따라서 시작 화면에는 길이 전혀 보이지 않습니다.
-    /// </summary>
-    [ContextMenu("테스트 - 현실 상태 적용")]
-    public void ApplyRealityState()
+    private void PrepareFullDreamlandRevealState()
     {
-        SetActiveSafe(
-            realityWorld,
-            true);
+        CaptureRevealObjectStates();
 
         /*
-         * 바닥, 조명, 먼지 등 꿈나라 내부 표현은
-         * 시작할 때 전부 숨깁니다.
+         * 현실 오브젝트 제거
          */
         SetActiveSafe(
-            interiorDream,
+            realityWorld,
             false);
 
         /*
-         * 길을 나중에 개별적으로 등장시키기 위해
-         * 길의 상위 부모만 활성화합니다.
-         *
-         * Road_0~4는 DreamRoadRevealController의
-         * HideAllRoads()가 비활성화합니다.
+         * 기존 Interior Dream이 없어도 문제없습니다.
+         */
+        SetActiveSafe(
+            interiorDream,
+            true);
+
+        /*
+         * Stage 1에서 만들어진 길 유지
          */
         SetActiveSafe(
             dreamRoadRoot,
             true);
 
         /*
-         * 나무, 건물, 성 등 최종 꿈나라 사물은
-         * 시작할 때 모두 숨깁니다.
+         * 바닥, 성, 나무를 우선 숨깁니다.
          */
+        HideFullVRObjectsImmediately();
+
+        /*
+         * Part_1~4와 fence가 들어 있는 부모 활성화
+         */
+        SetActiveSafe(
+            finalDreamland,
+            true);
+
+        /*
+         * 흡수 포탈 효과 제거
+         */
+        SetActiveSafe(
+            portalEffects,
+            false);
+    }
+
+
+    /// <summary>
+    /// Full VR 전환 전용 오브젝트를 즉시 숨깁니다.
+    ///
+    /// DreamFloor가 FinalDreamland 자식이어도
+    /// Stage 2에서 미리 나타나지 않게 합니다.
+    /// </summary>
+    private void HideFullVRObjectsImmediately()
+    {
+        if (dreamFloor != null)
+        {
+            dreamFloor.gameObject.SetActive(false);
+        }
+
+        if (castleScene != null)
+        {
+            castleScene.gameObject.SetActive(false);
+        }
+
+        if (treeBorder != null)
+        {
+            treeBorder.gameObject.SetActive(false);
+        }
+    }
+
+
+    private IEnumerator RevealTreeBorderRoutine()
+    {
+        if (treeBorder == null)
+        {
+            yield break;
+        }
+
+        CaptureRevealObjectStates();
+
+        treeBorder.gameObject.SetActive(true);
+
+        List<Transform> trees =
+            new List<Transform>();
+
+        for (int i = 0;
+             i < treeBorder.childCount;
+             i++)
+        {
+            Transform tree =
+                treeBorder.GetChild(i);
+
+            if (tree == null)
+            {
+                continue;
+            }
+
+            trees.Add(tree);
+
+            if (treeOriginalStates.TryGetValue(
+                    tree,
+                    out TransformState state))
+            {
+                tree.localPosition =
+                    state.LocalPosition;
+
+                tree.localScale =
+                    state.LocalScale;
+            }
+
+            tree.gameObject.SetActive(false);
+        }
+
+        foreach (Transform tree in trees)
+        {
+            if (!treeOriginalStates.TryGetValue(
+                    tree,
+                    out TransformState state))
+            {
+                continue;
+            }
+
+            StartCoroutine(
+                RevealSingleTransformRoutine(
+                    tree,
+                    state,
+                    treeStartYOffset,
+                    treeStartScaleMultiplier,
+                    treeOvershootScaleMultiplier,
+                    treeRevealDuration));
+
+            if (delayBetweenTrees > 0f)
+            {
+                yield return new WaitForSeconds(
+                    delayBetweenTrees);
+            }
+        }
+
+        if (treeRevealDuration > 0f)
+        {
+            yield return new WaitForSeconds(
+                treeRevealDuration);
+        }
+    }
+
+
+    private IEnumerator RevealSingleTransformRoutine(
+        Transform target,
+        TransformState originalState,
+        float startYOffset,
+        float startScaleMultiplier,
+        float overshootScaleMultiplier,
+        float revealDuration)
+    {
+        if (target == null ||
+            originalState == null)
+        {
+            yield break;
+        }
+
+        Vector3 originalPosition =
+            originalState.LocalPosition;
+
+        Vector3 originalScale =
+            originalState.LocalScale;
+
+        Vector3 startPosition =
+            originalPosition +
+            Vector3.down *
+            Mathf.Max(
+                0f,
+                startYOffset);
+
+        Vector3 startScale =
+            originalScale *
+            Mathf.Clamp(
+                startScaleMultiplier,
+                0.01f,
+                1f);
+
+        Vector3 overshootScale =
+            originalScale *
+            Mathf.Max(
+                1f,
+                overshootScaleMultiplier);
+
+        target.localPosition =
+            startPosition;
+
+        target.localScale =
+            startScale;
+
+        target.gameObject.SetActive(true);
+
+        float duration =
+            Mathf.Max(
+                0.01f,
+                revealDuration);
+
+        float riseDuration =
+            duration * 0.8f;
+
+        float settleDuration =
+            duration * 0.2f;
+
+        float elapsed = 0f;
+
+        while (elapsed < riseDuration)
+        {
+            elapsed += Time.deltaTime;
+
+            float normalized =
+                riseDuration <= 0f
+                    ? 1f
+                    : Mathf.Clamp01(
+                        elapsed / riseDuration);
+
+            float eased =
+                1f -
+                Mathf.Pow(
+                    1f - normalized,
+                    3f);
+
+            target.localPosition =
+                Vector3.Lerp(
+                    startPosition,
+                    originalPosition,
+                    eased);
+
+            target.localScale =
+                Vector3.Lerp(
+                    startScale,
+                    overshootScale,
+                    eased);
+
+            yield return null;
+        }
+
+        target.localPosition =
+            originalPosition;
+
+        target.localScale =
+            overshootScale;
+
+        elapsed = 0f;
+
+        while (elapsed < settleDuration)
+        {
+            elapsed += Time.deltaTime;
+
+            float normalized =
+                settleDuration <= 0f
+                    ? 1f
+                    : Mathf.Clamp01(
+                        elapsed / settleDuration);
+
+            target.localScale =
+                Vector3.Lerp(
+                    overshootScale,
+                    originalScale,
+                    normalized);
+
+            yield return null;
+        }
+
+        target.localPosition =
+            originalPosition;
+
+        target.localScale =
+            originalScale;
+    }
+
+
+    private float CalculateTreeSequenceDuration()
+    {
+        if (treeBorder == null)
+        {
+            return 0f;
+        }
+
+        int treeCount =
+            treeBorder.childCount;
+
+        if (treeCount <= 0)
+        {
+            return 0f;
+        }
+
+        return
+            Mathf.Max(
+                0f,
+                delayBetweenTrees) *
+            Mathf.Max(
+                0,
+                treeCount - 1) +
+            Mathf.Max(
+                0.01f,
+                treeRevealDuration);
+    }
+
+
+    [ContextMenu("테스트 - 현실 상태 적용")]
+    public void ApplyRealityState()
+    {
+        RestoreRevealObjectStates();
+
+        SetActiveSafe(
+            realityWorld,
+            true);
+
+        SetActiveSafe(
+            interiorDream,
+            false);
+
+        SetActiveSafe(
+            dreamRoadRoot,
+            true);
+
         SetActiveSafe(
             finalDreamland,
             false);
@@ -502,21 +1026,26 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             portalEffects,
             false);
 
+        /*
+         * 게임 시작과 Stage 1에서는
+         * Full VR 오브젝트를 강제로 숨깁니다.
+         */
+        HideFullVRObjectsImmediately();
+
+        /*
+         * 게임 시작과 Stage 1에서는
+         * 가상 하늘을 숨깁니다.
+         */
+        skyTransitionController?.
+            HideSkyImmediately();
+
         Debug.Log(
-            "[DreamTransition] 현실 시작 상태 적용. " +
-            "꿈나라 내부와 최종 사물은 숨겼으며, " +
-            "Road_0~4도 길 컨트롤러가 숨긴 상태입니다.",
+            "[DreamTransition] 현실 시작 상태 적용 완료",
             this);
     }
 
 
-    /// <summary>
-    /// Stage 2 포탈 확장 상태를 적용합니다.
-    ///
-    /// Stage 1에서 이미 생성된 길은 유지하고,
-    /// 내부 꿈나라와 최종 꿈나라 사물은 아직 숨깁니다.
-    /// </summary>
-    [ContextMenu("테스트 - Stage 2 포탈 상태 적용")]
+    [ContextMenu("테스트 - Stage 2 상태 적용")]
     public void ApplyStage2PortalState()
     {
         SetActiveSafe(
@@ -527,15 +1056,14 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             interiorDream,
             false);
 
-        /*
-         * Stage 1에서 생성된 Road_0~2와
-         * Stage 2에서 생성될 Road_3~4가 보일 수 있도록
-         * 길의 부모는 활성화 상태로 유지합니다.
-         */
         SetActiveSafe(
             dreamRoadRoot,
             true);
 
+        /*
+         * DreamWorldRevealController가
+         * Part_1 등을 보여줄 때 다시 활성화합니다.
+         */
         SetActiveSafe(
             finalDreamland,
             false);
@@ -545,25 +1073,23 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             true);
 
         /*
-         * 가상 세계의 경계가 열리면서
-         * 기본 파란 하늘을 적용합니다.
+         * DreamFloor가 05_FINAL_DREAMLAND 아래에 있으므로
+         * Stage 2에서 부모가 켜져도 바닥이 나오지 않게 합니다.
+         */
+        HideFullVRObjectsImmediately();
+
+        /*
+         * Stage 2에서는 파란 하늘 적용
          */
         skyTransitionController?.
             ApplyBlueSkyImmediately();
 
         Debug.Log(
-            "[DreamTransition] Stage 2 포탈 확장 상태를 적용했습니다.",
+            "[DreamTransition] Stage 2 상태 적용 완료",
             this);
     }
 
 
-    /// <summary>
-    /// 완전한 꿈나라 상태를 적용합니다.
-    ///
-    /// 현실 표현을 숨기고,
-    /// 꿈나라 바닥·조명·먼지·최종 사물을 모두 표시합니다.
-    /// Stage 1~2에서 등장한 길도 그대로 유지합니다.
-    /// </summary>
     [ContextMenu("테스트 - 완전 꿈나라 상태 적용")]
     public void ApplyFullDreamlandState()
     {
@@ -587,22 +1113,87 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             portalEffects,
             false);
 
-        /*
-         * 테스트 메뉴로 직접 실행해도
-         * 분홍빛 꿈나라 하늘 전환을 확인할 수 있습니다.
-         */
+        RestoreRevealObjectStates();
+
+        if (dreamFloor != null)
+        {
+            dreamFloor.gameObject.SetActive(true);
+        }
+
+        if (castleScene != null)
+        {
+            castleScene.gameObject.SetActive(true);
+        }
+
+        if (treeBorder != null)
+        {
+            treeBorder.gameObject.SetActive(true);
+
+            for (int i = 0;
+                 i < treeBorder.childCount;
+                 i++)
+            {
+                treeBorder.GetChild(i)
+                    .gameObject.SetActive(true);
+            }
+        }
+
         skyTransitionController?.
-            TransitionToPinkSky();
+            ApplyPinkSkyImmediately();
 
         Debug.Log(
-            "[DreamTransition] 완전한 꿈나라 상태를 적용했습니다.",
+            "[DreamTransition] 완전 꿈나라 상태 적용 완료",
             this);
     }
 
 
-    /// <summary>
-    /// 현재 실행 중인 전환 코루틴을 중단합니다.
-    /// </summary>
+    private void RestoreRevealObjectStates()
+    {
+        if (dreamFloor != null &&
+            dreamFloorOriginalState != null)
+        {
+            dreamFloor.localPosition =
+                dreamFloorOriginalState.LocalPosition;
+
+            dreamFloor.localScale =
+                dreamFloorOriginalState.LocalScale;
+        }
+
+        if (castleScene != null &&
+            castleOriginalState != null)
+        {
+            castleScene.localPosition =
+                castleOriginalState.LocalPosition;
+
+            castleScene.localScale =
+                castleOriginalState.LocalScale;
+        }
+
+        foreach (
+            KeyValuePair<Transform, TransformState> pair
+            in treeOriginalStates)
+        {
+            Transform tree =
+                pair.Key;
+
+            TransformState state =
+                pair.Value;
+
+            if (tree == null ||
+                state == null)
+            {
+                continue;
+            }
+
+            tree.localPosition =
+                state.LocalPosition;
+
+            tree.localScale =
+                state.LocalScale;
+        }
+    }
+
+
     private void StopTransitionRoutine()
     {
         if (transitionRoutine == null)
@@ -617,9 +1208,6 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// 포탈 효과의 기본 크기를 저장합니다.
-    /// </summary>
     private void CapturePortalBaseScale()
     {
         if (portalEffects == null)
@@ -632,9 +1220,6 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// 포탈 효과의 크기를 원래 상태로 복원합니다.
-    /// </summary>
     private void RestorePortalScale()
     {
         if (portalEffects == null)
@@ -647,10 +1232,6 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// null 여부와 현재 활성 상태를 확인한 후
-    /// GameObject를 안전하게 켜거나 끕니다.
-    /// </summary>
     private static void SetActiveSafe(
         GameObject target,
         bool active)
@@ -669,11 +1250,20 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// 비활성 오브젝트를 포함해
-    /// 씬에서 이름이 일치하는 오브젝트를 찾습니다.
-    /// </summary>
     private static GameObject FindSceneObject(
+        string objectName)
+    {
+        Transform transform =
+            FindSceneTransform(
+                objectName);
+
+        return transform != null
+            ? transform.gameObject
+            : null;
+    }
+
+
+    private static Transform FindSceneTransform(
         string objectName)
     {
         Transform[] transforms =
@@ -691,7 +1281,7 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
             if (candidate.name == objectName)
             {
-                return candidate.gameObject;
+                return candidate;
             }
         }
 
@@ -716,9 +1306,87 @@ public sealed class DreamlandTransitionController : MonoBehaviour
                 0f,
                 fullVRTransitionDelay);
 
+        floorToCastleDelay =
+            Mathf.Max(
+                0f,
+                floorToCastleDelay);
+
+        castleToTreeDelay =
+            Mathf.Max(
+                0f,
+                castleToTreeDelay);
+
         postTransitionHold =
             Mathf.Max(
                 0f,
                 postTransitionHold);
+
+        floorStartYOffset =
+            Mathf.Max(
+                0f,
+                floorStartYOffset);
+
+        floorStartScaleMultiplier =
+            Mathf.Clamp(
+                floorStartScaleMultiplier,
+                0.01f,
+                1f);
+
+        floorOvershootScaleMultiplier =
+            Mathf.Max(
+                1f,
+                floorOvershootScaleMultiplier);
+
+        floorRevealDuration =
+            Mathf.Max(
+                0.01f,
+                floorRevealDuration);
+
+        castleStartYOffset =
+            Mathf.Max(
+                0f,
+                castleStartYOffset);
+
+        castleStartScaleMultiplier =
+            Mathf.Clamp(
+                castleStartScaleMultiplier,
+                0.01f,
+                1f);
+
+        castleOvershootScaleMultiplier =
+            Mathf.Max(
+                1f,
+                castleOvershootScaleMultiplier);
+
+        castleRevealDuration =
+            Mathf.Max(
+                0.01f,
+                castleRevealDuration);
+
+        treeStartYOffset =
+            Mathf.Max(
+                0f,
+                treeStartYOffset);
+
+        treeStartScaleMultiplier =
+            Mathf.Clamp(
+                treeStartScaleMultiplier,
+                0.01f,
+                1f);
+
+        treeOvershootScaleMultiplier =
+            Mathf.Max(
+                1f,
+                treeOvershootScaleMultiplier);
+
+        treeRevealDuration =
+            Mathf.Max(
+                0.01f,
+                treeRevealDuration);
+
+        delayBetweenTrees =
+            Mathf.Max(
+                0f,
+                delayBetweenTrees);
     }
 }
