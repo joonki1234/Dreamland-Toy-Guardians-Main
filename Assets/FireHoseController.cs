@@ -4,13 +4,13 @@ using UnityEngine;
 public class FireHoseController : MonoBehaviour
 {
     [Header("컴포넌트 연결")]
-    public ParticleSystem waterParticle; // WaterParticle 프리팹/오브젝트
-    public Transform firePoint;          // 물 발사 위치
+    public ParticleSystem waterParticle; // waterParticle 오브젝트 연결
+    public Transform firePoint;          // FirePoint 오브젝트 연결
 
     [Header("물호스 옵션")]
-    public float maxDistance = 15f;      // 물 사거리
+    public float maxDistance = 20f;      // 물 사거리 (넉넉하게 설정)
     public float waterDamage = 10f;      // 불 끄는 데미지/파워
-    public LayerMask targetLayer;        // 불/적 레이어
+    public LayerMask targetLayer;        // 타겟 레이어 (Everything 권장)
 
     private Coroutine stopRoutine;
     private float defaultSpeed;
@@ -99,12 +99,20 @@ public class FireHoseController : MonoBehaviour
 
         if (Physics.Raycast(firePoint.position, shootDirection, out RaycastHit hit, maxDistance, targetLayer))
         {
-            // TODO: 타격 대상 처리 (예: 불 끄기)
-            // if (hit.collider.TryGetComponent<IFireTarget>(out var target))
-            // {
-            //     target.Extinguish(waterDamage * Time.deltaTime);
-            // }
+            // 💡 콜라이더가 자식/부모 어디에 붙어있어도 StatusReceiver를 탐색
+            StatusReceiver statusReceiver = hit.collider.GetComponentInParent<StatusReceiver>();
+            if (statusReceiver == null)
+            {
+                statusReceiver = hit.collider.GetComponentInChildren<StatusReceiver>();
+            }
 
+            // 🌊 물 속성 전달
+            if (statusReceiver != null)
+            {
+                statusReceiver.ApplyElementalAttack(ElementalType.Water, waterDamage * Time.deltaTime);
+            }
+
+            // Scene 뷰에서 조준선 확인용 레이저 디버그 (청록색)
             Debug.DrawLine(firePoint.position, hit.point, Color.cyan);
         }
     }

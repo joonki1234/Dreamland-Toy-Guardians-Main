@@ -9390,7 +9390,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 42b78c06e9a375d44a22157d416a831d, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 42b78c06e9a375d44a22157d416a831d, type: 3}
       propertyPath: m_Layer
@@ -9807,7 +9807,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4554063229924063033, guid: 164d1a1e0c76c47a1b6dd0845a841623, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -17450,7 +17450,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: d133d49caa1ef8c47bcb316e36a35451, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: d133d49caa1ef8c47bcb316e36a35451, type: 3}
       propertyPath: m_Layer
@@ -21370,7 +21370,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 18f1131baa53c48bab5f52e81e727d92, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerJobController
-  currentJob: 2
+  currentJob: 1
   modelPolice: {fileID: 130166218}
   modelFirefighter: {fileID: 287419633}
   modelChef: {fileID: 609952574}
@@ -24542,7 +24542,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1098216456
 Transform:
   m_ObjectHideFlags: 0
@@ -24579,7 +24579,7 @@ MonoBehaviour:
   waterDamage: 30
   targetLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
 --- !u!120 &1098216458
 LineRenderer:
   serializedVersion: 3

@@ -1023,6 +1023,8 @@ GameObject:
   m_Component:
   - component: {fileID: 6653300275220220119}
   - component: {fileID: -2371528413863021581}
+  - component: {fileID: -4220009792913830759}
+  - component: {fileID: -5322426905391787775}
   m_Layer: 0
   m_Name: Enemy_ToyRobot
   m_TagString: Untagged
@@ -1066,22 +1068,56 @@ MonoBehaviour:
   rightArm: {fileID: 0}
   leftLeg: {fileID: 0}
   rightLeg: {fileID: 0}
-  leftArmHitbox: {fileID: 0}
-  rightArmHitbox: {fileID: 0}
-  leftLegHitbox: {fileID: 0}
-  rightLegHitbox: {fileID: 0}
-  movementThreshold: 0.01
   walkFrequency: 6
   armSwingAngle: 18
   legSwingAngle: 10
   bodySwayAngle: 3
-  headTurnAngle: 6
-  bobHeight: 0.025
+  headForwardLean: 12
+  headNodAngle: 8
+  headTiltAngle: 5
   smoothing: 12
-  armAxis: {x: 1, y: 0, z: 0}
-  legAxis: {x: 1, y: 0, z: 0}
-  headAxis: {x: 0, y: 1, z: 0}
-  bodyAxis: {x: 0, y: 0, z: 1}
+  runtimeStatus: Not initialized
+--- !u!114 &-4220009792913830759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7208967736245470348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0773e564f0da4e08ab660bd9b5d5020, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StatusReceiver
+  isMuddy: 0
+  isWet: 0
+  isOnFire: 0
+  isShocked: 0
+  waterEffectPrefab: {fileID: 2334455049011862081, guid: c1335396aea434a6ab7bf94c401421a0, type: 3}
+  electricSynergyVFX: {fileID: 0}
+  fireSynergyVFX: {fileID: 0}
+  shockStunDuration: 0.1
+--- !u!65 &-5322426905391787775
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7208967736245470348}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &7879924939525970573
 GameObject:
   m_ObjectHideFlags: 0
