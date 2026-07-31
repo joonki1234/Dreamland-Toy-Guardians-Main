@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 8830725425824633541}
   - component: {fileID: 6731191172386612751}
   - component: {fileID: 4494705683560772350}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Bundt Cake
   m_TagString: Untagged
   m_Icon: {fileID: 0}

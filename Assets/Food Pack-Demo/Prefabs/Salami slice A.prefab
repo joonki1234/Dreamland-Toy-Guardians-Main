@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2334165113043176152}
   - component: {fileID: 540547972016684562}
   - component: {fileID: -6944519917856063242}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Salami slice A
   m_TagString: Untagged
   m_Icon: {fileID: 0}

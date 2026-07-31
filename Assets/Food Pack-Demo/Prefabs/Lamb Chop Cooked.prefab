@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2477630120928524575}
   - component: {fileID: 398208194046873045}
   - component: {fileID: -6685378152440779536}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Lamb Chop Cooked
   m_TagString: Untagged
   m_Icon: {fileID: 0}

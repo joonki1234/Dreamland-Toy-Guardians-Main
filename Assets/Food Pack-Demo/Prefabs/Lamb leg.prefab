@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1772309848527845731}
   - component: {fileID: 4574660115281300905}
   - component: {fileID: 3074686838447828116}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Lamb leg
   m_TagString: Untagged
   m_Icon: {fileID: 0}

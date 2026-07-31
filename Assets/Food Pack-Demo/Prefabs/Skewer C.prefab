@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 7982120077463687195}
   - component: {fileID: 5270012707254068433}
   - component: {fileID: 2609692096817048661}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Skewer C
   m_TagString: Untagged
   m_Icon: {fileID: 0}

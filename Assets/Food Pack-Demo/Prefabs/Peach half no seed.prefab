@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 4459202389906831599}
   - component: {fileID: 1875383912564837413}
   - component: {fileID: 2121665777533079386}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Peach half no seed
   m_TagString: Untagged
   m_Icon: {fileID: 0}

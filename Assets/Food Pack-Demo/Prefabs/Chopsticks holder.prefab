@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 4967200434640264648}
   - component: {fileID: 7137076432952813826}
   - component: {fileID: 3635641540372384379}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Chopsticks holder
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 6634398762545039693}
   - component: {fileID: 8932583989589917063}
   - component: {fileID: 7215890846448431359}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Peach slice
   m_TagString: Untagged
   m_Icon: {fileID: 0}

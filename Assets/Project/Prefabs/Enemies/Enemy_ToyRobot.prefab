@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 433235940742062736}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: BrickToy_3D_LP_Warrior_Robots_2_1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -47,7 +47,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4510515454078453938}
   - component: {fileID: 6256298816612276332}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: BodyHitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -101,7 +101,7 @@ GameObject:
   - component: {fileID: 5600098517553715685}
   - component: {fileID: 8573424946137692316}
   - component: {fileID: 2009305964030324847}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_004
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -192,7 +192,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 991223205449013648}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LeftArmPivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -225,7 +225,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5705768706653253487}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: RightArmHitboxPivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -258,7 +258,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1679086876520834492}
   - component: {fileID: 6839318494353776217}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LeftArmHitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -310,7 +310,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5051830091031006446}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LeftArmHitboxPivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -344,7 +344,7 @@ GameObject:
   - component: {fileID: 7531491182468455154}
   - component: {fileID: 482356235662314473}
   - component: {fileID: 9061008716315244163}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_001
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -436,7 +436,7 @@ GameObject:
   - component: {fileID: 2539362158991715594}
   - component: {fileID: 5544489636522441706}
   - component: {fileID: 7946833257263568103}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_005
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -543,7 +543,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4749976550310869696}
   - component: {fileID: 3242560823074326552}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LegHitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -595,7 +595,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 539882173064712357}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Hitboxes
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -631,7 +631,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5232313246115777397}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: RightArmPivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -666,7 +666,7 @@ GameObject:
   - component: {fileID: 5386800885487254394}
   - component: {fileID: 7115152056821916306}
   - component: {fileID: 4370844133665135991}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_008
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -782,7 +782,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8633636508340495211}
   - component: {fileID: 7497976637252721106}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: HeadHitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -836,7 +836,7 @@ GameObject:
   - component: {fileID: 1134668552752922652}
   - component: {fileID: 4040125393932481648}
   - component: {fileID: 8244269524557649701}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_003
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -931,7 +931,7 @@ GameObject:
   - component: {fileID: 1908627631952963931}
   - component: {fileID: 181742521003902556}
   - component: {fileID: 3785701011493402847}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_006
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1025,7 +1025,7 @@ GameObject:
   - component: {fileID: -2371528413863021581}
   - component: {fileID: -4220009792913830759}
   - component: {fileID: -5322426905391787775}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Enemy_ToyRobot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1129,7 +1129,7 @@ GameObject:
   - component: {fileID: 594411353021562758}
   - component: {fileID: 3690512531671318822}
   - component: {fileID: 3673424058052095622}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_007
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1223,7 +1223,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2134974012500074681}
   - component: {fileID: 1671003147691170483}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: RightArmHitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1277,7 +1277,7 @@ GameObject:
   - component: {fileID: 8310214193601999079}
   - component: {fileID: 500831477283800384}
   - component: {fileID: 3993601894705877862}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Brick_Robots_2_002
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2234607397973608592}
   - component: {fileID: 4099996255453559898}
   - component: {fileID: 4778217885611574471}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Salmon Cut
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1258312850777015515}
   - component: {fileID: 3932376497973587985}
   - component: {fileID: 4203564059390353474}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Tomato Quarter
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 786280733988141908}
   - component: {fileID: 3246419546298929054}
   - component: {fileID: 3401556900939687190}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Pizza Margarita
   m_TagString: Untagged
   m_Icon: {fileID: 0}

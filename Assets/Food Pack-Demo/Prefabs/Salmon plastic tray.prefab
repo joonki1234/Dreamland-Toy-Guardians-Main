@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1114903833941183311}
   - component: {fileID: 2926240695773167493}
   - component: {fileID: 1114889760519466044}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Salmon plastic tray
   m_TagString: Untagged
   m_Icon: {fileID: 0}

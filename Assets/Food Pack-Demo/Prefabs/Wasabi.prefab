@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 8439154691577546925}
   - component: {fileID: 5978828892496854119}
   - component: {fileID: 1602805352090818183}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Wasabi
   m_TagString: Untagged
   m_Icon: {fileID: 0}

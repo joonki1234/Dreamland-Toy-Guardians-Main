@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 3870588497892560048}
   - component: {fileID: 1320646448463329402}
   - component: {fileID: -1669416357276697671}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Bell pepper green slice
   m_TagString: Untagged
   m_Icon: {fileID: 0}

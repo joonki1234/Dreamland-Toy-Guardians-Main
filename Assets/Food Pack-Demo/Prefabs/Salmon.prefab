@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 6907284112704473072}
   - component: {fileID: 8664764072943940410}
   - component: {fileID: 5532855480627999658}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Salmon
   m_TagString: Untagged
   m_Icon: {fileID: 0}

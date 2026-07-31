@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 5469037547826210796}
   - component: {fileID: 7782532303705903910}
   - component: {fileID: -5837332504396888385}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Udon
   m_TagString: Untagged
   m_Icon: {fileID: 0}

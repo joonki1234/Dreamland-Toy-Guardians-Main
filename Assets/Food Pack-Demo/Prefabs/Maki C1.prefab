@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 7675749643804615300}
   - component: {fileID: 5575820191098394190}
   - component: {fileID: 8587801077789089721}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Maki C1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
