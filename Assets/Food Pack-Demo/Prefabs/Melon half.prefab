@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 2866489678191725180}
   - component: {fileID: 9893840070770358}
   - component: {fileID: -8324430526282123778}
+  - component: {fileID: -8574719729882143577}
   m_Layer: 9
   m_Name: Melon half
   m_TagString: Untagged
@@ -117,4 +118,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &-8574719729882143577
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1955646447211667299}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.69646394, y: 0.35433882, z: 0.95695925}
+  m_Center: {x: -0.00000047683716, y: 0.17716941, z: -0.016957581}

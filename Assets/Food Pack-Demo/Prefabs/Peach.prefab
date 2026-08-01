@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5913716464500032637}
   - component: {fileID: 8499781799222161591}
   - component: {fileID: -1872808214382882476}
+  - component: {fileID: -6415772653046911621}
   m_Layer: 9
   m_Name: Peach
   m_TagString: Untagged
@@ -117,4 +118,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &-6415772653046911621
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7995497868466590050}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.40542182, y: 0.39457124, z: 0.32231313}
+  m_Center: {x: 0.041552186, y: 0.19728622, z: -0.00000010430813}

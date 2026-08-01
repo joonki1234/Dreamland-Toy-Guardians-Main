@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6784032243508054337}
   - component: {fileID: 8773379483756985739}
   - component: {fileID: -8849054742133062592}
+  - component: {fileID: -1917004611484127094}
   m_Layer: 9
   m_Name: Bundt Cake Piece
   m_TagString: Untagged
@@ -117,4 +118,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &-1917004611484127094
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7116164977511586910}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.301561, y: 0.4119011, z: 0.38460103}
+  m_Center: {x: 0.00013162941, y: 0.20595072, z: -0.035164997}

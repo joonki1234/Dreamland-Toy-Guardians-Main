@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1305890368225792005}
   - component: {fileID: 3889846838301500623}
   - component: {fileID: 7385345296633219765}
+  - component: {fileID: 8683621241489165128}
   m_Layer: 9
   m_Name: Frappe B
   m_TagString: Untagged
@@ -118,4 +119,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &8683621241489165128
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3385439625878996250}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.35762787, y: 0.7449866, z: 0.35582316}
+  m_Center: {x: -0.0037419498, y: 0.37249324, z: -0.0026400462}

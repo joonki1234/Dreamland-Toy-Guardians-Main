@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4057475692466439726}
   - component: {fileID: 2282194631455044324}
   - component: {fileID: -1682419855498363569}
+  - component: {fileID: -6328696526716822038}
   m_Layer: 9
   m_Name: Pretzel
   m_TagString: Untagged
@@ -117,4 +118,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &-6328696526716822038
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 336370967163032369}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.40739137, y: 0.099761665, z: 0.33719903}
+  m_Center: {x: 0.00082912296, y: 0.049881175, z: -0.0036240518}

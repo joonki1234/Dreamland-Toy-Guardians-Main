@@ -50,7 +50,7 @@ public class DirtMainCluster : MonoBehaviour
                 DirtMainCluster childCluster = shard.GetComponent<DirtMainCluster>();
                 if (childCluster != null)
                 {
-                    DestroyImmediate(childCluster);
+                    Destroy(childCluster);
                 }
 
                 // 2. 안전한 파편 전용 스크립트 부착

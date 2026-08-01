@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8439154691577546925}
   - component: {fileID: 5978828892496854119}
   - component: {fileID: 1602805352090818183}
+  - component: {fileID: -4815335189785900809}
   m_Layer: 9
   m_Name: Wasabi
   m_TagString: Untagged
@@ -117,4 +118,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &-4815335189785900809
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5330552507610586546}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.21451378, y: 0.07684787, z: 0.21451336}
+  m_Center: {x: -0.0000020228326, y: 0.038423304, z: 0.00000035762787}

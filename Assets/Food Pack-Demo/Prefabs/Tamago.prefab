@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 7765973104289387387}
   - component: {fileID: 5486141005868099505}
   - component: {fileID: -2884221390146137673}
+  - component: {fileID: -8998637403125742143}
   m_Layer: 9
   m_Name: Tamago
   m_TagString: Untagged
@@ -117,4 +118,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &-8998637403125742143
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6278664795589133924}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.113471605, y: 0.07777845, z: 0.29635864}
+  m_Center: {x: -0.00000048056245, y: 0.038889814, z: 0.00000018626451}

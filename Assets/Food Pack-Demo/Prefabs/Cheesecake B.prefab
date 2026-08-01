@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 3424980458821914640}
   - component: {fileID: 604343118701847770}
   - component: {fileID: -8521075034436376976}
+  - component: {fileID: 4991943498501233900}
   m_Layer: 9
   m_Name: Cheesecake B
   m_TagString: Untagged
@@ -117,4 +118,25 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
+--- !u!65 &4991943498501233900
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1397227135969740047}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.26752442, y: 0.18014932, z: 0.4118233}
+  m_Center: {x: -0.0010663345, y: 0.09007496, z: -0.00029966235}
