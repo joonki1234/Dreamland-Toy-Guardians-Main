@@ -132,6 +132,12 @@ public class ChefWeaponController : MonoBehaviour
         GameObject selectedFood = foodPrefabs[randomIndex];
         GameObject spawnedFood = Instantiate(selectedFood, foodSpawnPoint.position, Random.rotation);
 
+        // 생성된 모든 음식에 요리사 투사체 표시를 자동으로 붙인다.
+        if (spawnedFood.GetComponent<ChefFoodProjectile>() == null)
+        {
+            spawnedFood.AddComponent<ChefFoodProjectile>();
+        }
+
         if (spawnedFood.TryGetComponent<Rigidbody>(out Rigidbody rb))
         {
             Vector3 launchDirection = (foodSpawnPoint.forward * launchForce) + (Vector3.up * upwardForce);

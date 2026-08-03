@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace DreamGuardians
@@ -56,6 +57,8 @@ namespace DreamGuardians
         private float nextAttackTime;
         private float stunnedUntil;
         private float fixedHeight;
+        private bool isBeingKnockedBack;
+        private Coroutine knockbackRoutine;
 
 
         public CoreState TargetCore => targetCore;
@@ -99,6 +102,12 @@ namespace DreamGuardians
         private void Update()
         {
             if (health != null && health.IsDead)
+            {
+                return;
+            }
+
+            // 넉백 중에는 코어 방향으로 이동하지 않는다.
+            if (isBeingKnockedBack)
             {
                 return;
             }
@@ -237,6 +246,86 @@ namespace DreamGuardians
             stunnedUntil = Mathf.Max(
                 stunnedUntil,
                 Time.time + Mathf.Max(0f, duration));
+        }
+
+        /// <summary>
+        /// 적을 지정한 방향으로 짧게 밀어낸다.
+        /// 기존 적 이동이 Transform 방식이므로 Rigidbody 힘 대신
+        /// 코루틴으로 위치를 이동한다.
+        /// </summary>
+        public void ApplyKnockback(
+            Vector3 direction,
+            float distance,
+            float duration)
+        {
+            direction.y = 0f;
+
+            if (direction.sqrMagnitude <= 0.0001f)
+            {
+                direction = -transform.forward;
+            }
+
+            if (knockbackRoutine != null)
+            {
+                StopCoroutine(knockbackRoutine);
+            }
+
+            knockbackRoutine = StartCoroutine(
+                KnockbackRoutine(
+                    direction.normalized,
+                    Mathf.Max(0f, distance),
+                    Mathf.Max(0.01f, duration)
+                )
+            );
+        }
+
+        private IEnumerator KnockbackRoutine(
+            Vector3 direction,
+            float distance,
+            float duration)
+        {
+            isBeingKnockedBack = true;
+
+            Vector3 startPosition = transform.position;
+            Vector3 targetPosition =
+                startPosition + direction * distance;
+
+            // 적이 위아래로 뜨지 않도록 기존 높이를 유지한다.
+            targetPosition.y = keepSpawnHeight
+                ? fixedHeight
+                : startPosition.y;
+
+            float elapsedTime = 0f;
+
+            while (elapsedTime < duration)
+            {
+                if (health != null && health.IsDead)
+                {
+                    break;
+                }
+
+                elapsedTime += Time.deltaTime;
+
+                float progress = Mathf.Clamp01(
+                    elapsedTime / duration
+                );
+
+                transform.position = Vector3.Lerp(
+                    startPosition,
+                    targetPosition,
+                    progress
+                );
+
+                yield return null;
+            }
+
+            if (health == null || !health.IsDead)
+            {
+                transform.position = targetPosition;
+            }
+
+            isBeingKnockedBack = false;
+            knockbackRoutine = null;
         }
 
 
