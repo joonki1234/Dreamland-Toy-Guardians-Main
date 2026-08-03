@@ -3618,6 +3618,7 @@ GameObject:
   - component: {fileID: 246857757}
   - component: {fileID: 246857759}
   - component: {fileID: 246857758}
+  - component: {fileID: 246857760}
   m_Layer: 0
   m_Name: waterParticle
   m_TagString: Untagged
@@ -7306,9 +7307,9 @@ ParticleSystem:
         m_NumAlphaKeys: 2
     range: {x: 0, y: 1}
   CollisionModule:
-    enabled: 0
+    enabled: 1
     serializedVersion: 4
-    type: 0
+    type: 1
     collisionMode: 0
     colliderForce: 0
     multiplyColliderForceByParticleSize: 0
@@ -7371,7 +7372,7 @@ ParticleSystem:
     m_Bounce:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 0
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -7424,7 +7425,7 @@ ParticleSystem:
     m_EnergyLossOnCollision:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0
+      scalar: 1
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -7479,11 +7480,11 @@ ParticleSystem:
     radiusScale: 1
     collidesWith:
       serializedVersion: 2
-      m_Bits: 4294967295
+      m_Bits: 129
     maxCollisionShapes: 256
     quality: 0
     voxelSize: 0.5
-    collisionMessages: 0
+    collisionMessages: 1
     collidesWithDynamic: 1
     interiorCollisions: 0
   TriggerModule:
@@ -8443,6 +8444,20 @@ ParticleSystem:
         m_PostInfinity: 2
         m_RotationOrder: 4
     vectorLabel1_3: W
+--- !u!114 &246857760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 246857756}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c9b97dc06a0a15469bf58a1a062109f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WaterParticleHit
+  damagePerTick: 1
+  hitInterval: 0.1
 --- !u!4 &248616271 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 150790926590101587, guid: 217c83cba1802804e9aca651c8a2b50c, type: 3}
@@ -21188,6 +21203,14 @@ MonoBehaviour:
   dirtFlashLight: {fileID: 0}
   throwForce: 20
   builderCooldown: 0.5
+  dirtShardCount: 6
+  horizontalSpreadAngle: 12
+  verticalSpreadAngle: 5
+  shardUpwardForce: 3
+  shardScaleMultiplierRange: {x: 0.75, y: 1.05}
+  firstShardDamage: 8
+  additionalShardDamage: 2
+  maxShotDamagePerEnemy: 18
 --- !u!114 &853646953
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -24625,12 +24648,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FireHoseController
   waterParticle: {fileID: 246857759}
-  firePoint: {fileID: 1428131574}
-  maxDistance: 30
-  waterDamage: 30
-  targetLayer:
-    serializedVersion: 2
-    m_Bits: 0
 --- !u!120 &1098216458
 LineRenderer:
   serializedVersion: 3
@@ -34503,6 +34520,16 @@ MonoBehaviour:
   finalPhaseSubtitle: "\uB0A8\uC740 \uC545\uBABD\uC744 \uBAA8\uB450 \uC815\uD654\uD558\uB77C"
   waveBannerDuration: 1.5
   progressRefreshInterval: 0.2
+  quickGuideDuration: 3
+  stageStartGuideMessage: "\uC545\uBABD \uBC14\uC774\uB7EC\uC2A4\uAC00 \uB354 \uAC15\uD574\uC84C\uC5B4.
+    \uCF54\uC5B4\uB97C \uACC4\uC18D \uC9C0\uCF1C\uC918!"
+  firstWaveGuideMessage: "\uAC80\uC740 \uADE0\uC5F4\uC774 \uB2E4\uC2DC \uC5F4\uB9AC\uACE0
+    \uC788\uC5B4. \uCF54\uC5B4\uC5D0 \uB2FF\uAE30 \uC804\uC5D0 \uBAA8\uB450 \uC815\uD654\uD574!"
+  secondWaveGuideMessage: "\uADE0\uC5F4\uC774 \uB354 \uCEE4\uC9C0\uACE0 \uC788\uC5B4.
+    \uC0AC\uBC29\uC5D0\uC11C \uC624\uB294 \uC7A5\uB09C\uAC10\uB4E4\uC744 \uC870\uC2EC\uD574!"
+  finalWaveGuideMessage: "\uAFC8\uB098\uB77C\uAC00 \uD604\uC2E4\uC744 \uB36E\uACE0
+    \uC788\uC5B4. \uB9C8\uC9C0\uB9C9 \uACF5\uACA9\uC774\uC57C. \uC870\uAE08\uB9CC
+    \uB354 \uBC84\uD168!"
   clearTitle: STAGE 2 CLEAR
   clearSubtitle: "\uAFC8\uC758 \uADE0\uC5F4\uC774 \uC57D\uD574\uC84C\uC2B5\uB2C8\uB2E4"
   clearSpeaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
@@ -46306,7 +46333,10 @@ MonoBehaviour:
   missionUI: {fileID: 2125966795}
   tutorialSpawnPoint: {fileID: 1215213847}
   dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
+  roleSelection: {fileID: 0}
+  toyFriend: {fileID: 0}
   allyPortalCoreRevealController: {fileID: 507189367}
+  toyFriendEntranceSequence: {fileID: 0}
   requiredHitsPerPlayer: 3
   expectedPlayerCount: 1
   requireBothSynergiesBeforePurification: 0
@@ -46329,6 +46359,7 @@ MonoBehaviour:
   missionUI: {fileID: 2125966795}
   core: {fileID: 2019763646}
   dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
+  toyFriend: {fileID: 0}
   groups:
   - label: "1\uCC28 \uACF5\uACA9"
     enemyCount: 3
@@ -46405,6 +46436,11 @@ MonoBehaviour:
   customBannerRoot: {fileID: 1358047092}
   customBannerTitle: {fileID: 754781543}
   customBannerSubtitle: {fileID: 1360605894}
+  toyFriendPortrait: {fileID: 0}
+  customGuideRoot: {fileID: 0}
+  customGuidePortrait: {fileID: 0}
+  customGuideSpeaker: {fileID: 0}
+  customGuideMessage: {fileID: 0}
   defaultBannerDuration: 2
 --- !u!4 &2125966796
 Transform:
