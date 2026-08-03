@@ -173,7 +173,7 @@ namespace DreamGuardians
             }
             else if (keyboard.digit3Key.wasPressedThisFrame || keyboard.numpad3Key.wasPressedThisFrame)
             {
-                SetRole(PlayerRole.Astronomer);
+                SetRole(PlayerRole.Chef);
             }
             else if (keyboard.digit4Key.wasPressedThisFrame || keyboard.numpad4Key.wasPressedThisFrame)
             {

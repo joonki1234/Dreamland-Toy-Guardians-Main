@@ -14,7 +14,7 @@ namespace DreamGuardians
         [SerializeField, Min(0f)] private float emergencyBonusDamage = 20f;
         [SerializeField, Min(0f)] private float emergencyStunDuration = 2f;
 
-        [Header("Astronomer + Architect")]
+        [Header("Chef + Architect (Prototype - 상세 효과 추후 확정)")]
         [SerializeField, Min(0f)] private float starlightBonusDamage = 15f;
         [SerializeField, Min(1f)] private float starlightDamageMultiplier = 1.25f;
         [SerializeField, Min(0f)] private float starlightDuration = 4f;
@@ -37,7 +37,8 @@ namespace DreamGuardians
 
         public SynergyResult RegisterHit(PlayerRole role)
         {
-            if (role == PlayerRole.None)
+            if (role == PlayerRole.None ||
+                !RoleSynergyProgression.IsUnlocked)
             {
                 return SynergyResult.None;
             }
@@ -61,16 +62,16 @@ namespace DreamGuardians
                     emergencyBonusDamage,
                     now),
 
-                PlayerRole.Astronomer => TryTrigger(
-                    SynergyKind.StarlightBlueprint,
-                    PlayerRole.Astronomer,
+                PlayerRole.Chef => TryTrigger(
+                    SynergyKind.ChefArchitectCombo,
+                    PlayerRole.Chef,
                     PlayerRole.Architect,
                     starlightBonusDamage,
                     now),
 
                 PlayerRole.Architect => TryTrigger(
-                    SynergyKind.StarlightBlueprint,
-                    PlayerRole.Astronomer,
+                    SynergyKind.ChefArchitectCombo,
+                    PlayerRole.Chef,
                     PlayerRole.Architect,
                     starlightBonusDamage,
                     now),
@@ -125,7 +126,7 @@ namespace DreamGuardians
                     mover?.ApplyStun(emergencyStunDuration);
                     break;
 
-                case SynergyKind.StarlightBlueprint:
+                case SynergyKind.ChefArchitectCombo:
                     vulnerableUntil = Mathf.Max(vulnerableUntil, Time.time + starlightDuration);
                     break;
             }
