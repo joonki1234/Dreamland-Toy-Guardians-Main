@@ -39,6 +39,10 @@ namespace DreamGuardians
         private readonly Dictionary<SynergyKind, float> lastTriggerTimes =
             new Dictionary<SynergyKind, float>();
 
+        [Header("Chef + Architect (Prototype - 상세 효과 추후 확정)")]
+        [SerializeField, Min(0f)] private float starlightBonusDamage = 15f;
+        [SerializeField, Min(1f)] private float starlightDamageMultiplier = 1.25f;
+        [SerializeField, Min(0f)] private float starlightDuration = 4f;
 
         private EnemyHealth owner;
         private EnemyCoreMover mover;
@@ -69,7 +73,8 @@ namespace DreamGuardians
         /// </summary>
         public SynergyResult RegisterHit(PlayerRole role)
         {
-            if (role == PlayerRole.None)
+            if (role == PlayerRole.None ||
+                !RoleSynergyProgression.IsUnlocked)
             {
                 return SynergyResult.None;
             }
@@ -94,14 +99,14 @@ namespace DreamGuardians
                     now),
 
                 PlayerRole.Chef => TryTrigger(
-                    SynergyKind.StarlightBlueprint,
+                    SynergyKind.ChefArchitectCombo,
                     PlayerRole.Chef,
                     PlayerRole.Architect,
                     chefBuilderBonusDamage,
                     now),
 
                 PlayerRole.Architect => TryTrigger(
-                    SynergyKind.StarlightBlueprint,
+                    SynergyKind.ChefArchitectCombo,
                     PlayerRole.Chef,
                     PlayerRole.Architect,
                     chefBuilderBonusDamage,
@@ -178,11 +183,8 @@ namespace DreamGuardians
                     );
                     break;
 
-                case SynergyKind.StarlightBlueprint:
-                    vulnerableUntil = Mathf.Max(
-                        vulnerableUntil,
-                        Time.time + chefBuilderDuration
-                    );
+                case SynergyKind.ChefArchitectCombo:
+                    vulnerableUntil = Mathf.Max(vulnerableUntil, Time.time + starlightDuration);
                     break;
             }
         }

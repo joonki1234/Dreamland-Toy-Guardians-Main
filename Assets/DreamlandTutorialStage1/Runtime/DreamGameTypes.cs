@@ -16,19 +16,20 @@ namespace DreamGuardians
     {
         None = 0,
         EmergencySuppression = 1,
-        StarlightBlueprint = 2
+        ChefArchitectCombo = 2
     }
 
     public enum TutorialStage1State
     {
         Idle = 0,
         Intro = 1,
-        ShootingPractice = 2,
-        SynergyPractice = 3,
-        PurifyTutorialEnemy = 4,
-        TutorialClear = 5,
-        Wave1 = 6,
-        Complete = 7
+        RoleSelection = 2,
+        ShootingPractice = 3,
+        SynergyPractice = 4,
+        PurifyTutorialEnemy = 5,
+        TutorialClear = 6,
+        Wave1 = 7,
+        Complete = 8
     }
 
     [Serializable]
@@ -122,9 +123,46 @@ namespace DreamGuardians
             return kind switch
             {
                 SynergyKind.EmergencySuppression => "긴급 진압",
-                SynergyKind.StarlightBlueprint => "별빛 설계",
+                SynergyKind.ChefArchitectCombo => "협동 제작",
                 _ => "시너지"
             };
+        }
+    }
+
+    /// <summary>
+    /// Stage 1 Wave 2 전후의 시너지 잠금 상태를 공유합니다.
+    /// 적이 런타임에 계속 생성되기 때문에 개별 Enemy가 아니라
+    /// 한 곳에서 잠금 상태를 관리합니다.
+    /// </summary>
+    public static class RoleSynergyProgression
+    {
+        public static bool IsUnlocked { get; private set; }
+
+        public static event Action Unlocked;
+
+        [RuntimeInitializeOnLoadMethod(
+            RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnPlay()
+        {
+            IsUnlocked = false;
+            Unlocked = null;
+        }
+
+        public static void Lock()
+        {
+            IsUnlocked = false;
+        }
+
+        public static bool Unlock()
+        {
+            if (IsUnlocked)
+            {
+                return false;
+            }
+
+            IsUnlocked = true;
+            Unlocked?.Invoke();
+            return true;
         }
     }
 }
