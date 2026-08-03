@@ -8,7 +8,7 @@ namespace DreamGuardians
         None = 0,
         Police = 1,
         Firefighter = 2,
-        Astronomer = 3,
+        Chef = 3,
         Architect = 4
     }
 
@@ -111,7 +111,7 @@ namespace DreamGuardians
             {
                 PlayerRole.Police => "경찰",
                 PlayerRole.Firefighter => "소방관",
-                PlayerRole.Astronomer => "천문학자",
+                PlayerRole.Chef => "요리사",
                 PlayerRole.Architect => "건축가",
                 _ => "미지정"
             };

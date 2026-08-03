@@ -1,5 +1,6 @@
-using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 
 public enum PlayerJob
 {
@@ -14,11 +15,13 @@ public class PlayerJobController : MonoBehaviour
     [Header("현재 선택된 직업")]
     public PlayerJob currentJob = PlayerJob.Police;
 
+
     [Header("직업별 모델링 (Models)")]
     public GameObject modelPolice;
     public GameObject modelFirefighter;
     public GameObject modelChef;
     public GameObject modelBuilder;
+
 
     [Header("직업별 무기 (Camera 자식들)")]
     public GameObject weaponPolice;
@@ -26,16 +29,63 @@ public class PlayerJobController : MonoBehaviour
     public GameObject weaponChef;
     public GameObject weaponBuilder;
 
-    [Header("건설자(Builder) 흙 발사 세팅")]
-    public GameObject dirtPrefab;             // 흙 클러스터 메인 프리팹
-    public Transform shovelFirePoint;         // FirePoint 위치
-    public ParticleSystem dirtParticleSystem; // 흙 먼지/빛 파티클
-    public Light dirtFlashLight;              // 흙 빛(섬광) 조명
-    public float throwForce = 32f;            // 먼 거리로 발사하는 강한 힘
-    public float builderCooldown = 0.5f;      // 쿨타임 (0.5초)
+
+    [Header("건축가(Builder) 흙 발사 기본 설정")]
+    public GameObject dirtPrefab;
+
+    public Transform shovelFirePoint;
+
+    public ParticleSystem dirtParticleSystem;
+
+    public Light dirtFlashLight;
+
+    [Tooltip("각 흙 파편을 앞으로 발사하는 힘")]
+    public float throwForce = 32f;
+
+    [Tooltip("건축가 공격 쿨타임")]
+    public float builderCooldown = 0.5f;
+
+
+    [Header("건축가 흙 산탄 설정")]
+
+    [Tooltip("한 번의 삽질에서 발사할 흙 파편 수")]
+    [Range(1, 12)]
+    public int dirtShardCount = 6;
+
+    [Tooltip("좌우로 퍼지는 최대 각도")]
+    [Range(0f, 30f)]
+    public float horizontalSpreadAngle = 12f;
+
+    [Tooltip("위아래로 퍼지는 최대 각도")]
+    [Range(0f, 20f)]
+    public float verticalSpreadAngle = 5f;
+
+    [Tooltip("각 파편에 추가되는 위쪽 힘")]
+    public float shardUpwardForce = 3f;
+
+    [Tooltip("파편 크기의 최소·최대 무작위 배율")]
+    public Vector2 shardScaleMultiplierRange =
+        new Vector2(0.75f, 1.05f);
+
+
+    [Header("건축가 흙 산탄 피해")]
+
+    [Tooltip("같은 적에게 가장 먼저 맞은 파편의 피해")]
+    public float firstShardDamage = 8f;
+
+    [Tooltip("같은 적에게 두 번째부터 맞는 파편의 피해")]
+    public float additionalShardDamage = 2f;
+
+    [Tooltip("한 번의 삽질로 같은 적에게 줄 수 있는 최대 피해")]
+    public float maxShotDamagePerEnemy = 18f;
+
 
     private float lastAttackTime = -999f;
-    private bool isSwinging = false;
+    private bool isSwinging;
+
+    private static int nextBuilderProjectileShotId =
+        300000;
+
 
     private void Start()
     {
@@ -43,25 +93,70 @@ public class PlayerJobController : MonoBehaviour
         ApplyJobSettings(currentJob);
     }
 
+
     private void Update()
     {
+        // 플레이 도중 Hierarchy에서 직접 직업 모델과 무기를
+        // 켜고 끄는 테스트 방식에도 대응한다.
+        DetectActiveJobFromHierarchy();
+
         if (Input.GetButtonDown("Fire1"))
         {
             Attack();
         }
     }
 
+
+    /// <summary>
+    /// 현재 활성화된 모델 또는 무기를 기준으로
+    /// 현재 직업을 자동 감지한다.
+    /// </summary>
     private void DetectActiveJobFromHierarchy()
     {
-        if (modelPolice != null && modelPolice.activeSelf) currentJob = PlayerJob.Police;
-        else if (modelFirefighter != null && modelFirefighter.activeSelf) currentJob = PlayerJob.Firefighter;
-        else if (modelChef != null && modelChef.activeSelf) currentJob = PlayerJob.Chef;
-        else if (modelBuilder != null && modelBuilder.activeSelf) currentJob = PlayerJob.Builder;
+        if (IsJobActive(modelPolice, weaponPolice))
+        {
+            currentJob = PlayerJob.Police;
+        }
+        else if (IsJobActive(
+                     modelFirefighter,
+                     weaponFirefighter))
+        {
+            currentJob = PlayerJob.Firefighter;
+        }
+        else if (IsJobActive(modelChef, weaponChef))
+        {
+            currentJob = PlayerJob.Chef;
+        }
+        else if (IsJobActive(modelBuilder, weaponBuilder))
+        {
+            currentJob = PlayerJob.Builder;
+        }
     }
+
+
+    private bool IsJobActive(
+        GameObject modelObject,
+        GameObject weaponObject)
+    {
+        bool modelActive =
+            modelObject != null &&
+            modelObject.activeSelf;
+
+        bool weaponActive =
+            weaponObject != null &&
+            weaponObject.activeSelf;
+
+        return modelActive || weaponActive;
+    }
+
 
     public void Attack()
     {
-        if (Time.time < lastAttackTime + builderCooldown) return;
+        if (Time.time <
+            lastAttackTime + builderCooldown)
+        {
+            return;
+        }
 
         switch (currentJob)
         {
@@ -79,47 +174,114 @@ public class PlayerJobController : MonoBehaviour
 
             case PlayerJob.Builder:
                 lastAttackTime = Time.time;
-                if (weaponBuilder != null && !isSwinging)
+
+                if (weaponBuilder != null &&
+                    !isSwinging)
                 {
-                    StartCoroutine(ShovelScoopRoutine());
+                    StartCoroutine(
+                        ShovelScoopRoutine()
+                    );
                 }
+
                 break;
         }
     }
 
+
+    /// <summary>
+    /// 삽을 아래로 내렸다가 위로 퍼 올리는 공격 모션이다.
+    /// </summary>
     private IEnumerator ShovelScoopRoutine()
     {
         isSwinging = true;
 
-        Transform targetTransform = weaponBuilder.transform;
-        Transform shovelChild = weaponBuilder.transform.Find("Shovel_001");
-        if (shovelChild != null) targetTransform = shovelChild;
+        Transform targetTransform =
+            weaponBuilder.transform;
 
-        Vector3 origPos = targetTransform.localPosition;
-        Vector3 origEuler = targetTransform.localEulerAngles;
+        Transform shovelChild =
+            weaponBuilder.transform.Find(
+                "Shovel_001"
+            );
 
-        Vector3 downPos = origPos + new Vector3(0f, -0.2f, -0.1f);
-        Vector3 downEuler = origEuler + new Vector3(35f, 0f, 0f);
+        if (shovelChild != null)
+        {
+            targetTransform = shovelChild;
+        }
 
-        Vector3 upPos = origPos + new Vector3(0f, 0.2f, 0.15f);
-        Vector3 upEuler = origEuler + new Vector3(-25f, 0f, 0f);
+        Vector3 originalPosition =
+            targetTransform.localPosition;
+
+        Vector3 originalEuler =
+            targetTransform.localEulerAngles;
+
+        Vector3 downPosition =
+            originalPosition +
+            new Vector3(
+                0f,
+                -0.2f,
+                -0.1f
+            );
+
+        Vector3 downEuler =
+            originalEuler +
+            new Vector3(
+                35f,
+                0f,
+                0f
+            );
+
+        Vector3 upPosition =
+            originalPosition +
+            new Vector3(
+                0f,
+                0.2f,
+                0.15f
+            );
+
+        Vector3 upEuler =
+            originalEuler +
+            new Vector3(
+                -25f,
+                0f,
+                0f
+            );
 
         float elapsed = 0f;
         float durationDownToUp = 0.14f;
+
         bool hasFired = false;
 
         while (elapsed < durationDownToUp)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / durationDownToUp;
-            float smoothT = Mathf.SmoothStep(0f, 1f, t);
 
-            targetTransform.localPosition = Vector3.Lerp(downPos, upPos, smoothT);
-            targetTransform.localEulerAngles = new Vector3(
-                Mathf.LerpAngle(downEuler.x, upEuler.x, smoothT),
-                origEuler.y,
-                origEuler.z
-            );
+            float t =
+                elapsed / durationDownToUp;
+
+            float smoothT =
+                Mathf.SmoothStep(
+                    0f,
+                    1f,
+                    t
+                );
+
+            targetTransform.localPosition =
+                Vector3.Lerp(
+                    downPosition,
+                    upPosition,
+                    smoothT
+                );
+
+            targetTransform.localEulerAngles =
+                new Vector3(
+                    Mathf.LerpAngle(
+                        downEuler.x,
+                        upEuler.x,
+                        smoothT
+                    ),
+                    originalEuler.y,
+                    originalEuler.z
+                );
 
             if (!hasFired && t >= 0.65f)
             {
@@ -130,94 +292,422 @@ public class PlayerJobController : MonoBehaviour
             yield return null;
         }
 
-        if (!hasFired) SpawnDirtCluster();
+        if (!hasFired)
+        {
+            SpawnDirtCluster();
+        }
 
         elapsed = 0f;
-        float durationReturn = 0.16f;
 
-        while (elapsed < durationReturn)
+        float returnDuration = 0.16f;
+
+        while (elapsed < returnDuration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / durationReturn;
 
-            targetTransform.localPosition = Vector3.Lerp(upPos, origPos, t);
-            targetTransform.localEulerAngles = new Vector3(
-                Mathf.LerpAngle(upEuler.x, origEuler.x, t),
-                origEuler.y,
-                origEuler.z
-            );
+            float t =
+                elapsed / returnDuration;
+
+            targetTransform.localPosition =
+                Vector3.Lerp(
+                    upPosition,
+                    originalPosition,
+                    t
+                );
+
+            targetTransform.localEulerAngles =
+                new Vector3(
+                    Mathf.LerpAngle(
+                        upEuler.x,
+                        originalEuler.x,
+                        t
+                    ),
+                    originalEuler.y,
+                    originalEuler.z
+                );
 
             yield return null;
         }
 
-        targetTransform.localPosition = origPos;
-        targetTransform.localEulerAngles = origEuler;
+        targetTransform.localPosition =
+            originalPosition;
+
+        targetTransform.localEulerAngles =
+            originalEuler;
 
         isSwinging = false;
     }
 
-    // 메인 탄환 1개를 쏘아 보내는 함수 (공중에서 폭죽처럼 분열하는 탄환)
+
+    /// <summary>
+    /// 삽질 한 번에 여러 개의 작은 흙 파편을
+    /// 처음부터 부채꼴로 흩뿌린다.
+    /// </summary>
     private void SpawnDirtCluster()
     {
-        if (dirtParticleSystem != null) dirtParticleSystem.Play();
-        if (dirtFlashLight != null) StartCoroutine(FlashDirtLight());
-
-        if (dirtPrefab != null && shovelFirePoint != null)
+        if (dirtParticleSystem != null)
         {
-            GameObject mainDirt = Instantiate(dirtPrefab, shovelFirePoint.position, shovelFirePoint.rotation);
+            dirtParticleSystem.Play();
+        }
 
-            Rigidbody dirtRb = mainDirt.GetComponent<Rigidbody>();
-            if (dirtRb != null)
+        if (dirtFlashLight != null)
+        {
+            StartCoroutine(
+                FlashDirtLight()
+            );
+        }
+
+        if (dirtPrefab == null ||
+            shovelFirePoint == null)
+        {
+            Debug.LogWarning(
+                "건축가 Dirt Prefab 또는 " +
+                "Shovel Fire Point가 비어 있습니다."
+            );
+
+            return;
+        }
+
+        int shardCount =
+            Mathf.Max(
+                1,
+                dirtShardCount
+            );
+
+        // 이번 삽질에서 생성되는 모든 파편이
+        // 동일한 피해와 장판 생성 정보를 공유한다.
+        DirtShotContext shotContext =
+            new DirtShotContext(
+                firstShardDamage,
+                additionalShardDamage,
+                maxShotDamagePerEnemy
+            );
+
+        List<Collider> spawnedColliders =
+            new List<Collider>();
+
+        float centerIndex =
+            (shardCount - 1) * 0.5f;
+
+        for (int i = 0; i < shardCount; i++)
+        {
+            float normalizedHorizontal =
+                centerIndex <= 0f
+                    ? 0f
+                    : (i - centerIndex) /
+                      centerIndex;
+
+            float horizontalAngle =
+                normalizedHorizontal *
+                horizontalSpreadAngle;
+
+            // 파편 배열이 너무 규칙적으로 보이지 않도록
+            // 작은 무작위 각도를 추가한다.
+            horizontalAngle +=
+                Random.Range(
+                    -1.2f,
+                    1.2f
+                );
+
+            float verticalAngle =
+                Random.Range(
+                    -verticalSpreadAngle,
+                    verticalSpreadAngle
+                );
+
+            Quaternion horizontalRotation =
+                Quaternion.AngleAxis(
+                    horizontalAngle,
+                    shovelFirePoint.up
+                );
+
+            Quaternion verticalRotation =
+                Quaternion.AngleAxis(
+                    verticalAngle,
+                    shovelFirePoint.right
+                );
+
+            Vector3 launchDirection =
+                horizontalRotation *
+                verticalRotation *
+                shovelFirePoint.forward;
+
+            GameObject dirtShard =
+                Instantiate(
+                    dirtPrefab,
+                    shovelFirePoint.position,
+                    Random.rotation
+                );
+
+            // 같은 모델만 반복되어 보이지 않도록
+            // 파편마다 크기를 조금씩 다르게 만든다.
+            float minimumScale =
+                Mathf.Min(
+                    shardScaleMultiplierRange.x,
+                    shardScaleMultiplierRange.y
+                );
+
+            float maximumScale =
+                Mathf.Max(
+                    shardScaleMultiplierRange.x,
+                    shardScaleMultiplierRange.y
+                );
+
+            float scaleMultiplier =
+                Random.Range(
+                    minimumScale,
+                    maximumScale
+                );
+
+            dirtShard.transform.localScale *=
+                scaleMultiplier;
+
+            DirtProjectile projectile =
+                dirtShard.GetComponent<DirtProjectile>();
+
+            if (projectile != null)
             {
-                Vector3 throwDirection = shovelFirePoint.forward * throwForce + Vector3.up * 4f;
-                dirtRb.AddForce(throwDirection, ForceMode.Impulse);
+                projectile.Initialize(
+                    shotContext,
+                    nextBuilderProjectileShotId++
+                );
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"{dirtShard.name}에 " +
+                    "DirtProjectile이 없습니다."
+                );
+            }
+
+            Collider shardCollider =
+                dirtShard.GetComponent<Collider>();
+
+            if (shardCollider != null)
+            {
+                // 같은 삽질에서 만들어진 파편끼리는
+                // 서로 충돌하지 않도록 설정한다.
+                foreach (
+                    Collider previousCollider
+                    in spawnedColliders)
+                {
+                    if (previousCollider != null)
+                    {
+                        Physics.IgnoreCollision(
+                            shardCollider,
+                            previousCollider,
+                            true
+                        );
+                    }
+                }
+
+                spawnedColliders.Add(
+                    shardCollider
+                );
+            }
+
+            Rigidbody dirtRigidbody =
+                dirtShard.GetComponent<Rigidbody>();
+
+            if (dirtRigidbody != null)
+            {
+                Vector3 impulse =
+                    launchDirection.normalized *
+                    throwForce +
+                    Vector3.up *
+                    shardUpwardForce;
+
+                dirtRigidbody.AddForce(
+                    impulse,
+                    ForceMode.Impulse
+                );
             }
         }
     }
 
+
     private IEnumerator FlashDirtLight()
     {
         dirtFlashLight.enabled = true;
-        yield return new WaitForSeconds(0.1f);
+
+        yield return new WaitForSeconds(
+            0.1f
+        );
+
         dirtFlashLight.enabled = false;
     }
+
 
     public void ApplyJobSettings(PlayerJob job)
     {
         currentJob = job;
+
         DisableAllObjects();
 
         switch (currentJob)
         {
             case PlayerJob.Police:
-                if (modelPolice) modelPolice.SetActive(true);
-                if (weaponPolice) weaponPolice.SetActive(true);
+                if (modelPolice != null)
+                {
+                    modelPolice.SetActive(true);
+                }
+
+                if (weaponPolice != null)
+                {
+                    weaponPolice.SetActive(true);
+                }
+
                 break;
+
             case PlayerJob.Firefighter:
-                if (modelFirefighter) modelFirefighter.SetActive(true);
-                if (weaponFirefighter) weaponFirefighter.SetActive(true);
+                if (modelFirefighter != null)
+                {
+                    modelFirefighter.SetActive(true);
+                }
+
+                if (weaponFirefighter != null)
+                {
+                    weaponFirefighter.SetActive(true);
+                }
+
                 break;
+
             case PlayerJob.Chef:
-                if (modelChef) modelChef.SetActive(true);
-                if (weaponChef) weaponChef.SetActive(true);
+                if (modelChef != null)
+                {
+                    modelChef.SetActive(true);
+                }
+
+                if (weaponChef != null)
+                {
+                    weaponChef.SetActive(true);
+                }
+
                 break;
+
             case PlayerJob.Builder:
-                if (modelBuilder) modelBuilder.SetActive(true);
-                if (weaponBuilder) weaponBuilder.SetActive(true);
+                if (modelBuilder != null)
+                {
+                    modelBuilder.SetActive(true);
+                }
+
+                if (weaponBuilder != null)
+                {
+                    weaponBuilder.SetActive(true);
+                }
+
                 break;
         }
     }
 
+
     private void DisableAllObjects()
     {
-        if (modelPolice) modelPolice.SetActive(false);
-        if (modelFirefighter) modelFirefighter.SetActive(false);
-        if (modelChef) modelChef.SetActive(false);
-        if (modelBuilder) modelBuilder.SetActive(false);
+        if (modelPolice != null)
+        {
+            modelPolice.SetActive(false);
+        }
 
-        if (weaponPolice) weaponPolice.SetActive(false);
-        if (weaponFirefighter) weaponFirefighter.SetActive(false);
-        if (weaponChef) weaponChef.SetActive(false);
-        if (weaponBuilder) weaponBuilder.SetActive(false);
+        if (modelFirefighter != null)
+        {
+            modelFirefighter.SetActive(false);
+        }
+
+        if (modelChef != null)
+        {
+            modelChef.SetActive(false);
+        }
+
+        if (modelBuilder != null)
+        {
+            modelBuilder.SetActive(false);
+        }
+
+        if (weaponPolice != null)
+        {
+            weaponPolice.SetActive(false);
+        }
+
+        if (weaponFirefighter != null)
+        {
+            weaponFirefighter.SetActive(false);
+        }
+
+        if (weaponChef != null)
+        {
+            weaponChef.SetActive(false);
+        }
+
+        if (weaponBuilder != null)
+        {
+            weaponBuilder.SetActive(false);
+        }
+    }
+
+
+    private void OnValidate()
+    {
+        throwForce =
+            Mathf.Max(0f, throwForce);
+
+        builderCooldown =
+            Mathf.Max(0.01f, builderCooldown);
+
+        dirtShardCount =
+            Mathf.Clamp(
+                dirtShardCount,
+                1,
+                12
+            );
+
+        horizontalSpreadAngle =
+            Mathf.Clamp(
+                horizontalSpreadAngle,
+                0f,
+                30f
+            );
+
+        verticalSpreadAngle =
+            Mathf.Clamp(
+                verticalSpreadAngle,
+                0f,
+                20f
+            );
+
+        shardUpwardForce =
+            Mathf.Max(
+                0f,
+                shardUpwardForce
+            );
+
+        shardScaleMultiplierRange.x =
+            Mathf.Max(
+                0.1f,
+                shardScaleMultiplierRange.x
+            );
+
+        shardScaleMultiplierRange.y =
+            Mathf.Max(
+                0.1f,
+                shardScaleMultiplierRange.y
+            );
+
+        firstShardDamage =
+            Mathf.Max(
+                0f,
+                firstShardDamage
+            );
+
+        additionalShardDamage =
+            Mathf.Max(
+                0f,
+                additionalShardDamage
+            );
+
+        maxShotDamagePerEnemy =
+            Mathf.Max(
+                firstShardDamage,
+                maxShotDamagePerEnemy
+            );
     }
 }
