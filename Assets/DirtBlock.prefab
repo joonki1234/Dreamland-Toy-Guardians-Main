@@ -153,6 +153,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25e5d09973c2e4cdca91e3bf83944c33, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DirtProjectile
-  damage: 10
-  mudSplatPrefab: {fileID: 6874483687604971407, guid: 3745d4488e31a470d9cf0cf5d4b0f103, type: 3}
+  mudSplatPrefab: {fileID: 2316888069084625288, guid: 3745d4488e31a470d9cf0cf5d4b0f103, type: 3}
   destroyDelay: 30
+  minimumGroundNormalY: 0.45
