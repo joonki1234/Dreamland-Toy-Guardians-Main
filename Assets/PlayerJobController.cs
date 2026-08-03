@@ -30,7 +30,7 @@ public class PlayerJobController : MonoBehaviour
     public GameObject weaponBuilder;
 
 
-    [Header("건설자(Builder) 흙 발사 기본 설정")]
+    [Header("건축가(Builder) 흙 발사 기본 설정")]
     public GameObject dirtPrefab;
 
     public Transform shovelFirePoint;

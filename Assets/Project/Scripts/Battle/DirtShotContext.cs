@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using DreamGuardians;
 
 /// <summary>
 /// 건축가가 한 번 삽질했을 때 생성되는 모든 흙 파편이
@@ -10,8 +11,10 @@ using UnityEngine;
 /// </summary>
 public sealed class DirtShotContext
 {
-    private readonly Dictionary<int, float> accumulatedDamageByEnemy =
-        new Dictionary<int, float>();
+    // 적 오브젝트 자체를 기준으로 누적 피해를 기록한다.
+    private readonly Dictionary<EnemyHealth, float>
+        accumulatedDamageByEnemy =
+            new Dictionary<EnemyHealth, float>();
 
     private readonly float firstShardDamage;
     private readonly float additionalShardDamage;
@@ -38,13 +41,17 @@ public sealed class DirtShotContext
     /// 같은 공격에서 해당 적에게 이번 파편이 줄 피해량을 반환한다.
     ///
     /// 첫 번째 파편은 큰 피해를 주고,
-    /// 두 번째 파편부터는 감소된 피해를 준다.
-    /// 최대 피해량에 도달하면 0을 반환한다.
+    /// 이후 파편은 감소된 피해를 준다.
     /// </summary>
-    public float ClaimDamage(int enemyInstanceId)
+    public float ClaimDamage(EnemyHealth enemy)
     {
+        if (enemy == null)
+        {
+            return 0f;
+        }
+
         accumulatedDamageByEnemy.TryGetValue(
-            enemyInstanceId,
+            enemy,
             out float accumulatedDamage
         );
 
@@ -54,7 +61,8 @@ public sealed class DirtShotContext
                 : additionalShardDamage;
 
         float remainingDamage =
-            maximumDamagePerEnemy - accumulatedDamage;
+            maximumDamagePerEnemy -
+            accumulatedDamage;
 
         float appliedDamage =
             Mathf.Clamp(
@@ -63,7 +71,7 @@ public sealed class DirtShotContext
                 remainingDamage
             );
 
-        accumulatedDamageByEnemy[enemyInstanceId] =
+        accumulatedDamageByEnemy[enemy] =
             accumulatedDamage + appliedDamage;
 
         return appliedDamage;

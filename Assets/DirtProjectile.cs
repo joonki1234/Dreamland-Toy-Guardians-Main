@@ -85,9 +85,7 @@ public class DirtProjectile : MonoBehaviour
         );
 
         float damage =
-            shotContext.ClaimDamage(
-                enemy.GetInstanceID()
-            );
+            shotContext.ClaimDamage(enemy);
 
         if (damage > 0f)
         {
