@@ -10,10 +10,13 @@ namespace DreamGuardians
         [SerializeField] private string speaker = "장난감 친구";
         [SerializeField, TextArea(2, 5)] private string message = "대사를 입력하세요.";
         [SerializeField, Min(0.2f)] private float duration = 3f;
+        [Tooltip("나중에 음성을 연결할 때 사용할 선택 항목입니다.")]
+        [SerializeField] private AudioClip voiceClip;
 
         public string Speaker => speaker;
         public string Message => message;
         public float Duration => Mathf.Max(0.2f, duration);
+        public AudioClip VoiceClip => voiceClip;
 
         public TutorialDialogueLine()
         {
@@ -33,12 +36,20 @@ namespace DreamGuardians
     public sealed class TutorialDialogueData : ScriptableObject
     {
         [Header("미션 시작 배너")]
-        [SerializeField] private string missionStartTitle = "MISSION START";
-        [SerializeField] private string missionStartSubtitle = "꿈빛 무기 훈련";
+        [SerializeField] private string missionStartTitle = "TUTORIAL START";
+        [SerializeField] private string missionStartSubtitle = "오염된 장난감을 정화해보세요";
         [SerializeField, Min(0.2f)] private float missionStartDuration = 2f;
 
         [Header("튜토리얼 시작 대사 - 위에서부터 순서대로 재생")]
         [SerializeField] private List<TutorialDialogueLine> introLines = new List<TutorialDialogueLine>();
+
+        [Header("직업 소개 및 8인 선택")]
+        [SerializeField] private List<TutorialDialogueLine> roleIntroductionLines =
+            new List<TutorialDialogueLine>();
+        [SerializeField] private TutorialDialogueLine roleSelectionPromptLine =
+            new TutorialDialogueLine();
+        [SerializeField] private TutorialDialogueLine roleSelectionCompleteLine =
+            new TutorialDialogueLine();
 
         [Header("튜토리얼 적 등장 직전")]
         [SerializeField] private TutorialDialogueLine enemyAppearsLine = new TutorialDialogueLine();
@@ -71,6 +82,12 @@ namespace DreamGuardians
         [SerializeField] private TutorialDialogueLine afterFirstGroupLine = new TutorialDialogueLine();
         [SerializeField] private TutorialDialogueLine beforeFinalGroupLine = new TutorialDialogueLine();
 
+        [Header("2차 공격 종료 - 시너지 해금")]
+        [SerializeField] private string synergyUnlockTitle = "SYNERGY UNLOCK";
+        [SerializeField] private string synergyUnlockSubtitle = "직업의 힘이 서로 연결됩니다";
+        [SerializeField] private List<TutorialDialogueLine> synergyUnlockLines =
+            new List<TutorialDialogueLine>();
+
         [Header("Wave 1 완료")]
         [SerializeField] private string waveClearTitle = "WAVE 1 CLEAR";
         [SerializeField] private string waveClearSubtitle = "꿈빛 코어 방어 성공";
@@ -88,6 +105,12 @@ namespace DreamGuardians
         public string MissionStartSubtitle => missionStartSubtitle;
         public float MissionStartDuration => Mathf.Max(0.2f, missionStartDuration);
         public IReadOnlyList<TutorialDialogueLine> IntroLines => introLines;
+        public IReadOnlyList<TutorialDialogueLine> RoleIntroductionLines =>
+            roleIntroductionLines;
+        public TutorialDialogueLine RoleSelectionPromptLine =>
+            roleSelectionPromptLine;
+        public TutorialDialogueLine RoleSelectionCompleteLine =>
+            roleSelectionCompleteLine;
         public TutorialDialogueLine EnemyAppearsLine => enemyAppearsLine;
         public string ShootingObjective => shootingObjective;
         public TutorialDialogueLine ShootingInstructionLine => shootingInstructionLine;
@@ -105,6 +128,10 @@ namespace DreamGuardians
         public string WaveObjective => waveObjective;
         public TutorialDialogueLine AfterFirstGroupLine => afterFirstGroupLine;
         public TutorialDialogueLine BeforeFinalGroupLine => beforeFinalGroupLine;
+        public string SynergyUnlockTitle => synergyUnlockTitle;
+        public string SynergyUnlockSubtitle => synergyUnlockSubtitle;
+        public IReadOnlyList<TutorialDialogueLine> SynergyUnlockLines =>
+            synergyUnlockLines;
         public string WaveClearTitle => waveClearTitle;
         public string WaveClearSubtitle => waveClearSubtitle;
         public string CoreUpgradeTitle => coreUpgradeTitle;
@@ -115,41 +142,83 @@ namespace DreamGuardians
 
         public void ResetToPrototypeDefaults()
         {
-            missionStartTitle = "MISSION START";
-            missionStartSubtitle = "꿈빛 무기 훈련";
+            missionStartTitle = "TUTORIAL START";
+            missionStartSubtitle = "오염된 장난감을 정화해보세요";
             missionStartDuration = 2f;
 
             introLines = new List<TutorialDialogueLine>
             {
                 new TutorialDialogueLine(
                     "장난감 친구",
-                    "꿈나라 수호대에 온 걸 환영해!",
-                    2.5f),
+                    "다행이다... 드디어 현실과 연결됐어.",
+                    2.6f),
                 new TutorialDialogueLine(
                     "장난감 친구",
-                    "저 빛나는 곳이 우리가 지켜야 할 꿈빛 코어야.",
+                    "너희가 현실에서 온 아이들이구나. 부탁이 있어.",
+                    3.2f),
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "우리 꿈나라가 악몽 바이러스에 오염되고 있어.",
                     3f),
                 new TutorialDialogueLine(
                     "장난감 친구",
-                    "손에 든 꿈빛 무기로 나타나는 악몽을 맞혀보자!",
-                    3f)
+                    "오염된 장난감들이 꿈빛 코어를 빼앗아 포탈을 닫으려 해.",
+                    3.5f),
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "포탈이 닫히면 꿈나라는 현실과 영원히 단절돼.",
+                    3.2f),
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "나와 함께 코어를 지켜줄래?",
+                    2.6f)
             };
+
+            roleIntroductionLines = new List<TutorialDialogueLine>
+            {
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "너희 여덟 명은 두 명씩 한 팀이 되어 네 가지 직업을 맡게 될 거야.",
+                    4f),
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "경찰은 위험을 빠르게 찾아 막고, 소방관은 위급한 순간에 모두를 지켜줘.",
+                    4.5f),
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "요리사는 동료가 계속 싸울 수 있게 돕고, 건축가는 안전한 길과 방어를 만들어.",
+                    4.5f),
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "지금은 각 직업이 무엇을 잘하는지만 기억해 둬. 힘을 연결하는 방법은 전투 중에 알려줄게!",
+                    4.5f)
+            };
+
+            roleSelectionPromptLine = new TutorialDialogueLine(
+                "장난감 친구",
+                "이제 원하는 직업을 골라 줘. 한 직업에는 정확히 두 명씩 들어가야 해!",
+                3.8f);
+
+            roleSelectionCompleteLine = new TutorialDialogueLine(
+                "장난감 친구",
+                "좋아, 여덟 명 모두 준비됐어! 각자의 역할을 기억하고 서로 가까이 움직여 줘.",
+                3.8f);
 
             enemyAppearsLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "정면 성 쪽을 봐! 바닥의 작은 균열에서 연습용 악몽이 나타날 거야.",
+                "고마워. 먼저 오염된 장난감을 정화하는 방법을 알려줄게.",
                 3f);
 
             shootingObjective = "튜토리얼 몬스터를 명중";
             shootingInstructionLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "조준한 뒤 악몽을 세 번 맞혀봐!",
+                "앞에 나타난 장난감을 조준해서 세 번 공격해 봐!",
                 2.5f);
 
             synergyObjective = "두 가지 직업 시너지를 발동";
             synergyInstructionLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "잘했어! 이제 경찰과 소방관, 천문학자와 건축가의 꿈빛을 각각 이어보자!",
+                "직업 시너지는 아직 잠겨 있어. 2차 공격을 막아내면 코어가 힘을 열어 줄 거야!",
                 4f);
 
             purificationObjective = "모두 함께 악몽을 정화";
@@ -164,8 +233,8 @@ namespace DreamGuardians
             tutorialClearDuration = 2f;
             tutorialClearLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "완벽해! 이제 몰려오는 악몽들로부터 꿈빛 코어를 지켜줘!",
-                3f);
+                "좋았어! 이제 오염된 장난감을 정화하면서 꿈빛 코어를 끝까지 지켜줘!",
+                3.5f);
 
             waveStartTitle = "WAVE 1 START";
             waveStartSubtitle = "꿈빛 코어를 지켜라";
@@ -173,12 +242,26 @@ namespace DreamGuardians
 
             afterFirstGroupLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "주변의 꿈이 변하고 있어. 다음 공격을 준비해!",
-                3f);
+                "악몽 바이러스가 현실을 침식하기 시작했어. 다음 공격을 준비해!",
+                3.5f);
             beforeFinalGroupLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "균열이 더 커졌어. 마지막 공격이 올 거야!",
-                3f);
+                "균열이 더 커졌어. 악몽이 빠르게 퍼지고 있어. 조금만 더 버텨!",
+                3.5f);
+
+            synergyUnlockTitle = "SYNERGY UNLOCK";
+            synergyUnlockSubtitle = "직업의 힘이 서로 연결됩니다";
+            synergyUnlockLines = new List<TutorialDialogueLine>
+            {
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "코어에 꿈빛이 충분히 모였어! 이제 서로 다른 직업의 힘을 연결할 수 있어.",
+                    4.2f),
+                new TutorialDialogueLine(
+                    "장난감 친구",
+                    "동료의 행동에 맞춰 직업 능력을 이어 써 봐. 혼자일 때보다 훨씬 강한 효과가 나타날 거야!",
+                    4.5f)
+            };
 
             waveClearTitle = "WAVE 1 CLEAR";
             waveClearSubtitle = "꿈빛 코어 방어 성공";
@@ -187,7 +270,7 @@ namespace DreamGuardians
             coreUpgradeSubtitle = "꿈빛 코어가 무기를 강화합니다";
             coreUpgradeLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "코어가 되찾은 꿈빛으로 무기를 강화하고 있어!",
+                "해냈어! 코어가 되찾은 꿈빛으로 무기를 강화하고 있어!",
                 3f);
 
             missionFailedTitle = "MISSION FAILED";
@@ -202,6 +285,9 @@ namespace DreamGuardians
             {
                 introLines = new List<TutorialDialogueLine>();
             }
+
+            roleIntroductionLines ??= new List<TutorialDialogueLine>();
+            synergyUnlockLines ??= new List<TutorialDialogueLine>();
         }
     }
 }

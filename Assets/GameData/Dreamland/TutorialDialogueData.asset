@@ -12,38 +12,62 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af3b96ad2529086478b5f219979d7bbe, type: 3}
   m_Name: TutorialDialogueData
   m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.TutorialDialogueData
-  missionStartTitle: MISSION START
-  missionStartSubtitle: "\uAFC8\uBE5B \uBB34\uAE30 \uD6C8\uB828"
+  missionStartTitle: TUTORIAL START
+  missionStartSubtitle: "\uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uC744 \uC815\uD654\uD574\uBCF4\uC138\uC694"
   missionStartDuration: 2
   introLines:
   - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uAFC8\uB098\uB77C \uC218\uD638\uB300\uC5D0 \uC628 \uAC78 \uD658\uC601\uD574!"
-    duration: 2.5
+    message: "\uB2E4\uD589\uC774\uB2E4... \uB4DC\uB514\uC5B4 \uD604\uC2E4\uACFC \uC5F0\uACB0\uB410\uC5B4."
+    duration: 2.6
   - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC800 \uBE5B\uB098\uB294 \uACF3\uC774 \uC6B0\uB9AC\uAC00 \uC9C0\uCF1C\uC57C
-      \uD560 \uAFC8\uBE5B \uCF54\uC5B4\uC57C."
+    message: "\uB108\uD76C\uAC00 \uD604\uC2E4\uC5D0\uC11C \uC628 \uC544\uC774\uB4E4\uC774\uAD6C\uB098. \uBD80\uD0C1\uC774 \uC788\uC5B4."
+    duration: 3.2
+  - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
+    message: "\uC6B0\uB9AC \uAFC8\uB098\uB77C\uAC00 \uC545\uBABD \uBC14\uC774\uB7EC\uC2A4\uC5D0 \uC624\uC5FC\uB418\uACE0 \uC788\uC5B4."
     duration: 3
   - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC190\uC5D0 \uB4E0 \uAFC8\uBE5B \uBB34\uAE30\uB85C \uB098\uD0C0\uB098\uB294
-      \uC545\uBABD\uC744 \uB9DE\uD600\uBCF4\uC790!"
-    duration: 3
+    message: "\uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uB4E4\uC774 \uAFC8\uBE5B \uCF54\uC5B4\uB97C \uBE7C\uC557\uC544 \uD3EC\uD0C8\uC744 \uB2EB\uC73C\uB824 \uD574."
+    duration: 3.5
+  - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
+    message: "\uD3EC\uD0C8\uC774 \uB2EB\uD788\uBA74 \uAFC8\uB098\uB77C\uB294 \uD604\uC2E4\uACFC \uC601\uC6D0\uD788 \uB2E8\uC808\uB3FC."
+    duration: 3.2
+  - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
+    message: "\uB098\uC640 \uD568\uAED8 \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uC904\uB798?"
+    duration: 2.6
+  roleIntroductionLines:
+  - speaker: "장난감 친구"
+    message: "너희 여덟 명은 두 명씩 한 팀이 되어 네 가지 직업을 맡게 될 거야."
+    duration: 4
+  - speaker: "장난감 친구"
+    message: "경찰은 위험을 빠르게 찾아 막고, 소방관은 위급한 순간에 모두를 지켜줘."
+    duration: 4.5
+  - speaker: "장난감 친구"
+    message: "요리사는 동료가 계속 싸울 수 있게 돕고, 건축가는 안전한 길과 방어를 만들어."
+    duration: 4.5
+  - speaker: "장난감 친구"
+    message: "지금은 각 직업이 무엇을 잘하는지만 기억해 둬. 힘을 연결하는 방법은 전투 중에 알려줄게!"
+    duration: 4.5
+  roleSelectionPromptLine:
+    speaker: "장난감 친구"
+    message: "이제 원하는 직업을 골라 줘. 한 직업에는 정확히 두 명씩 들어가야 해!"
+    duration: 3.8
+  roleSelectionCompleteLine:
+    speaker: "장난감 친구"
+    message: "좋아, 여덟 명 모두 준비됐어! 각자의 역할을 기억하고 서로 가까이 움직여 줘."
+    duration: 3.8
   enemyAppearsLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC815\uBA74 \uC131 \uCABD\uC744 \uBD10! \uBC14\uB2E5\uC758 \uC791\uC740
-      \uADE0\uC5F4\uC5D0\uC11C \uC5F0\uC2B5\uC6A9 \uC545\uBABD\uC774 \uB098\uD0C0\uB0A0
-      \uAC70\uC57C."
+    message: "\uACE0\uB9C8\uC6CC. \uBA3C\uC800 \uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uC744 \uC815\uD654\uD558\uB294 \uBC29\uBC95\uC744 \uC54C\uB824\uC904\uAC8C."
     duration: 3
   shootingObjective: "\uD29C\uD1A0\uB9AC\uC5BC \uBAAC\uC2A4\uD130\uB97C \uBA85\uC911"
   shootingInstructionLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC870\uC900\uD55C \uB4A4 \uC545\uBABD\uC744 \uC138 \uBC88 \uB9DE\uD600\uBD10!"
+    message: "\uC55E\uC5D0 \uB098\uD0C0\uB09C \uC7A5\uB09C\uAC10\uC744 \uC870\uC900\uD574\uC11C \uC138 \uBC88 \uACF5\uACA9\uD574 \uBD10!"
     duration: 2.5
   synergyObjective: "\uB450 \uAC00\uC9C0 \uC9C1\uC5C5 \uC2DC\uB108\uC9C0\uB97C \uBC1C\uB3D9"
   synergyInstructionLine:
-    speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC798\uD588\uC5B4! \uC774\uC81C \uACBD\uCC30\uACFC \uC18C\uBC29\uAD00,
-      \uCC9C\uBB38\uD559\uC790\uC640 \uAC74\uCD95\uAC00\uC758 \uAFC8\uBE5B\uC744
-      \uAC01\uAC01 \uC774\uC5B4\uBCF4\uC790!"
+    speaker: "장난감 친구"
+    message: "직업 시너지는 아직 잠겨 있어. 2차 공격을 막아내면 코어가 힘을 열어 줄 거야!"
     duration: 4
   purificationObjective: "\uBAA8\uB450 \uD568\uAED8 \uC545\uBABD\uC744 \uC815\uD654"
   purificationProgress: "\uBAAC\uC2A4\uD130 HP\uB97C 0\uC73C\uB85C \uB9CC\uB4DC\uC138\uC694"
@@ -58,30 +82,35 @@ MonoBehaviour:
   tutorialClearDuration: 2
   tutorialClearLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC644\uBCBD\uD574! \uC774\uC81C \uBAB0\uB824\uC624\uB294 \uC545\uBABD\uB4E4\uB85C\uBD80\uD130
-      \uAFC8\uBE5B \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uC918!"
-    duration: 3
+    message: "\uC88B\uC558\uC5B4! \uC774\uC81C \uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uC744 \uC815\uD654\uD558\uBA74\uC11C \uAFC8\uBE5B \uCF54\uC5B4\uB97C \uB05D\uAE4C\uC9C0 \uC9C0\uCF1C\uC918!"
+    duration: 3.5
   waveStartTitle: WAVE 1 START
   waveStartSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uB77C"
   waveObjective: "Stage 1 \xB7 \uCF54\uC5B4 \uBC29\uC5B4"
   afterFirstGroupLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC8FC\uBCC0\uC758 \uAFC8\uC774 \uBCC0\uD558\uACE0 \uC788\uC5B4. \uB2E4\uC74C
-      \uACF5\uACA9\uC744 \uC900\uBE44\uD574!"
-    duration: 3
+    message: "\uC545\uBABD \uBC14\uC774\uB7EC\uC2A4\uAC00 \uD604\uC2E4\uC744 \uCE68\uC2DD\uD558\uAE30 \uC2DC\uC791\uD588\uC5B4. \uB2E4\uC74C \uACF5\uACA9\uC744 \uC900\uBE44\uD574!"
+    duration: 3.5
   beforeFinalGroupLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uADE0\uC5F4\uC774 \uB354 \uCEE4\uC84C\uC5B4. \uB9C8\uC9C0\uB9C9 \uACF5\uACA9\uC774
-      \uC62C \uAC70\uC57C!"
-    duration: 3
+    message: "\uADE0\uC5F4\uC774 \uB354 \uCEE4\uC84C\uC5B4. \uC545\uBABD\uC774 \uBE60\uB974\uAC8C \uD37C\uC9C0\uACE0 \uC788\uC5B4. \uC870\uAE08\uB9CC \uB354 \uBC84\uD168!"
+    duration: 3.5
+  synergyUnlockTitle: SYNERGY UNLOCK
+  synergyUnlockSubtitle: "직업의 힘이 서로 연결됩니다"
+  synergyUnlockLines:
+  - speaker: "장난감 친구"
+    message: "코어에 꿈빛이 충분히 모였어! 이제 서로 다른 직업의 힘을 연결할 수 있어."
+    duration: 4.2
+  - speaker: "장난감 친구"
+    message: "동료의 행동에 맞춰 직업 능력을 이어 써 봐. 혼자일 때보다 훨씬 강한 효과가 나타날 거야!"
+    duration: 4.5
   waveClearTitle: WAVE 1 CLEAR
   waveClearSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4 \uBC29\uC5B4 \uC131\uACF5"
   coreUpgradeTitle: CORE UPGRADE
   coreUpgradeSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4\uAC00 \uBB34\uAE30\uB97C \uAC15\uD654\uD569\uB2C8\uB2E4"
   coreUpgradeLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uCF54\uC5B4\uAC00 \uB418\uCC3E\uC740 \uAFC8\uBE5B\uC73C\uB85C \uBB34\uAE30\uB97C
-      \uAC15\uD654\uD558\uACE0 \uC788\uC5B4!"
+    message: "\uD574\uB0C8\uC5B4! \uCF54\uC5B4\uAC00 \uB418\uCC3E\uC740 \uAFC8\uBE5B\uC73C\uB85C \uBB34\uAE30\uB97C \uAC15\uD654\uD558\uACE0 \uC788\uC5B4!"
     duration: 3
   missionFailedTitle: MISSION FAILED
   missionFailedSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4\uAC00 \uBB34\uB108\uC84C\uC2B5\uB2C8\uB2E4"

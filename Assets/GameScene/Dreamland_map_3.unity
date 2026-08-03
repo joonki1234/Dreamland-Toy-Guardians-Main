@@ -26280,12 +26280,15 @@ MonoBehaviour:
   lightIntensity: 3.5
   lightRange: 2.5
   trailTime: 0.45
-  playOnStart: 1
+  playOnStart: 0
   playOnlyOnce: 1
   onOrbStarted:
     m_PersistentCalls:
       m_Calls: []
   onFriendAppeared:
+    m_PersistentCalls:
+      m_Calls: []
+  onSequenceCompleted:
     m_PersistentCalls:
       m_Calls: []
 --- !u!1 &1208015191
@@ -34804,6 +34807,11 @@ MonoBehaviour:
   finalPhaseSubtitle: "\uB0A8\uC740 \uC545\uBABD\uC744 \uBAA8\uB450 \uC815\uD654\uD558\uB77C"
   waveBannerDuration: 1.5
   progressRefreshInterval: 0.2
+  quickGuideDuration: 3
+  stageStartGuideMessage: "\uC545\uBABD \uBC14\uC774\uB7EC\uC2A4\uAC00 \uB354 \uAC15\uD574\uC84C\uC5B4. \uCF54\uC5B4\uB97C \uACC4\uC18D \uC9C0\uCF1C\uC918!"
+  firstWaveGuideMessage: "\uAC80\uC740 \uADE0\uC5F4\uC774 \uB2E4\uC2DC \uC5F4\uB9AC\uACE0 \uC788\uC5B4. \uCF54\uC5B4\uC5D0 \uB2FF\uAE30 \uC804\uC5D0 \uBAA8\uB450 \uC815\uD654\uD574!"
+  secondWaveGuideMessage: "\uADE0\uC5F4\uC774 \uB354 \uCEE4\uC9C0\uACE0 \uC788\uC5B4. \uC0AC\uBC29\uC5D0\uC11C \uC624\uB294 \uC7A5\uB09C\uAC10\uB4E4\uC744 \uC870\uC2EC\uD574!"
+  finalWaveGuideMessage: "\uAFC8\uB098\uB77C\uAC00 \uD604\uC2E4\uC744 \uB36E\uACE0 \uC788\uC5B4. \uB9C8\uC9C0\uB9C9 \uACF5\uACA9\uC774\uC57C. \uC870\uAE08\uB9CC \uB354 \uBC84\uD168!"
   clearTitle: STAGE 2 CLEAR
   clearSubtitle: "\uAFC8\uC758 \uADE0\uC5F4\uC774 \uC57D\uD574\uC84C\uC2B5\uB2C8\uB2E4"
   clearSpeaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
@@ -46582,6 +46590,7 @@ MonoBehaviour:
   tutorialSpawnPoint: {fileID: 1215213847}
   dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
   allyPortalCoreRevealController: {fileID: 507189367}
+  toyFriendEntranceSequence: {fileID: 1204546938}
   requiredHitsPerPlayer: 3
   expectedPlayerCount: 1
   requireBothSynergiesBeforePurification: 0

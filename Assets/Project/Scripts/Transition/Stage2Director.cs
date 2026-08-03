@@ -69,6 +69,30 @@ public sealed class Stage2Director : MonoBehaviour
     [SerializeField]
     private float progressRefreshInterval = 0.2f;
 
+    [Header("장난감 친구 2D 안내")]
+    [SerializeField, Min(0.1f)]
+    private float quickGuideDuration = 3f;
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string stageStartGuideMessage =
+        "악몽 바이러스가 더 강해졌어. 코어를 계속 지켜줘!";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string firstWaveGuideMessage =
+        "검은 균열이 다시 열리고 있어. 코어에 닿기 전에 모두 정화해!";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string secondWaveGuideMessage =
+        "균열이 더 커지고 있어. 사방에서 오는 장난감들을 조심해!";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string finalWaveGuideMessage =
+        "꿈나라가 현실을 덮고 있어. 마지막 공격이야. 조금만 더 버텨!";
+
     [Header("Stage 2 완료 UI")]
     [SerializeField]
     private string clearTitle = "STAGE 2 CLEAR";
@@ -214,6 +238,12 @@ public sealed class Stage2Director : MonoBehaviour
             stageStartBannerDuration);
         missionUI?.SetObjective(stageObjective);
         missionUI?.SetProgress("Stage 2 전투 준비");
+        missionUI?.ShowQuickGuide(
+            "장난감 친구",
+            stageStartGuideMessage,
+            Mathf.Min(
+                quickGuideDuration,
+                stageStartBannerDuration));
 
         progressRoutine = StartCoroutine(UpdateProgressRoutine());
 
@@ -230,27 +260,32 @@ public sealed class Stage2Director : MonoBehaviour
         }
 
         string title;
+        string guideMessage;
 
         switch (phase)
         {
             case Stage2WaveController.Stage2WavePhase.First:
                 title = firstWaveTitle;
                 currentPhaseLabel = "첫 번째 공격";
+                guideMessage = firstWaveGuideMessage;
                 break;
 
             case Stage2WaveController.Stage2WavePhase.Second:
                 title = secondWaveTitle;
                 currentPhaseLabel = "두 번째 공격";
+                guideMessage = secondWaveGuideMessage;
                 break;
 
             case Stage2WaveController.Stage2WavePhase.Final:
                 title = finalWaveTitle;
                 currentPhaseLabel = "최종 공격";
+                guideMessage = finalWaveGuideMessage;
                 break;
 
             default:
                 title = "WAVE";
                 currentPhaseLabel = "공격 진행";
+                guideMessage = string.Empty;
                 break;
         }
 
@@ -258,6 +293,14 @@ public sealed class Stage2Director : MonoBehaviour
             title,
             "악몽 " + enemyCount + "마리 출현",
             waveBannerDuration);
+
+        if (!string.IsNullOrWhiteSpace(guideMessage))
+        {
+            missionUI?.ShowQuickGuide(
+                "장난감 친구",
+                guideMessage,
+                quickGuideDuration);
+        }
 
         RefreshProgressText();
     }
@@ -313,7 +356,7 @@ public sealed class Stage2Director : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(clearMessage))
         {
-            missionUI?.ShowDialogue(
+            missionUI?.ShowQuickGuide(
                 clearSpeaker,
                 clearMessage,
                 clearDialogueDuration);
@@ -428,6 +471,7 @@ public sealed class Stage2Director : MonoBehaviour
         stageStartBannerDuration = Mathf.Max(0.1f, stageStartBannerDuration);
         waveBannerDuration = Mathf.Max(0.1f, waveBannerDuration);
         progressRefreshInterval = Mathf.Max(0.05f, progressRefreshInterval);
+        quickGuideDuration = Mathf.Max(0.1f, quickGuideDuration);
         clearBannerDuration = Mathf.Max(0.1f, clearBannerDuration);
         clearDialogueDuration = Mathf.Max(0.1f, clearDialogueDuration);
         failedBannerDuration = Mathf.Max(0.1f, failedBannerDuration);

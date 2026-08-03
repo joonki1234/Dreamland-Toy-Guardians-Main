@@ -25,12 +25,26 @@ namespace DreamGuardians
         [SerializeField]
         private TutorialDialogueData dialogueData;
 
+        [Tooltip("8명이 직업을 두 명씩 선택하는 튜토리얼 단계입니다.")]
+        [SerializeField]
+        private RoleSelectionController roleSelection;
+
+        [Tooltip("3D 대사 말풍선과 말하는 몸짓을 재생할 장난감 친구입니다.")]
+        [SerializeField]
+        private ToyFriendController toyFriend;
+
         [Tooltip(
             "아군 포탈 → 코어 → Road_0 등장 연출을 " +
             "관리하는 컨트롤러입니다.")]
         [SerializeField]
         private AllyPortalCoreRevealController
             allyPortalCoreRevealController;
+
+        [Tooltip(
+            "코어에서 빛이 나와 장난감 친구로 변하는 등장 연출입니다.")]
+        [SerializeField]
+        private ToyFriendEntranceSequence
+            toyFriendEntranceSequence;
 
 
         [Header("Tutorial")]
@@ -157,6 +171,33 @@ namespace DreamGuardians
                     UnityEngine.Object.FindAnyObjectByType
                         <AllyPortalCoreRevealController>();
             }
+
+            if (toyFriendEntranceSequence == null)
+            {
+                toyFriendEntranceSequence =
+                    UnityEngine.Object.FindAnyObjectByType
+                        <ToyFriendEntranceSequence>();
+            }
+
+            if (toyFriend == null)
+            {
+                toyFriend = UnityEngine.Object.FindAnyObjectByType
+                    <ToyFriendController>();
+            }
+
+            if (roleSelection == null)
+            {
+                roleSelection = GetComponent<RoleSelectionController>();
+            }
+
+            if (roleSelection == null)
+            {
+                // 씬을 직접 수정하지 않아도 기존 프로젝트에서 바로 시험할 수 있습니다.
+                roleSelection = gameObject.AddComponent<RoleSelectionController>();
+            }
+
+            // 코어보다 먼저 등장하지 않도록 튜토리얼 진행이 시작 시점을 관리합니다.
+            toyFriendEntranceSequence?.SetAutomaticStart(false);
         }
 
 
@@ -240,6 +281,7 @@ namespace DreamGuardians
             ResolveReferences();
 
             stage1CompletionEventRaised = false;
+            RoleSynergyProgression.Lock();
 
             flowRoutine =
                 StartCoroutine(
@@ -251,12 +293,11 @@ namespace DreamGuardians
         /// 튜토리얼 시작 흐름입니다.
         ///
         /// 진행 순서:
-        /// 1. MISSION START 배너
-        /// 2. 아군 포탈 등장
-        /// 3. 코어 등장
-        /// 4. Road_0 등장
-        /// 5. 튜토리얼 대사
-        /// 6. 튜토리얼 적 등장
+        /// 1. 아군 포탈 → 코어 → Road_0 등장
+        /// 2. 장난감 친구 등장과 이동
+        /// 3. 장난감 친구의 3D 스토리 설명
+        /// 4. 튜토리얼 시작 배너
+        /// 5. 튜토리얼 적 등장과 2D 행동 안내
         /// </summary>
         private IEnumerator BeginRoutine()
         {
@@ -265,36 +306,7 @@ namespace DreamGuardians
 
 
             /*
-             * 1단계: 미션 시작 배너
-             */
-            missionUI?.ShowBanner(
-                dialogueData != null
-                    ? dialogueData.MissionStartTitle
-                    : "MISSION START",
-
-                dialogueData != null
-                    ? dialogueData.MissionStartSubtitle
-                    : "꿈빛 무기 훈련",
-
-                dialogueData != null
-                    ? dialogueData.MissionStartDuration
-                    : 2f);
-
-
-            float missionStartDuration =
-                dialogueData != null
-                    ? dialogueData.MissionStartDuration
-                    : 2f;
-
-            if (missionStartDuration > 0f)
-            {
-                yield return new WaitForSeconds(
-                    missionStartDuration);
-            }
-
-
-            /*
-             * 2단계:
+             * 1단계:
              * 아군 포탈 → 코어 → Road_0 등장
              */
             if (allyPortalCoreRevealController != null)
@@ -332,7 +344,38 @@ namespace DreamGuardians
 
 
             /*
-             * 3단계: 튜토리얼 설명 대사
+             * 2단계:
+             * 코어에서 나온 빛이 장난감 친구로 변하고,
+             * 대화 위치까지 걸어온 뒤 플레이어를 바라봅니다.
+             */
+            if (toyFriendEntranceSequence != null)
+            {
+                toyFriendEntranceSequence.PlaySequence();
+
+                while (toyFriendEntranceSequence.IsPlaying)
+                {
+                    yield return null;
+                }
+
+                if (!toyFriendEntranceSequence.HasCompleted)
+                {
+                    Debug.LogWarning(
+                        "[Dreamland] 장난감 친구 등장 연출이 " +
+                        "완료되지 않았습니다.",
+                        this);
+                }
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[Dreamland] ToyFriendEntranceSequence가 없어 " +
+                    "장난감 친구 등장 연출을 건너뜁니다.",
+                    this);
+            }
+
+
+            /*
+             * 3단계: 3D 장난감 친구의 스토리 설명
              */
             if (dialogueData != null &&
                 dialogueData.IntroLines != null)
@@ -345,25 +388,92 @@ namespace DreamGuardians
                         PlayDialogueLine(line);
                 }
 
-                yield return
-                    PlayDialogueLine(
-                        dialogueData.EnemyAppearsLine);
             }
             else
             {
-                missionUI?.ShowDialogue(
-                    "장난감 친구",
-                    "꿈나라 수호대에 온 걸 환영해! " +
-                    "손에 든 꿈빛 무기로 악몽을 맞혀보자.",
-                    3f);
-
-                yield return
-                    new WaitForSeconds(3f);
+                yield return PlayDialogueLine(
+                    new TutorialDialogueLine(
+                        "장난감 친구",
+                        "우리 꿈나라가 악몽 바이러스에 오염되고 있어. 나와 함께 꿈빛 코어를 지켜줄래?",
+                        3f));
             }
 
 
             /*
-             * 4단계: 튜토리얼 적 등장 전 대기
+             * 4단계:
+             * 직업의 역할만 먼저 설명한 뒤 8명이 두 명씩 직업을 선택합니다.
+             * 시너지 설명과 실제 해금은 Stage 1의 2차 공격 종료 뒤에 진행합니다.
+             */
+            State = TutorialStage1State.RoleSelection;
+
+            if (dialogueData != null &&
+                dialogueData.RoleIntroductionLines != null)
+            {
+                foreach (TutorialDialogueLine line in
+                         dialogueData.RoleIntroductionLines)
+                {
+                    yield return PlayDialogueLine(line);
+                }
+
+                yield return PlayDialogueLine(
+                    dialogueData.RoleSelectionPromptLine);
+            }
+            else
+            {
+                yield return PlayDialogueLine(
+                    new TutorialDialogueLine(
+                        "장난감 친구",
+                        "여덟 명이 두 명씩 경찰, 소방관, 요리사, 건축가를 맡아 줘!",
+                        4f));
+            }
+
+            if (roleSelection != null)
+            {
+                yield return roleSelection.ShowAndWait();
+            }
+
+            if (dialogueData != null)
+            {
+                yield return PlayDialogueLine(
+                    dialogueData.RoleSelectionCompleteLine);
+                yield return PlayDialogueLine(
+                    dialogueData.EnemyAppearsLine);
+            }
+
+            State = TutorialStage1State.Intro;
+
+
+            /*
+             * 5단계: 설명과 직업 선택이 끝난 뒤 튜토리얼 시작 배너
+             */
+            missionUI?.ShowBanner(
+                dialogueData != null
+                    ? dialogueData.MissionStartTitle
+                    : "TUTORIAL START",
+
+                dialogueData != null
+                    ? dialogueData.MissionStartSubtitle
+                    : "오염된 장난감을 정화해보세요",
+
+                dialogueData != null
+                    ? dialogueData.MissionStartDuration
+                    : 2f);
+
+
+            float missionStartDuration =
+                dialogueData != null
+                    ? dialogueData.MissionStartDuration
+                    : 2f;
+
+            if (missionStartDuration > 0f)
+            {
+                yield return new WaitForSeconds(
+                    missionStartDuration);
+            }
+
+
+            /*
+             * 5단계: 튜토리얼 적 등장 전 대기
              */
             if (firstSpawnDelay > 0f)
             {
@@ -377,7 +487,7 @@ namespace DreamGuardians
 
 
             /*
-             * 5단계: 튜토리얼 적 생성
+             * 6단계: 튜토리얼 적 생성
              */
             tutorialEnemy =
                 spawner.SpawnTutorialEnemy(
@@ -413,7 +523,7 @@ namespace DreamGuardians
 
             if (dialogueData != null)
             {
-                ShowDialogueLine(
+                ShowGuideLine(
                     dialogueData
                         .ShootingInstructionLine);
             }
@@ -432,18 +542,29 @@ namespace DreamGuardians
                 yield break;
             }
 
+            float playbackDuration =
+                line.VoiceClip != null
+                    ? Mathf.Max(line.Duration, line.VoiceClip.length)
+                    : line.Duration;
+
             missionUI?.ShowDialogue(
                 line.Speaker,
                 line.Message,
-                line.Duration);
+                playbackDuration);
+
+            toyFriend?.Speak(
+                line.Message,
+                playbackDuration,
+                false,
+                line.VoiceClip);
 
             yield return
                 new WaitForSeconds(
-                    line.Duration);
+                    playbackDuration);
         }
 
 
-        private void ShowDialogueLine(
+        private void ShowGuideLine(
             TutorialDialogueLine line)
         {
             if (line == null ||
@@ -453,7 +574,7 @@ namespace DreamGuardians
                 return;
             }
 
-            missionUI?.ShowDialogue(
+            missionUI?.ShowQuickGuide(
                 line.Speaker,
                 line.Message,
                 line.Duration);
@@ -629,13 +750,13 @@ namespace DreamGuardians
 
                 if (dialogueData != null)
                 {
-                    ShowDialogueLine(
+                    ShowGuideLine(
                         dialogueData
                             .SynergyInstructionLine);
                 }
                 else
                 {
-                    missionUI?.ShowDialogue(
+                    missionUI?.ShowQuickGuide(
                         "장난감 친구",
                         "잘했어! 이제 두 가지 " +
                         "꿈빛 시너지를 발동해보자!",
@@ -673,7 +794,7 @@ namespace DreamGuardians
             }
             else if (
                 data.Kind ==
-                SynergyKind.StarlightBlueprint)
+                SynergyKind.ChefArchitectCombo)
             {
                 starlightBlueprintCompleted =
                     true;
@@ -732,13 +853,13 @@ namespace DreamGuardians
 
             if (dialogueData != null)
             {
-                ShowDialogueLine(
+                ShowGuideLine(
                     dialogueData
                         .PurificationInstructionLine);
             }
             else
             {
-                missionUI?.ShowDialogue(
+                missionUI?.ShowQuickGuide(
                     "장난감 친구",
                     "좋아! 이제 악몽을 " +
                     "완전히 정화해보자!",
@@ -812,7 +933,7 @@ namespace DreamGuardians
 
             if (dialogueData != null)
             {
-                ShowDialogueLine(
+                ShowGuideLine(
                     dialogueData
                         .TutorialClearLine);
 
@@ -829,7 +950,7 @@ namespace DreamGuardians
             }
             else
             {
-                missionUI?.ShowDialogue(
+                missionUI?.ShowQuickGuide(
                     "장난감 친구",
                     "완벽해! 이제 꿈빛 코어를 지켜줘!",
                     3f);
@@ -908,7 +1029,7 @@ namespace DreamGuardians
 
             if (dialogueData != null)
             {
-                ShowDialogueLine(
+                ShowGuideLine(
                     dialogueData.CoreUpgradeLine);
 
                 if (dialogueData.CoreUpgradeLine != null)
@@ -923,7 +1044,7 @@ namespace DreamGuardians
             }
             else
             {
-                missionUI?.ShowDialogue(
+                missionUI?.ShowQuickGuide(
                     "장난감 친구",
                     "코어가 되찾은 꿈빛으로 " +
                     "무기를 강화하고 있어!",
@@ -1042,6 +1163,7 @@ namespace DreamGuardians
             emergencySuppressionCompleted = false;
             starlightBlueprintCompleted = false;
             stage1CompletionEventRaised = false;
+            RoleSynergyProgression.Unlock();
 
 
             State =
@@ -1065,6 +1187,9 @@ namespace DreamGuardians
         private void StopDirectorCoroutines()
         {
             StopAllCoroutines();
+
+            roleSelection?.Hide();
+            toyFriend?.StopSpeaking();
 
             flowRoutine = null;
             transitionToWaveRoutine = null;
@@ -1135,7 +1260,7 @@ namespace DreamGuardians
 
             missionUI?.SetProgress(
                 $"긴급 진압: {first}  ·  " +
-                $"별빛 설계: {second}");
+                $"협동 제작: {second}");
         }
 
 

@@ -81,8 +81,16 @@ namespace DreamGuardians
         [SerializeField]
         private UnityEvent onFriendAppeared;
 
+        [SerializeField]
+        private UnityEvent onSequenceCompleted;
+
         private Coroutine sequenceRoutine;
         private bool hasPlayed;
+        private bool hasCompleted;
+
+        public bool IsPlaying => sequenceRoutine != null;
+        public bool HasPlayed => hasPlayed;
+        public bool HasCompleted => hasCompleted;
 
         private void Awake()
         {
@@ -131,11 +139,21 @@ namespace DreamGuardians
                     SequenceRoutine());
         }
 
+        /// <summary>
+        /// 다른 진행 컨트롤러가 등장 시점을 관리할 때 사용합니다.
+        /// Awake 이후 Start가 실행되기 전에 호출하면 자동 재생을 막을 수 있습니다.
+        /// </summary>
+        public void SetAutomaticStart(bool enabled)
+        {
+            playOnStart = enabled;
+        }
+
         [ContextMenu("Reset Sequence")]
         public void ResetSequence()
         {
             StopSequence();
             hasPlayed = false;
+            hasCompleted = false;
 
             if (toyFriend != null)
             {
@@ -190,6 +208,7 @@ namespace DreamGuardians
         private IEnumerator SequenceRoutine()
         {
             hasPlayed = true;
+            hasCompleted = false;
             toyFriend.SetAutomaticEntrance(false);
             toyFriend.PrepareAtSpawn(false);
 
@@ -309,7 +328,18 @@ namespace DreamGuardians
             // 친구가 SpawnPoint에서 TalkPoint까지 걷도록 기존 로직을 실행합니다.
             toyFriend.PlayEntrance();
 
+            // 이동 코루틴이 시작될 한 프레임을 보낸 뒤,
+            // 대화 위치 도착과 플레이어 바라보기가 끝날 때까지 기다립니다.
+            yield return null;
+
+            while (toyFriend.IsMoving)
+            {
+                yield return null;
+            }
+
             sequenceRoutine = null;
+            hasCompleted = true;
+            onSequenceCompleted?.Invoke();
         }
 
         private IEnumerator ArrivalFlash(

@@ -1,5 +1,7 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
 
 namespace DreamGuardians
 {
@@ -12,6 +14,10 @@ namespace DreamGuardians
     {
         private static readonly int BlendHash =
             Animator.StringToHash("Blend");
+        private static readonly int NormalHash =
+            Animator.StringToHash("normal");
+        private static readonly int HappyHash =
+            Animator.StringToHash("happy");
 
         [Header("References")]
         [SerializeField]
@@ -26,6 +32,10 @@ namespace DreamGuardians
 
         [SerializeField]
         private Transform talkPoint;
+
+        [Tooltip("비워두면 Animator가 붙은 Visual 루트를 사용합니다.")]
+        [SerializeField]
+        private Transform visualRoot;
 
         [Header("Movement")]
         [SerializeField, Min(0.1f)]
@@ -51,6 +61,36 @@ namespace DreamGuardians
         [SerializeField, Min(0f)]
         private float animationDampTime = 0.12f;
 
+        [Header("Speaking")]
+        [Tooltip("말풍선 위치입니다. 비워두면 캐릭터 렌더러 위에 자동 배치합니다.")]
+        [SerializeField]
+        private Transform bubbleAnchor;
+
+        [SerializeField, Min(0.001f)]
+        private float bubbleWorldScale = 0.0035f;
+
+        [SerializeField, Min(0f)]
+        private float bubbleHeightPadding = 0.35f;
+
+        [SerializeField, Min(0f)]
+        private float speakingBobAmount = 0.025f;
+
+        [SerializeField, Min(0f)]
+        private float speakingSwayAngle = 2.5f;
+
+        [SerializeField, Min(0.1f)]
+        private float speakingMotionSpeed = 3.2f;
+
+        [Tooltip("대사별 AudioClip이 연결되면 이 소스로 재생합니다.")]
+        [SerializeField]
+        private AudioSource voiceSource;
+
+        [SerializeField]
+        private UnityEvent onSpeechStarted;
+
+        [SerializeField]
+        private UnityEvent onSpeechFinished;
+
         [Header("Entrance Test")]
         [Tooltip("빛 등장 연출을 사용할 때는 외부 스크립트가 자동으로 해제합니다.")]
         [SerializeField]
@@ -60,11 +100,18 @@ namespace DreamGuardians
         private bool hideBeforeEntrance;
 
         private Coroutine currentRoutine;
+        private Coroutine speakingRoutine;
         private Renderer[] cachedRenderers;
+        private GameObject speechBubbleRoot;
+        private Text speechBubbleText;
+        private Vector3 visualBaseLocalPosition;
+        private Quaternion visualBaseLocalRotation;
+        private static Font runtimeFont;
 
         public Transform SpawnPoint => spawnPoint;
         public Transform TalkPoint => talkPoint;
         public bool IsMoving { get; private set; }
+        public bool IsSpeaking => speakingRoutine != null;
 
         private void Awake()
         {
@@ -72,6 +119,17 @@ namespace DreamGuardians
             {
                 animator =
                     GetComponentInChildren<Animator>(true);
+            }
+
+            if (visualRoot == null && animator != null)
+            {
+                visualRoot = animator.transform;
+            }
+
+            if (bubbleAnchor == null)
+            {
+                Transform existingAnchor = transform.Find("WorldBubblePoint");
+                bubbleAnchor = existingAnchor;
             }
 
             if (playerLookTarget == null &&
@@ -83,6 +141,12 @@ namespace DreamGuardians
 
             cachedRenderers =
                 GetComponentsInChildren<Renderer>(true);
+
+            if (visualRoot != null)
+            {
+                visualBaseLocalPosition = visualRoot.localPosition;
+                visualBaseLocalRotation = visualRoot.localRotation;
+            }
 
             SetBlend(idleBlend, true);
 
@@ -102,6 +166,26 @@ namespace DreamGuardians
             }
         }
 
+        private void LateUpdate()
+        {
+            if (speechBubbleRoot == null ||
+                !speechBubbleRoot.activeSelf)
+            {
+                return;
+            }
+
+            if (playerLookTarget == null && Camera.main != null)
+            {
+                playerLookTarget = Camera.main.transform;
+            }
+
+            if (playerLookTarget != null)
+            {
+                speechBubbleRoot.transform.rotation =
+                    playerLookTarget.rotation;
+            }
+        }
+
         /// <summary>
         /// 외부 등장 연출이 자동 시작을 끄거나 켤 때 사용합니다.
         /// </summary>
@@ -116,6 +200,7 @@ namespace DreamGuardians
         public void PrepareAtSpawn(bool visible)
         {
             StopCurrentRoutine();
+            StopSpeaking();
 
             if (spawnPoint != null)
             {
@@ -176,6 +261,48 @@ namespace DreamGuardians
                         playerLookTarget.position));
         }
 
+        /// <summary>
+        /// 장난감 친구가 플레이어를 바라보며 말풍선과 작은 몸짓으로 말합니다.
+        /// voiceClip은 비워둘 수 있으며, 나중에 대사별 음성을 바로 연결할 수 있습니다.
+        /// </summary>
+        public void Speak(
+            string message,
+            float duration,
+            bool celebratory = false,
+            AudioClip voiceClip = null)
+        {
+            StopSpeaking();
+            EnsureSpeechBubble();
+
+            speakingRoutine = StartCoroutine(
+                SpeakingRoutine(
+                    message,
+                    Mathf.Max(0.2f, duration),
+                    celebratory,
+                    voiceClip));
+        }
+
+        public void StopSpeaking()
+        {
+            if (speakingRoutine != null)
+            {
+                StopCoroutine(speakingRoutine);
+                speakingRoutine = null;
+            }
+
+            if (voiceSource != null && voiceSource.isPlaying)
+            {
+                voiceSource.Stop();
+            }
+
+            RestoreVisualPose();
+
+            if (speechBubbleRoot != null)
+            {
+                speechBubbleRoot.SetActive(false);
+            }
+        }
+
         public void SetVisible(bool visible)
         {
             if (cachedRenderers == null)
@@ -196,6 +323,310 @@ namespace DreamGuardians
                     targetRenderer.enabled = visible;
                 }
             }
+
+            if (!visible && speechBubbleRoot != null)
+            {
+                speechBubbleRoot.SetActive(false);
+            }
+        }
+
+        private IEnumerator SpeakingRoutine(
+            string message,
+            float duration,
+            bool celebratory,
+            AudioClip voiceClip)
+        {
+            if (speechBubbleText != null)
+            {
+                speechBubbleText.text = message ?? string.Empty;
+            }
+
+            if (speechBubbleRoot != null)
+            {
+                speechBubbleRoot.SetActive(true);
+            }
+
+            if (animator != null)
+            {
+                int trigger = celebratory ? HappyHash : NormalHash;
+
+                if (HasAnimatorParameter(trigger, AnimatorControllerParameterType.Trigger))
+                {
+                    animator.SetTrigger(trigger);
+                }
+
+                SetBlend(idleBlend, true);
+            }
+
+            if (voiceClip != null)
+            {
+                if (voiceSource == null)
+                {
+                    voiceSource = gameObject.AddComponent<AudioSource>();
+                    voiceSource.playOnAwake = false;
+                    voiceSource.spatialBlend = 1f;
+                    voiceSource.minDistance = 1f;
+                    voiceSource.maxDistance = 18f;
+                }
+
+                voiceSource.clip = voiceClip;
+                voiceSource.Play();
+            }
+
+            onSpeechStarted?.Invoke();
+
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+
+                if (playerLookTarget != null)
+                {
+                    RotateTowards(playerLookTarget.position);
+                }
+
+                if (visualRoot != null)
+                {
+                    float phase = elapsed * speakingMotionSpeed;
+                    float bob = Mathf.Sin(phase * 2f) * speakingBobAmount;
+                    float sway = Mathf.Sin(phase) * speakingSwayAngle;
+
+                    visualRoot.localPosition =
+                        visualBaseLocalPosition + Vector3.up * bob;
+                    visualRoot.localRotation =
+                        visualBaseLocalRotation *
+                        Quaternion.Euler(0f, 0f, sway);
+                }
+
+                yield return null;
+            }
+
+            RestoreVisualPose();
+
+            if (animator != null &&
+                HasAnimatorParameter(NormalHash, AnimatorControllerParameterType.Trigger))
+            {
+                animator.SetTrigger(NormalHash);
+            }
+
+            if (speechBubbleRoot != null)
+            {
+                speechBubbleRoot.SetActive(false);
+            }
+
+            if (voiceSource != null && voiceSource.isPlaying)
+            {
+                voiceSource.Stop();
+            }
+
+            onSpeechFinished?.Invoke();
+            speakingRoutine = null;
+        }
+
+        private void EnsureSpeechBubble()
+        {
+            if (speechBubbleRoot != null)
+            {
+                return;
+            }
+
+            if (bubbleAnchor == null)
+            {
+                GameObject anchorObject = new GameObject("WorldBubblePoint");
+                bubbleAnchor = anchorObject.transform;
+                bubbleAnchor.SetParent(transform, false);
+
+                Bounds bounds = CalculateRendererBounds();
+                Vector3 worldPosition = bounds.size.sqrMagnitude > 0f
+                    ? new Vector3(bounds.center.x, bounds.max.y + bubbleHeightPadding, bounds.center.z)
+                    : transform.position + Vector3.up * 2f;
+
+                bubbleAnchor.position = worldPosition;
+            }
+            else if (Mathf.Abs(bubbleAnchor.localPosition.y) < 0.01f)
+            {
+                Bounds bounds = CalculateRendererBounds();
+
+                if (bounds.size.sqrMagnitude > 0f)
+                {
+                    bubbleAnchor.position = new Vector3(
+                        bounds.center.x,
+                        bounds.max.y + bubbleHeightPadding,
+                        bounds.center.z);
+                }
+            }
+
+            speechBubbleRoot = new GameObject(
+                "ToyFriendSpeechBubble",
+                typeof(RectTransform),
+                typeof(Canvas));
+            speechBubbleRoot.transform.SetParent(bubbleAnchor, false);
+
+            Canvas canvas = speechBubbleRoot.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.sortingOrder = 200;
+
+            RectTransform canvasRect = speechBubbleRoot.GetComponent<RectTransform>();
+            canvasRect.sizeDelta = new Vector2(640f, 190f);
+            canvasRect.localScale = Vector3.one * bubbleWorldScale;
+
+            GameObject panelObject = new GameObject(
+                "BubblePanel",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            panelObject.transform.SetParent(speechBubbleRoot.transform, false);
+
+            RectTransform panelRect = panelObject.GetComponent<RectTransform>();
+            panelRect.anchorMin = Vector2.zero;
+            panelRect.anchorMax = Vector2.one;
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+
+            Image panel = panelObject.GetComponent<Image>();
+            panel.color = new Color(0.96f, 1f, 0.98f, 0.96f);
+            panel.raycastTarget = false;
+
+            GameObject tailObject = new GameObject(
+                "BubbleTail",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            tailObject.transform.SetParent(speechBubbleRoot.transform, false);
+
+            RectTransform tailRect = tailObject.GetComponent<RectTransform>();
+            tailRect.anchorMin = new Vector2(0.28f, 0f);
+            tailRect.anchorMax = new Vector2(0.28f, 0f);
+            tailRect.pivot = new Vector2(0.5f, 0.5f);
+            tailRect.anchoredPosition = new Vector2(0f, -22f);
+            tailRect.sizeDelta = new Vector2(54f, 54f);
+            tailRect.localRotation = Quaternion.Euler(0f, 0f, 45f);
+
+            Image tail = tailObject.GetComponent<Image>();
+            tail.color = panel.color;
+            tail.raycastTarget = false;
+
+            GameObject textObject = new GameObject(
+                "Message",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Text));
+            textObject.transform.SetParent(speechBubbleRoot.transform, false);
+
+            RectTransform textRect = textObject.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(38f, 24f);
+            textRect.offsetMax = new Vector2(-38f, -24f);
+
+            speechBubbleText = textObject.GetComponent<Text>();
+            speechBubbleText.font = GetRuntimeFont();
+            speechBubbleText.fontSize = 34;
+            speechBubbleText.fontStyle = FontStyle.Bold;
+            speechBubbleText.alignment = TextAnchor.MiddleCenter;
+            speechBubbleText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            speechBubbleText.verticalOverflow = VerticalWrapMode.Overflow;
+            speechBubbleText.color = new Color(0.05f, 0.12f, 0.11f, 1f);
+            speechBubbleText.raycastTarget = false;
+
+            speechBubbleRoot.SetActive(false);
+        }
+
+        private Bounds CalculateRendererBounds()
+        {
+            if (cachedRenderers == null)
+            {
+                cachedRenderers = GetComponentsInChildren<Renderer>(true);
+            }
+
+            Bounds bounds = default;
+            bool hasBounds = false;
+
+            for (int i = 0; i < cachedRenderers.Length; i++)
+            {
+                Renderer targetRenderer = cachedRenderers[i];
+
+                if (targetRenderer == null)
+                {
+                    continue;
+                }
+
+                if (!hasBounds)
+                {
+                    bounds = targetRenderer.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(targetRenderer.bounds);
+                }
+            }
+
+            return bounds;
+        }
+
+        private bool HasAnimatorParameter(
+            int parameterHash,
+            AnimatorControllerParameterType parameterType)
+        {
+            if (animator == null)
+            {
+                return false;
+            }
+
+            AnimatorControllerParameter[] parameters = animator.parameters;
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if (parameters[i].nameHash == parameterHash &&
+                    parameters[i].type == parameterType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void RestoreVisualPose()
+        {
+            if (visualRoot == null)
+            {
+                return;
+            }
+
+            visualRoot.localPosition = visualBaseLocalPosition;
+            visualRoot.localRotation = visualBaseLocalRotation;
+        }
+
+        private static Font GetRuntimeFont()
+        {
+            if (runtimeFont != null)
+            {
+                return runtimeFont;
+            }
+
+            string[] preferredFonts =
+            {
+                "Malgun Gothic",
+                "Noto Sans CJK KR",
+                "Noto Sans KR",
+                "Apple SD Gothic Neo",
+                "Arial"
+            };
+
+            try
+            {
+                runtimeFont = Font.CreateDynamicFontFromOSFont(preferredFonts, 32);
+            }
+            catch
+            {
+                runtimeFont = null;
+            }
+
+            runtimeFont ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            return runtimeFont;
         }
 
         private IEnumerator EntranceRoutine()

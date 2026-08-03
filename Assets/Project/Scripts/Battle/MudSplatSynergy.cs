@@ -30,7 +30,8 @@ public class MudSplatSynergy : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (synergyActivated)
+        if (synergyActivated ||
+            !RoleSynergyProgression.IsUnlocked)
         {
             return;
         }

@@ -21,6 +21,17 @@ namespace DreamGuardians
         [Tooltip("커스텀 배너의 설명 TMP 텍스트")]
         [SerializeField] private TMP_Text customBannerSubtitle;
 
+        [Header("Toy Friend Quick Guide (Optional)")]
+        [Tooltip("카카오톡형 안내창에 사용할 장난감 친구 얼굴 이미지")]
+        [SerializeField] private Sprite toyFriendPortrait;
+
+        [Tooltip("직접 만든 2D 안내창의 루트 오브젝트")]
+        [SerializeField] private GameObject customGuideRoot;
+
+        [SerializeField] private Image customGuidePortrait;
+        [SerializeField] private TMP_Text customGuideSpeaker;
+        [SerializeField] private TMP_Text customGuideMessage;
+
         [Header("Timing")]
         [SerializeField, Min(0.2f)] private float defaultBannerDuration = 2f;
 
@@ -32,11 +43,17 @@ namespace DreamGuardians
         private Text fallbackBannerSubtitle;
 
         private Text dialogueText;
+        private GameObject fallbackGuidePanel;
+        private Image fallbackGuidePortrait;
+        private Text fallbackGuidePortraitLabel;
+        private Text fallbackGuideSpeaker;
+        private Text fallbackGuideMessage;
         private Text objectiveText;
         private Text progressText;
         private Text roleText;
         private Coroutine bannerRoutine;
         private Coroutine dialogueRoutine;
+        private Coroutine guideRoutine;
         private Coroutine synergyRoutine;
         private static Font runtimeFont;
 
@@ -45,6 +62,11 @@ namespace DreamGuardians
             customBannerTitle != null &&
             customBannerSubtitle != null;
 
+        private bool HasCustomGuide =>
+            customGuideRoot != null &&
+            customGuideSpeaker != null &&
+            customGuideMessage != null;
+
         private void Awake()
         {
             EnsureUI();
@@ -52,6 +74,11 @@ namespace DreamGuardians
             if (customBannerRoot != null)
             {
                 customBannerRoot.SetActive(false);
+            }
+
+            if (customGuideRoot != null)
+            {
+                customGuideRoot.SetActive(false);
             }
         }
 
@@ -104,6 +131,55 @@ namespace DreamGuardians
             dialogueRoutine = StartCoroutine(DialogueRoutine(prefix + message, duration));
         }
 
+        /// <summary>
+        /// 전투를 가리지 않는 짧은 2D 프로필 안내를 표시합니다.
+        /// 커스텀 UI를 연결하지 않으면 우측 상단에 임시 대화창을 자동 생성합니다.
+        /// </summary>
+        public void ShowQuickGuide(
+            string speaker,
+            string message,
+            float duration = 3f)
+        {
+            EnsureUI();
+
+            if (guideRoutine != null)
+            {
+                StopCoroutine(guideRoutine);
+            }
+
+            guideRoutine = StartCoroutine(
+                QuickGuideRoutine(
+                    speaker,
+                    message,
+                    duration));
+        }
+
+        public void SetToyFriendPortrait(Sprite portrait)
+        {
+            toyFriendPortrait = portrait;
+
+            if (customGuidePortrait != null)
+            {
+                customGuidePortrait.sprite = portrait;
+                customGuidePortrait.enabled = portrait != null;
+            }
+
+            if (fallbackGuidePortrait != null)
+            {
+                fallbackGuidePortrait.sprite = portrait;
+                fallbackGuidePortrait.color =
+                    portrait != null
+                        ? Color.white
+                        : new Color(0.64f, 0.92f, 0.83f, 1f);
+            }
+
+            if (fallbackGuidePortraitLabel != null)
+            {
+                fallbackGuidePortraitLabel.gameObject.SetActive(
+                    portrait == null);
+            }
+        }
+
         public void SetObjective(string message)
         {
             EnsureUI();
@@ -121,7 +197,7 @@ namespace DreamGuardians
         public void SetRole(PlayerRole role)
         {
             EnsureUI();
-            roleText.text = "현재 직업: " + DreamGameText.GetRoleName(role) + "  [1 경찰 / 2 소방관 / 3 천문학자 / 4 건축가]";
+            roleText.text = "현재 직업: " + DreamGameText.GetRoleName(role) + "  [1 경찰 / 2 소방관 / 3 요리사 / 4 건축가]";
         }
 
         public void ClearPersistentText()
@@ -163,6 +239,60 @@ namespace DreamGuardians
             yield return new WaitForSeconds(Mathf.Max(0.1f, duration));
             dialogueText.gameObject.SetActive(false);
             dialogueRoutine = null;
+        }
+
+        private IEnumerator QuickGuideRoutine(
+            string speaker,
+            string message,
+            float duration)
+        {
+            string safeSpeaker =
+                string.IsNullOrWhiteSpace(speaker)
+                    ? "장난감 친구"
+                    : speaker;
+
+            string safeMessage = message ?? string.Empty;
+
+            if (HasCustomGuide)
+            {
+                customGuideSpeaker.text = safeSpeaker;
+                customGuideMessage.text = safeMessage;
+
+                if (customGuidePortrait != null)
+                {
+                    customGuidePortrait.sprite = toyFriendPortrait;
+                    customGuidePortrait.enabled = toyFriendPortrait != null;
+                }
+
+                customGuideRoot.SetActive(true);
+            }
+            else
+            {
+                fallbackGuideSpeaker.text = safeSpeaker;
+                fallbackGuideMessage.text = safeMessage;
+                fallbackGuidePortrait.sprite = toyFriendPortrait;
+                fallbackGuidePortrait.color =
+                    toyFriendPortrait != null
+                        ? Color.white
+                        : new Color(0.64f, 0.92f, 0.83f, 1f);
+                fallbackGuidePortraitLabel.gameObject.SetActive(
+                    toyFriendPortrait == null);
+                fallbackGuidePanel.SetActive(true);
+            }
+
+            yield return new WaitForSeconds(
+                Mathf.Max(0.1f, duration));
+
+            if (HasCustomGuide)
+            {
+                customGuideRoot.SetActive(false);
+            }
+            else if (fallbackGuidePanel != null)
+            {
+                fallbackGuidePanel.SetActive(false);
+            }
+
+            guideRoutine = null;
         }
 
         private void HandleSynergy(SynergyEventData data)
@@ -257,6 +387,65 @@ namespace DreamGuardians
             AddOutline(dialogueText);
             dialogueText.gameObject.SetActive(false);
 
+            fallbackGuidePanel = CreatePanel(
+                "ToyFriendQuickGuide",
+                canvasRect,
+                new Vector2(0.76f, 0.68f),
+                new Vector2(760f, 170f),
+                new Color(0.05f, 0.08f, 0.12f, 0.88f));
+
+            RectTransform guideRect =
+                fallbackGuidePanel.GetComponent<RectTransform>();
+
+            fallbackGuidePortrait = CreateImage(
+                "Portrait",
+                guideRect,
+                new Vector2(0.11f, 0.5f),
+                new Vector2(118f, 118f),
+                new Color(0.64f, 0.92f, 0.83f, 1f));
+            fallbackGuidePortrait.sprite = toyFriendPortrait;
+            fallbackGuidePortrait.preserveAspect = true;
+
+            fallbackGuidePortraitLabel = CreateText(
+                "PortraitPlaceholder",
+                guideRect,
+                new Vector2(0.11f, 0.5f),
+                new Vector2(100f, 42f),
+                22,
+                TextAnchor.MiddleCenter,
+                FontStyle.Bold);
+            fallbackGuidePortraitLabel.text = "친구";
+            fallbackGuidePortraitLabel.color =
+                new Color(0.05f, 0.16f, 0.14f, 1f);
+            fallbackGuidePortraitLabel.gameObject.SetActive(
+                toyFriendPortrait == null);
+
+            fallbackGuideSpeaker = CreateText(
+                "Speaker",
+                guideRect,
+                new Vector2(0.29f, 0.72f),
+                new Vector2(500f, 38f),
+                23,
+                TextAnchor.MiddleLeft,
+                FontStyle.Bold);
+            fallbackGuideSpeaker.rectTransform.pivot =
+                new Vector2(0f, 0.5f);
+            fallbackGuideSpeaker.color =
+                new Color(0.72f, 1f, 0.89f, 1f);
+
+            fallbackGuideMessage = CreateText(
+                "Message",
+                guideRect,
+                new Vector2(0.29f, 0.39f),
+                new Vector2(500f, 88f),
+                25,
+                TextAnchor.MiddleLeft,
+                FontStyle.Normal);
+            fallbackGuideMessage.rectTransform.pivot =
+                new Vector2(0f, 0.5f);
+
+            fallbackGuidePanel.SetActive(false);
+
             objectiveText = CreateText(
                 "ObjectiveText",
                 canvasRect,
@@ -334,6 +523,34 @@ namespace DreamGuardians
             image.color = color;
             image.raycastTarget = false;
             return panel;
+        }
+
+        private static Image CreateImage(
+            string objectName,
+            Transform parent,
+            Vector2 anchor,
+            Vector2 size,
+            Color color)
+        {
+            GameObject imageObject = new GameObject(
+                objectName,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            imageObject.transform.SetParent(parent, false);
+
+            RectTransform rect =
+                imageObject.GetComponent<RectTransform>();
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = size;
+
+            Image image = imageObject.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
         }
 
         private static Text CreateText(

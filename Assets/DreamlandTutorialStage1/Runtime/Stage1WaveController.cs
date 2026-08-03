@@ -84,6 +84,9 @@ namespace DreamGuardians
         [SerializeField]
         private TutorialDialogueData dialogueData;
 
+        [SerializeField]
+        private ToyFriendController toyFriend;
+
 
         [Header("Wave 1")]
 
@@ -166,6 +169,11 @@ namespace DreamGuardians
         /// </summary>
         public event Action<int> EnvironmentPreparationRequested;
 
+        /// <summary>0부터 시작하는 공격 그룹 인덱스입니다.</summary>
+        public event Action<int> WaveGroupCompleted;
+
+        public event Action SynergyUnlocked;
+
 
         public event Action Completed;
         public event Action Failed;
@@ -174,6 +182,11 @@ namespace DreamGuardians
         private void Awake()
         {
             EnsureDefaultGroups();
+
+            if (toyFriend == null)
+            {
+                toyFriend = FindAnyObjectByType<ToyFriendController>();
+            }
         }
 
 
@@ -324,6 +337,7 @@ namespace DreamGuardians
 
             waitingPreparationStep = -1;
             preparationCompleted = false;
+            RoleSynergyProgression.Lock();
 
             /*
              * 기존 Stage 1 시작 이벤트입니다.
@@ -473,17 +487,45 @@ namespace DreamGuardians
                  * 마지막인 적 스폰을 여기에서 시작합니다.
                  */
                 runningSpawnRoutineCount++;
-
-                StartCoroutine(
-                    SpawnWaveGroup(group));
-
-
                 Debug.Log(
                     $"[Dreamland] Stage 1 {group.label} 스폰 시작. " +
                     $"포탈과 길 준비 완료 후 " +
                     $"총 {group.enemyCount}마리를 생성합니다. " +
                     $"스폰 간격 {group.spawnInterval:0.0}초.",
                     this);
+
+                yield return SpawnWaveGroup(group);
+
+
+                /*
+                 * 이번 공격으로 등장한 적을 모두 정화해야
+                 * 해당 공격이 종료되고 다음 단계로 넘어갑니다.
+                 */
+                yield return WaitForWaveClear(index);
+
+
+                if (failed)
+                {
+                    yield break;
+                }
+
+
+                WaveGroupCompleted?.Invoke(index);
+
+
+                float occupiedTransitionTime = 0f;
+
+                /*
+                 * index 1 = Stage 1의 두 번째 공격 종료.
+                 * 이 순간부터 모든 새 Enemy의 직업 시너지가 활성화됩니다.
+                 */
+                if (index == 1)
+                {
+                    occupiedTransitionTime =
+                        GetSynergyUnlockSequenceDuration();
+
+                    yield return PlaySynergyUnlockSequence();
+                }
 
 
                 if (index >= groups.Count - 1)
@@ -492,14 +534,15 @@ namespace DreamGuardians
                 }
 
 
-                /*
-                 * 적이 남아 있더라도 설정 시간이 지나면
-                 * 다음 포탈과 길 준비를 시작합니다.
-                 */
-                if (group.transitionDelay > 0f)
+                float remainingTransitionDelay =
+                    Mathf.Max(
+                        0f,
+                        group.transitionDelay - occupiedTransitionTime);
+
+                if (remainingTransitionDelay > 0f)
                 {
                     yield return WaitForNextWaveDelay(
-                        group.transitionDelay,
+                        remainingTransitionDelay,
                         index);
                 }
 
@@ -541,14 +584,14 @@ namespace DreamGuardians
                     !string.IsNullOrWhiteSpace(
                         transitionLine.Message))
                 {
-                    missionUI?.ShowDialogue(
+                    missionUI?.ShowQuickGuide(
                         transitionLine.Speaker,
                         transitionLine.Message,
                         transitionLine.Duration);
                 }
                 else
                 {
-                    missionUI?.ShowDialogue(
+                    missionUI?.ShowQuickGuide(
                         "장난감 친구",
 
                         environmentPhase == 1
@@ -791,6 +834,121 @@ namespace DreamGuardians
         }
 
 
+        private IEnumerator WaitForWaveClear(int groupIndex)
+        {
+            while (!failed && spawner.ActiveEnemyCount > 0)
+            {
+                missionUI?.SetProgress(
+                    $"공격 {groupIndex + 1} / {groups.Count}" +
+                    $"  ·  남은 악몽 {spawner.ActiveEnemyCount}");
+
+                yield return null;
+            }
+        }
+
+
+        private IEnumerator PlaySynergyUnlockSequence()
+        {
+            RoleSynergyProgression.Unlock();
+            SynergyUnlocked?.Invoke();
+
+            missionUI?.ShowBanner(
+                dialogueData != null
+                    ? dialogueData.SynergyUnlockTitle
+                    : "SYNERGY UNLOCK",
+                dialogueData != null
+                    ? dialogueData.SynergyUnlockSubtitle
+                    : "직업의 힘이 서로 연결됩니다",
+                2.2f);
+
+            yield return new WaitForSeconds(1.2f);
+
+            if (dialogueData != null &&
+                dialogueData.SynergyUnlockLines != null &&
+                dialogueData.SynergyUnlockLines.Count > 0)
+            {
+                for (int i = 0;
+                     i < dialogueData.SynergyUnlockLines.Count;
+                     i++)
+                {
+                    TutorialDialogueLine line =
+                        dialogueData.SynergyUnlockLines[i];
+
+                    if (line == null ||
+                        string.IsNullOrWhiteSpace(line.Message))
+                    {
+                        continue;
+                    }
+
+                    float playbackDuration =
+                        line.VoiceClip != null
+                            ? Mathf.Max(line.Duration, line.VoiceClip.length)
+                            : line.Duration;
+
+                    missionUI?.ShowDialogue(
+                        line.Speaker,
+                        line.Message,
+                        playbackDuration);
+
+                    toyFriend?.Speak(
+                        line.Message,
+                        playbackDuration,
+                        i == 0,
+                        line.VoiceClip);
+
+                    yield return new WaitForSeconds(playbackDuration);
+                }
+            }
+            else
+            {
+                const string fallbackMessage =
+                    "코어에 꿈빛이 충분히 모였어! 이제 동료의 직업 능력을 이어 시너지를 발동해 봐!";
+
+                missionUI?.ShowDialogue(
+                    "장난감 친구",
+                    fallbackMessage,
+                    4.5f);
+                toyFriend?.Speak(
+                    fallbackMessage,
+                    4.5f,
+                    true);
+
+                yield return new WaitForSeconds(4.5f);
+            }
+        }
+
+
+        private float GetSynergyUnlockSequenceDuration()
+        {
+            float duration = 1.2f;
+
+            if (dialogueData == null ||
+                dialogueData.SynergyUnlockLines == null ||
+                dialogueData.SynergyUnlockLines.Count == 0)
+            {
+                return duration + 4.5f;
+            }
+
+            for (int i = 0;
+                 i < dialogueData.SynergyUnlockLines.Count;
+                 i++)
+            {
+                TutorialDialogueLine line =
+                    dialogueData.SynergyUnlockLines[i];
+
+                if (line != null &&
+                    !string.IsNullOrWhiteSpace(line.Message))
+                {
+                    duration += line.VoiceClip != null
+                        ? Mathf.Max(line.Duration, line.VoiceClip.length)
+                        : line.Duration;
+                }
+            }
+
+            return duration;
+        }
+
+
         private IEnumerator WaitForNextWaveDelay(
             float duration,
             int currentGroupIndex)
@@ -868,6 +1026,7 @@ namespace DreamGuardians
             failed = true;
 
             StopAllCoroutines();
+            toyFriend?.StopSpeaking();
 
             waveRoutine = null;
             runningSpawnRoutineCount = 0;
@@ -910,8 +1069,10 @@ namespace DreamGuardians
         public void StopForStage2Test()
         {
             StopAllCoroutines();
+            toyFriend?.StopSpeaking();
 
             ResetRuntimeState();
+            RoleSynergyProgression.Unlock();
 
             missionUI?.SetProgress(
                 string.Empty);
