@@ -1983,7 +1983,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_Layer
@@ -21496,7 +21496,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 18f1131baa53c48bab5f52e81e727d92, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerJobController
-  currentJob: 3
+  currentJob: 0
   modelPolice: {fileID: 130166218}
   modelFirefighter: {fileID: 287419633}
   modelChef: {fileID: 609952574}
@@ -22284,7 +22284,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 60cc3c07650e6c447b4a28512dad9844, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 60cc3c07650e6c447b4a28512dad9844, type: 3}
       propertyPath: m_Layer
@@ -24782,9 +24782,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FireHoseController
   waterParticle: {fileID: 246857759}
-  firePoint: {fileID: 1428131574}
-  pressureDropDuration: 0.25
-  minimumWaterSpeed: 2
+  firePoint: {fileID: 0}
+  maxDistance: 20
+  waterDamage: 10
+  targetLayer:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!120 &1098216458
 LineRenderer:
   serializedVersion: 3
@@ -25831,7 +25834,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 975f39bd024bb824990302eff7e92d8f, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -25872,7 +25875,14 @@ MonoBehaviour:
   bulletPrefab: {fileID: 7250585977690855279, guid: dc50b394d263643c6a3f450a91713afd, type: 3}
   firePoint: {fileID: 136377783}
   bulletSpeed: 20
+  bulletDamage: 10
+  bulletLifetime: 3
   playerCamera: {fileID: 1264465688}
+  aimDistance: 50
+  aimMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bulletRotationOffset: {x: 90, y: 0, z: 0}
   muzzleFlashLight: {fileID: 1654616241}
   flashDuration: 0.05
 --- !u!4 &1185496322 stripped
@@ -46882,7 +46892,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &1711813855948850935
 MeshRenderer:
   m_ObjectHideFlags: 0

@@ -1,120 +1,91 @@
+using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// 소방관 물 Particle System의 시작과 정지를 담당한다.
-///
-/// 마우스를 놓으면 새로운 물 생성만 멈추고,
-/// 이미 발사된 물은 수명이 끝날 때까지 계속 날아간다.
-///
-/// 다시 누르면 기존 물은 그대로 진행되는 동시에
-/// 새로운 물줄기가 바로 생성된다.
-///
-/// 실제 충돌 피해는 WaterParticleHit가 처리한다.
-/// </summary>
 public class FireHoseController : MonoBehaviour
 {
     [Header("컴포넌트 연결")]
-    [SerializeField]
-    private ParticleSystem waterParticle;
+    public ParticleSystem waterParticle; // waterParticle 오브젝트
+    public Transform firePoint;          // FirePoint 오브젝트
 
-    private bool isWaterActive;
+    [Header("물호스 옵션")]
+    public float maxDistance = 20f;      // 물 사거리
+    public float waterDamage = 10f;      // 물 데미지
+    public LayerMask targetLayer;        // Everything 권장
 
-    private void Awake()
-    {
-        if (waterParticle == null)
-        {
-            Transform waterTransform =
-                transform.Find("FirePoint/waterParticle");
-
-            if (waterTransform != null)
-            {
-                waterParticle =
-                    waterTransform.GetComponent<ParticleSystem>();
-            }
-        }
-    }
+    private Coroutine stopRoutine;
+    private float defaultSpeed;
+    private bool isShooting = false;
 
     private void Start()
     {
-        if (waterParticle == null)
+        if (waterParticle != null)
         {
-            Debug.LogWarning(
-                $"{gameObject.name}: waterParticle이 연결되지 않았습니다."
-            );
-
-            return;
+            var main = waterParticle.main;
+            defaultSpeed = main.startSpeed.constant;
+            waterParticle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
-
-        // 게임 시작 시에만 기존 파티클까지 완전히 비운다.
-        waterParticle.Stop(
-            true,
-            ParticleSystemStopBehavior.StopEmittingAndClear
-        );
-
-        isWaterActive = false;
     }
 
     private void Update()
     {
-        if (Input.GetButtonDown("Fire1"))
-        {
-            StartWater();
-        }
+        if (Input.GetButtonDown("Fire1")) StartWater();
+        else if (Input.GetButtonUp("Fire1")) StopWater();
 
-        if (Input.GetButtonUp("Fire1"))
-        {
-            StopWater();
-        }
+        if (isShooting && firePoint != null) ProcessWaterHit();
     }
 
-    /// <summary>
-    /// 기존에 날아가고 있는 물은 지우지 않고
-    /// 새로운 물 파티클 생성을 다시 시작한다.
-    /// </summary>
     public void StartWater()
     {
-        if (waterParticle == null)
-        {
-            return;
-        }
+        if (waterParticle == null) return;
+        if (stopRoutine != null) StopCoroutine(stopRoutine);
 
-        // Stop 또는 Clear를 먼저 하지 않는다.
-        // 기존 물은 그대로 날아가고 새 물줄기만 추가로 방출된다.
-        waterParticle.Play(true);
-
-        isWaterActive = true;
+        var main = waterParticle.main;
+        main.startSpeed = defaultSpeed;
+        waterParticle.Play();
+        isShooting = true;
     }
 
-    /// <summary>
-    /// 새로운 파티클 생성만 중지한다.
-    /// 이미 발사된 물은 수명이 끝날 때까지 계속 움직인다.
-    /// </summary>
     public void StopWater()
     {
-        if (waterParticle == null || !isWaterActive)
-        {
-            return;
-        }
-
-        waterParticle.Stop(
-            true,
-            ParticleSystemStopBehavior.StopEmitting
-        );
-
-        isWaterActive = false;
+        if (!isShooting) return;
+        if (stopRoutine != null) StopCoroutine(stopRoutine);
+        stopRoutine = StartCoroutine(PressureDropRoutine());
     }
 
-    private void OnDisable()
+    private IEnumerator PressureDropRoutine()
     {
-        isWaterActive = false;
+        var main = waterParticle.main;
+        float duration = 0.25f;
+        float elapsed = 0f;
 
-        if (waterParticle != null)
+        while (elapsed < duration)
         {
-            // 직업 자체가 비활성화될 때는 남은 물까지 정리한다.
-            waterParticle.Stop(
-                true,
-                ParticleSystemStopBehavior.StopEmittingAndClear
-            );
+            elapsed += Time.deltaTime;
+            main.startSpeed = Mathf.Lerp(defaultSpeed, 2f, elapsed / duration);
+            yield return null;
+        }
+
+        waterParticle.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        main.startSpeed = defaultSpeed;
+        isShooting = false;
+    }
+
+    private void ProcessWaterHit()
+    {
+        Vector3 shootDirection = firePoint.forward;
+
+        if (Physics.Raycast(firePoint.position, shootDirection, out RaycastHit hit, maxDistance, targetLayer))
+        {
+            // 부모/자식 관계없이 StatusReceiver를 감지하여 물 속성 전달
+            StatusReceiver statusReceiver = hit.collider.GetComponentInParent<StatusReceiver>();
+            if (statusReceiver == null) statusReceiver = hit.collider.GetComponentInChildren<StatusReceiver>();
+
+            if (statusReceiver != null)
+            {
+                statusReceiver.ApplyElementalAttack(ElementalType.Water, waterDamage * Time.deltaTime);
+            }
+
+            Debug.DrawLine(firePoint.position, hit.point, Color.cyan);
         }
     }
 }
