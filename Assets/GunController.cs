@@ -1,70 +1,329 @@
-using System.Collections; // 코루틴을 쓰기 위해 추가해야 합니다.
+using System;
+using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem; 
+using UnityEngine.InputSystem;
 
+/// <summary>
+/// 경찰 총의 발사 입력, 총알 생성, 발사 방향과 총구 효과를 담당한다.
+///
+/// 조준점 Raycast는 발사 방향 계산에만 사용하며
+/// 실제 피해는 PoliceBulletProjectile의 물리 충돌이 처리한다.
+/// </summary>
 public class GunController : MonoBehaviour
 {
     [Header("발사 설정")]
-    public GameObject bulletPrefab; // 광선 총알 프리팹
-    public Transform firePoint;     // 총알이 태어날 기준점 (총구)
-    public float bulletSpeed = 40f; // 총알 속도
 
-    [Header("카메라 설정")]
-    public Camera playerCamera;     // Main Camera
+    [Tooltip("실제로 날아갈 총알 프리팹")]
+    public GameObject bulletPrefab;
 
-    [Header("이펙트 설정")]
-    public Light muzzleFlashLight;  // 방금 만든 총구 불빛(Point Light)
-    public float flashDuration = 0.05f; // 불빛이 번쩍이고 켜져 있을 시간 (초)
+    [Tooltip("총알이 생성될 총구 위치")]
+    public Transform firePoint;
 
-    private Coroutine flashCoroutine; // 번쩍임 제어를 위한 변수
+    [Tooltip("총알 비행 속도")]
+    public float bulletSpeed = 40f;
 
-    void Update()
+    [Tooltip("총알 한 발의 피해량")]
+    public float bulletDamage = 10f;
+
+    [Tooltip("총알이 자동으로 사라지는 시간")]
+    public float bulletLifetime = 3f;
+
+
+    [Header("조준 설정")]
+
+    [Tooltip("화면 중앙 조준 방향을 계산할 플레이어 카메라")]
+    public Camera playerCamera;
+
+    [Tooltip("조준 가능한 최대 거리")]
+    public float aimDistance = 50f;
+
+    [Tooltip("조준 방향을 계산할 때 확인할 레이어")]
+    public LayerMask aimMask = ~0;
+
+
+    [Header("총알 모델 회전 보정")]
+
+    [Tooltip("총알 모델이 옆으로 눕는 경우 사용하는 회전 보정값")]
+    public Vector3 bulletRotationOffset =
+        new Vector3(90f, 0f, 0f);
+
+
+    [Header("총구 이펙트")]
+
+    public Light muzzleFlashLight;
+
+    [Tooltip("총구 불빛이 켜지는 시간")]
+    public float flashDuration = 0.05f;
+
+
+    private Coroutine flashCoroutine;
+
+    private static int nextPoliceShotId =
+        500000;
+
+
+    private void Update()
     {
-        // 마우스 왼쪽 버튼 클릭 감지 (New Input System)
-        if (Pointer.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        if (Mouse.current != null &&
+            Mouse.current.leftButton.wasPressedThisFrame)
         {
             Shoot();
         }
     }
 
-    void Shoot()
+
+    private void Shoot()
     {
-        if (bulletPrefab == null || firePoint == null || playerCamera == null) return;
-
-        // 1. 카메라 정면 기준으로 총알 스폰 위치 보정
-        Vector3 shootDirection = playerCamera.transform.forward;
-        Vector3 spawnPosition = playerCamera.transform.position + (shootDirection * 1.2f);
-
-        // 2. 총알 생성 및 눕히기
-        Quaternion bulletRotation = Quaternion.LookRotation(shootDirection);
-        GameObject bullet = Instantiate(bulletPrefab, spawnPosition, bulletRotation);
-        bullet.transform.Rotate(90f, 0f, 0f);
-
-        // 3. 물리 속도 주기
-        Rigidbody rb = bullet.GetComponent<Rigidbody>();
-        if (rb != null)
+        if (bulletPrefab == null)
         {
-            rb.linearVelocity = shootDirection * bulletSpeed;
-            rb.angularVelocity = Vector3.zero; // 회전 방지
+            Debug.LogWarning(
+                $"{gameObject.name}: Bullet Prefab이 비어 있습니다."
+            );
+
+            return;
         }
 
-        // 4. [추가] 총구 화염 번쩍임 코루틴 실행
-        if (muzzleFlashLight != null)
+        if (firePoint == null)
         {
-            // 이미 켜져 있는 번쩍임이 있다면 중복 방지를 위해 꺼줍니다.
-            if (flashCoroutine != null) StopCoroutine(flashCoroutine);
-            flashCoroutine = StartCoroutine(FlashMuzzle());
+            Debug.LogWarning(
+                $"{gameObject.name}: Fire Point가 비어 있습니다."
+            );
+
+            return;
         }
 
-        // 5. 3초 뒤 자동 파괴
-        Destroy(bullet, 3f);
+        if (playerCamera == null)
+        {
+            playerCamera = Camera.main;
+
+            if (playerCamera == null)
+            {
+                Debug.LogWarning(
+                    $"{gameObject.name}: Player Camera가 비어 있습니다."
+                );
+
+                return;
+            }
+        }
+
+        Vector3 targetPoint =
+            FindAimTargetPoint();
+
+        Vector3 shootDirection =
+            targetPoint - firePoint.position;
+
+        if (shootDirection.sqrMagnitude <= 0.0001f)
+        {
+            shootDirection =
+                playerCamera.transform.forward;
+        }
+
+        shootDirection.Normalize();
+
+        Quaternion bulletRotation =
+            Quaternion.LookRotation(
+                shootDirection,
+                Vector3.up
+            ) *
+            Quaternion.Euler(
+                bulletRotationOffset
+            );
+
+        GameObject bullet = Instantiate(
+            bulletPrefab,
+            firePoint.position,
+            bulletRotation
+        );
+
+        PoliceBulletProjectile projectile =
+            bullet.GetComponent<PoliceBulletProjectile>();
+
+        if (projectile == null)
+        {
+            projectile =
+                bullet.AddComponent<PoliceBulletProjectile>();
+        }
+
+        projectile.Initialize(
+            bulletDamage,
+            nextPoliceShotId++
+        );
+
+        IgnorePlayerCollision(bullet);
+
+        Rigidbody bulletRigidbody =
+            bullet.GetComponent<Rigidbody>();
+
+        if (bulletRigidbody != null)
+        {
+            bulletRigidbody.linearVelocity =
+                shootDirection * bulletSpeed;
+
+            bulletRigidbody.angularVelocity =
+                Vector3.zero;
+        }
+        else
+        {
+            Debug.LogWarning(
+                $"{bullet.name}: Rigidbody가 없습니다."
+            );
+        }
+
+        PlayMuzzleFlash();
+
+        Destroy(
+            bullet,
+            Mathf.Max(0.1f, bulletLifetime)
+        );
     }
 
-    // [추가] 아주 잠깐 불빛을 켰다가 끄는 코루틴 함수입니다.
-    IEnumerator FlashMuzzle()
+
+    /// <summary>
+    /// 카메라 화면 중앙이 가리키는 지점을 찾는다.
+    ///
+    /// 이것은 피해 판정이 아니라,
+    /// 총구에서 총알이 날아갈 방향만 계산하는 용도다.
+    /// </summary>
+    private Vector3 FindAimTargetPoint()
     {
-        muzzleFlashLight.enabled = true; // 불빛 켜기
-        yield return new WaitForSeconds(flashDuration); // 0.05초 대기
-        muzzleFlashLight.enabled = false; // 불빛 끄기
+        Ray aimRay = new Ray(
+            playerCamera.transform.position,
+            playerCamera.transform.forward
+        );
+
+        RaycastHit[] hits =
+            Physics.RaycastAll(
+                aimRay,
+                aimDistance,
+                aimMask,
+                QueryTriggerInteraction.Ignore
+            );
+
+        if (hits != null && hits.Length > 0)
+        {
+            Array.Sort(
+                hits,
+                (left, right) =>
+                    left.distance.CompareTo(right.distance)
+            );
+
+            Transform playerRoot =
+                transform.root;
+
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider == null)
+                {
+                    continue;
+                }
+
+                // 플레이어 자신의 Collider는 조준 대상에서 제외한다.
+                if (hit.collider.transform.IsChildOf(playerRoot))
+                {
+                    continue;
+                }
+
+                return hit.point;
+            }
+        }
+
+        return
+            playerCamera.transform.position +
+            playerCamera.transform.forward *
+            aimDistance;
+    }
+
+
+    /// <summary>
+    /// 총알이 생성 직후 플레이어 본인이나 무기에 부딪히지 않도록 한다.
+    /// </summary>
+    private void IgnorePlayerCollision(
+        GameObject bullet)
+    {
+        if (bullet == null)
+        {
+            return;
+        }
+
+        Collider[] bulletColliders =
+            bullet.GetComponentsInChildren<Collider>(true);
+
+        Collider[] playerColliders =
+            transform.root.GetComponentsInChildren<Collider>(true);
+
+        foreach (Collider bulletCollider in bulletColliders)
+        {
+            if (bulletCollider == null)
+            {
+                continue;
+            }
+
+            foreach (Collider playerCollider in playerColliders)
+            {
+                if (playerCollider == null ||
+                    playerCollider.transform.IsChildOf(
+                        bullet.transform))
+                {
+                    continue;
+                }
+
+                Physics.IgnoreCollision(
+                    bulletCollider,
+                    playerCollider,
+                    true
+                );
+            }
+        }
+    }
+
+
+    private void PlayMuzzleFlash()
+    {
+        if (muzzleFlashLight == null)
+        {
+            return;
+        }
+
+        if (flashCoroutine != null)
+        {
+            StopCoroutine(flashCoroutine);
+        }
+
+        flashCoroutine =
+            StartCoroutine(
+                FlashMuzzleRoutine()
+            );
+    }
+
+
+    private IEnumerator FlashMuzzleRoutine()
+    {
+        muzzleFlashLight.enabled = true;
+
+        yield return new WaitForSeconds(
+            Mathf.Max(0.01f, flashDuration)
+        );
+
+        muzzleFlashLight.enabled = false;
+        flashCoroutine = null;
+    }
+
+
+    private void OnValidate()
+    {
+        bulletSpeed =
+            Mathf.Max(0f, bulletSpeed);
+
+        bulletDamage =
+            Mathf.Max(0f, bulletDamage);
+
+        bulletLifetime =
+            Mathf.Max(0.1f, bulletLifetime);
+
+        aimDistance =
+            Mathf.Max(0.1f, aimDistance);
+
+        flashDuration =
+            Mathf.Max(0.01f, flashDuration);
     }
 }

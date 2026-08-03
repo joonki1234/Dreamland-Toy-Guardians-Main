@@ -1952,7 +1952,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_Layer
@@ -4558,7 +4558,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 750
+      scalar: 250
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -7480,7 +7480,7 @@ ParticleSystem:
     radiusScale: 1
     collidesWith:
       serializedVersion: 2
-      m_Bits: 129
+      m_Bits: 128
     maxCollisionShapes: 256
     quality: 0
     voxelSize: 0.5
@@ -9374,7 +9374,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 42b78c06e9a375d44a22157d416a831d, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 42b78c06e9a375d44a22157d416a831d, type: 3}
       propertyPath: m_Layer
@@ -23291,7 +23291,14 @@ MonoBehaviour:
   bulletPrefab: {fileID: 7250585977690855279, guid: dc50b394d263643c6a3f450a91713afd, type: 3}
   firePoint: {fileID: 2038168086}
   bulletSpeed: 10
+  bulletDamage: 10
+  bulletLifetime: 3
   playerCamera: {fileID: 1264465688}
+  aimDistance: 50
+  aimMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bulletRotationOffset: {x: 90, y: 0, z: 0}
   muzzleFlashLight: {fileID: 0}
   flashDuration: 0.05
 --- !u!1001 &971784543
@@ -24616,7 +24623,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1098216456
 Transform:
   m_ObjectHideFlags: 0
@@ -25689,7 +25696,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 975f39bd024bb824990302eff7e92d8f, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -25729,8 +25736,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunController
   bulletPrefab: {fileID: 7250585977690855279, guid: dc50b394d263643c6a3f450a91713afd, type: 3}
   firePoint: {fileID: 136377783}
-  bulletSpeed: 20
+  bulletSpeed: 40
+  bulletDamage: 10
+  bulletLifetime: 3
   playerCamera: {fileID: 1264465688}
+  aimDistance: 50
+  aimMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  bulletRotationOffset: {x: 90, y: 0, z: 0}
   muzzleFlashLight: {fileID: 1654616241}
   flashDuration: 0.05
 --- !u!4 &1185496322 stripped
@@ -27020,7 +27034,7 @@ Camera:
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 55
+    m_Bits: 695
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
