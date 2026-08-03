@@ -6,28 +6,55 @@ namespace DreamGuardians
     [DisallowMultipleComponent]
     public sealed class RoleSynergyTracker : MonoBehaviour
     {
-        [Header("Common")]
-        [SerializeField, Min(0.1f)] private float triggerWindow = 3f;
-        [SerializeField, Min(0f)] private float cooldown = 5f;
+        [Header("공통 설정")]
+        [SerializeField, Min(0.1f)]
+        private float triggerWindow = 3f;
 
-        [Header("Police + Firefighter")]
-        [SerializeField, Min(0f)] private float emergencyBonusDamage = 20f;
-        [SerializeField, Min(0f)] private float emergencyStunDuration = 2f;
+        [SerializeField, Min(0f)]
+        private float cooldown = 5f;
 
-        [Header("Astronomer + Architect")]
-        [SerializeField, Min(0f)] private float starlightBonusDamage = 15f;
-        [SerializeField, Min(1f)] private float starlightDamageMultiplier = 1.25f;
-        [SerializeField, Min(0f)] private float starlightDuration = 4f;
 
-        private readonly Dictionary<PlayerRole, float> lastHitTimes = new Dictionary<PlayerRole, float>();
-        private readonly Dictionary<SynergyKind, float> lastTriggerTimes = new Dictionary<SynergyKind, float>();
+        [Header("경찰 + 소방관")]
+        [SerializeField, Min(0f)]
+        private float emergencyBonusDamage = 20f;
+
+        [SerializeField, Min(0f)]
+        private float emergencyStunDuration = 2f;
+
+
+        [Header("요리사 + 건축가")]
+        [SerializeField, Min(0f)]
+        private float chefBuilderBonusDamage = 15f;
+
+        [SerializeField, Min(1f)]
+        private float chefBuilderDamageMultiplier = 1.25f;
+
+        [SerializeField, Min(0f)]
+        private float chefBuilderDuration = 4f;
+
+
+        private readonly Dictionary<PlayerRole, float> lastHitTimes =
+            new Dictionary<PlayerRole, float>();
+
+        private readonly Dictionary<SynergyKind, float> lastTriggerTimes =
+            new Dictionary<SynergyKind, float>();
+
+
         private EnemyHealth owner;
         private EnemyCoreMover mover;
+
         private float vulnerableUntil;
 
-        public float CurrentDamageMultiplier => Time.time < vulnerableUntil
-            ? Mathf.Max(1f, starlightDamageMultiplier)
-            : 1f;
+
+        /// <summary>
+        /// 요리사 + 건축가 시너지가 발동한 동안
+        /// 해당 적이 추가로 받는 피해 배율이다.
+        /// </summary>
+        public float CurrentDamageMultiplier =>
+            Time.time < vulnerableUntil
+                ? Mathf.Max(1f, chefBuilderDamageMultiplier)
+                : 1f;
+
 
         private void Awake()
         {
@@ -35,6 +62,11 @@ namespace DreamGuardians
             mover = GetComponent<EnemyCoreMover>();
         }
 
+
+        /// <summary>
+        /// 적이 어떤 직업의 공격에 맞았는지 기록하고
+        /// 가능한 시너지가 있는지 확인한다.
+        /// </summary>
         public SynergyResult RegisterHit(PlayerRole role)
         {
             if (role == PlayerRole.None)
@@ -61,18 +93,18 @@ namespace DreamGuardians
                     emergencyBonusDamage,
                     now),
 
-                PlayerRole.Astronomer => TryTrigger(
+                PlayerRole.Chef => TryTrigger(
                     SynergyKind.StarlightBlueprint,
-                    PlayerRole.Astronomer,
+                    PlayerRole.Chef,
                     PlayerRole.Architect,
-                    starlightBonusDamage,
+                    chefBuilderBonusDamage,
                     now),
 
                 PlayerRole.Architect => TryTrigger(
                     SynergyKind.StarlightBlueprint,
-                    PlayerRole.Astronomer,
+                    PlayerRole.Chef,
                     PlayerRole.Architect,
-                    starlightBonusDamage,
+                    chefBuilderBonusDamage,
                     now),
 
                 _ => SynergyResult.None
@@ -84,9 +116,14 @@ namespace DreamGuardians
             }
 
             ApplyEffect(result.Kind);
-            DreamGameEvents.RaiseSynergyTriggered(new SynergyEventData(owner, result));
+
+            DreamGameEvents.RaiseSynergyTriggered(
+                new SynergyEventData(owner, result)
+            );
+
             return result;
         }
+
 
         private SynergyResult TryTrigger(
             SynergyKind kind,
@@ -95,8 +132,12 @@ namespace DreamGuardians
             float bonusDamage,
             float now)
         {
-            if (!lastHitTimes.TryGetValue(firstRole, out float firstTime) ||
-                !lastHitTimes.TryGetValue(secondRole, out float secondTime))
+            if (!lastHitTimes.TryGetValue(
+                    firstRole,
+                    out float firstTime) ||
+                !lastHitTimes.TryGetValue(
+                    secondRole,
+                    out float secondTime))
             {
                 return SynergyResult.None;
             }
@@ -106,15 +147,24 @@ namespace DreamGuardians
                 return SynergyResult.None;
             }
 
-            if (lastTriggerTimes.TryGetValue(kind, out float lastTriggerTime) &&
+            if (lastTriggerTimes.TryGetValue(
+                    kind,
+                    out float lastTriggerTime) &&
                 now - lastTriggerTime < cooldown)
             {
                 return SynergyResult.None;
             }
 
             lastTriggerTimes[kind] = now;
-            return new SynergyResult(kind, bonusDamage, firstRole, secondRole);
+
+            return new SynergyResult(
+                kind,
+                bonusDamage,
+                firstRole,
+                secondRole
+            );
         }
+
 
         private void ApplyEffect(SynergyKind kind)
         {
@@ -122,20 +172,43 @@ namespace DreamGuardians
             {
                 case SynergyKind.EmergencySuppression:
                     mover ??= GetComponent<EnemyCoreMover>();
-                    mover?.ApplyStun(emergencyStunDuration);
+
+                    mover?.ApplyStun(
+                        emergencyStunDuration
+                    );
                     break;
 
                 case SynergyKind.StarlightBlueprint:
-                    vulnerableUntil = Mathf.Max(vulnerableUntil, Time.time + starlightDuration);
+                    vulnerableUntil = Mathf.Max(
+                        vulnerableUntil,
+                        Time.time + chefBuilderDuration
+                    );
                     break;
             }
         }
 
+
         private void OnValidate()
         {
-            triggerWindow = Mathf.Max(0.1f, triggerWindow);
-            cooldown = Mathf.Max(0f, cooldown);
-            starlightDamageMultiplier = Mathf.Max(1f, starlightDamageMultiplier);
+            triggerWindow = Mathf.Max(
+                0.1f,
+                triggerWindow
+            );
+
+            cooldown = Mathf.Max(
+                0f,
+                cooldown
+            );
+
+            chefBuilderDamageMultiplier = Mathf.Max(
+                1f,
+                chefBuilderDamageMultiplier
+            );
+
+            chefBuilderDuration = Mathf.Max(
+                0f,
+                chefBuilderDuration
+            );
         }
     }
 }

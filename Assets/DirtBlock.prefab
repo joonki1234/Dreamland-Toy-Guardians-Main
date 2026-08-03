@@ -10,12 +10,10 @@ GameObject:
   m_Component:
   - component: {fileID: 134042541746906849}
   - component: {fileID: 286304661963835248}
-  - component: {fileID: 6444393067937782523}
   - component: {fileID: 4439635796674088696}
+  - component: {fileID: 6444393067937782523}
   - component: {fileID: 88403379099774137}
   - component: {fileID: -3883145407857547968}
-  - component: {fileID: -4514035505357307342}
-  - component: {fileID: -4293582479687565371}
   m_Layer: 9
   m_Name: DirtBlock
   m_TagString: Untagged
@@ -46,6 +44,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6378157156313051141}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!135 &4439635796674088696
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6378157156313051141}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.5
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &6444393067937782523
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -95,27 +114,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!135 &4439635796674088696
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6378157156313051141}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.5
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!54 &88403379099774137
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -155,42 +153,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25e5d09973c2e4cdca91e3bf83944c33, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DirtProjectile
+  damage: 10
   mudSplatPrefab: {fileID: 6874483687604971407, guid: 3745d4488e31a470d9cf0cf5d4b0f103, type: 3}
-  destroyDelay: 10
---- !u!114 &-4514035505357307342
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6378157156313051141}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4f334554317234dfda34115414f1edcf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DirtMainCluster
-  subDirtPrefab: {fileID: 6378157156313051141}
-  subShardCount: 8
-  splitTime: 0.22
-  spreadAmount: 2.2
---- !u!135 &-4293582479687565371
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6378157156313051141}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.5
-  m_Center: {x: 0, y: 0, z: 0}
+  destroyDelay: 30
