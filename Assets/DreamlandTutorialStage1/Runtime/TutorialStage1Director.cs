@@ -967,6 +967,17 @@ namespace DreamGuardians
                     transitionDelay);
 
 
+            /*
+             * Stage 1 전투가 시작되면 3D 장난감 친구는 잠시 퇴장합니다.
+             * 이후 전투 중 안내는 MissionBannerUI의 2D Quick Guide가 담당하고,
+             * 2차 공격 종료 후 시너지 설명 때 다시 등장합니다.
+             */
+            if (toyFriend != null)
+            {
+                yield return toyFriend.HideForCombat();
+            }
+
+
             transitionToWaveRoutine = null;
 
             State =

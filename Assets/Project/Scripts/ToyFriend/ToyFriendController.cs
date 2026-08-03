@@ -91,6 +91,11 @@ namespace DreamGuardians
         [SerializeField]
         private UnityEvent onSpeechFinished;
 
+        [Header("Story Presence")]
+        [Tooltip("전투 중 숨었다가 스토리 설명을 위해 다시 나타날 때의 기본 연출 시간입니다.")]
+        [SerializeField, Min(0f)]
+        private float storyPresenceTransitionDuration = 0.35f;
+
         [Header("Entrance Test")]
         [Tooltip("빛 등장 연출을 사용할 때는 외부 스크립트가 자동으로 해제합니다.")]
         [SerializeField]
@@ -106,6 +111,7 @@ namespace DreamGuardians
         private Text speechBubbleText;
         private Vector3 visualBaseLocalPosition;
         private Quaternion visualBaseLocalRotation;
+        private Vector3 characterBaseLocalScale;
         private static Font runtimeFont;
 
         public Transform SpawnPoint => spawnPoint;
@@ -147,6 +153,8 @@ namespace DreamGuardians
                 visualBaseLocalPosition = visualRoot.localPosition;
                 visualBaseLocalRotation = visualRoot.localRotation;
             }
+
+            characterBaseLocalScale = transform.localScale;
 
             SetBlend(idleBlend, true);
 
@@ -327,6 +335,142 @@ namespace DreamGuardians
             if (!visible && speechBubbleRoot != null)
             {
                 speechBubbleRoot.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// 전투 중 숨었던 장난감 친구를 TalkPoint에서 다시 보여줍니다.
+        /// Stage 1의 시너지 설명처럼 중요한 3D 스토리 장면에 사용합니다.
+        /// </summary>
+        public IEnumerator ShowForStory(float duration = -1f)
+        {
+            StopCurrentRoutine();
+            StopSpeaking();
+
+            if (talkPoint != null)
+            {
+                transform.position = talkPoint.position;
+            }
+
+            float safeDuration = duration >= 0f
+                ? duration
+                : storyPresenceTransitionDuration;
+
+            Vector3 targetScale = characterBaseLocalScale;
+            Vector3 startScale = targetScale * 0.05f;
+
+            transform.localScale = startScale;
+            SetVisible(true);
+
+            if (safeDuration <= 0f)
+            {
+                transform.localScale = targetScale;
+                FacePlayerImmediately();
+                yield break;
+            }
+
+            float elapsed = 0f;
+
+            while (elapsed < safeDuration)
+            {
+                elapsed += Time.deltaTime;
+
+                float t = Mathf.SmoothStep(
+                    0f,
+                    1f,
+                    Mathf.Clamp01(elapsed / safeDuration));
+
+                transform.localScale = Vector3.LerpUnclamped(
+                    startScale,
+                    targetScale,
+                    t);
+
+                FacePlayerImmediately();
+                yield return null;
+            }
+
+            transform.localScale = targetScale;
+            FacePlayerImmediately();
+        }
+
+        /// <summary>
+        /// 장난감 친구를 전투 화면에서 숨깁니다.
+        /// 오브젝트를 비활성화하지 않으므로 이후 3D 설명 때 다시 사용할 수 있습니다.
+        /// </summary>
+        public IEnumerator HideForCombat(float duration = -1f)
+        {
+            StopCurrentRoutine();
+            StopSpeaking();
+
+            float safeDuration = duration >= 0f
+                ? duration
+                : storyPresenceTransitionDuration;
+
+            Vector3 startScale = characterBaseLocalScale;
+            Vector3 targetScale = startScale * 0.05f;
+
+            transform.localScale = startScale;
+
+            if (safeDuration > 0f)
+            {
+                float elapsed = 0f;
+
+                while (elapsed < safeDuration)
+                {
+                    elapsed += Time.deltaTime;
+
+                    float t = Mathf.SmoothStep(
+                        0f,
+                        1f,
+                        Mathf.Clamp01(elapsed / safeDuration));
+
+                    transform.localScale = Vector3.LerpUnclamped(
+                        startScale,
+                        targetScale,
+                        t);
+
+                    yield return null;
+                }
+            }
+
+            SetVisible(false);
+            transform.localScale = characterBaseLocalScale;
+        }
+
+        /// <summary>
+        /// 연출 없이 즉시 전투용 숨김 상태로 만듭니다.
+        /// Stage 1 직접 시작 및 테스트 진입의 안전장치입니다.
+        /// </summary>
+        public void HideForCombatImmediately()
+        {
+            StopCurrentRoutine();
+            StopSpeaking();
+            transform.localScale = characterBaseLocalScale;
+            SetVisible(false);
+        }
+
+        private void FacePlayerImmediately()
+        {
+            if (playerLookTarget == null && Camera.main != null)
+            {
+                playerLookTarget = Camera.main.transform;
+            }
+
+            if (playerLookTarget == null)
+            {
+                return;
+            }
+
+            Vector3 lookDirection =
+                playerLookTarget.position - transform.position;
+            lookDirection.y = 0f;
+
+            if (lookDirection.sqrMagnitude > 0.0001f)
+            {
+                transform.rotation = Quaternion.LookRotation(
+                    lookDirection.normalized,
+                    Vector3.up) *
+                    Quaternion.Euler(0f, modelForwardOffset, 0f);
             }
         }
 

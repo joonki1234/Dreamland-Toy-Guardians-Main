@@ -87,12 +87,28 @@ namespace DreamGuardians
         [SerializeField]
         private ToyFriendController toyFriend;
 
+        [Tooltip(
+            "Stage 1의 두 번째 공격부터 추가로 생성할 " +
+            "미니건 원거리 적 프리팹")]
+        [SerializeField]
+        private GameObject rangedEnemyPrefab;
+
 
         [Header("Wave 1")]
 
         [SerializeField]
         private List<WaveGroup> groups =
             new List<WaveGroup>();
+
+        [Header("Stage 1 원거리 적")]
+
+        [Tooltip("두 번째 공격에 기존 근접 적과 함께 추가되는 원거리 적 수")]
+        [SerializeField, Min(0)]
+        private int secondWaveRangedEnemyCount = 3;
+
+        [Tooltip("최종 공격에 기존 근접 적과 함께 추가되는 원거리 적 수")]
+        [SerializeField, Min(0)]
+        private int finalWaveRangedEnemyCount = 4;
 
         [Tooltip(
             "Portal A와 Road_1 준비가 끝난 뒤 " +
@@ -105,6 +121,10 @@ namespace DreamGuardians
 
         [SerializeField, Min(0f)]
         private float targetStageDurationSeconds = 240f;
+
+        [Tooltip("2차 공격 종료 후 장난감 친구가 나타나고 사라지는 데 걸리는 시간")]
+        [SerializeField, Min(0f)]
+        private float toyFriendStoryTransitionDuration = 0.35f;
 
 
         [Header("환경 준비 안전 설정")]
@@ -339,6 +359,10 @@ namespace DreamGuardians
             preparationCompleted = false;
             RoleSynergyProgression.Lock();
 
+            // 튜토리얼을 건너뛰거나 Stage 1을 직접 실행해도
+            // 3D 캐릭터가 전투 화면에 남지 않도록 합니다.
+            toyFriend?.HideForCombatImmediately();
+
             /*
              * 기존 Stage 1 시작 이벤트입니다.
              * 여기서는 포탈과 길을 직접 실행하지 않습니다.
@@ -436,9 +460,17 @@ namespace DreamGuardians
                 }
 
 
+                int rangedEnemyCount =
+                    GetRangedEnemyCount(index);
+
+                int totalEnemyCount =
+                    Mathf.Max(0, group.enemyCount) +
+                    rangedEnemyCount;
+
+
                 missionUI?.ShowBanner(
                     group.label,
-                    $"악몽 {group.enemyCount}마리 출현",
+                    $"악몽 {totalEnemyCount}마리 출현",
                     1.5f);
 
 
@@ -490,11 +522,14 @@ namespace DreamGuardians
                 Debug.Log(
                     $"[Dreamland] Stage 1 {group.label} 스폰 시작. " +
                     $"포탈과 길 준비 완료 후 " +
-                    $"총 {group.enemyCount}마리를 생성합니다. " +
+                    $"총 {totalEnemyCount}마리(근접 {group.enemyCount}, " +
+                    $"원거리 {rangedEnemyCount})를 생성합니다. " +
                     $"스폰 간격 {group.spawnInterval:0.0}초.",
                     this);
 
-                yield return SpawnWaveGroup(group);
+                yield return SpawnWaveGroup(
+                    group,
+                    rangedEnemyCount);
 
 
                 /*
@@ -813,10 +848,13 @@ namespace DreamGuardians
 
 
         private IEnumerator SpawnWaveGroup(
-            WaveGroup group)
+            WaveGroup group,
+            int rangedEnemyCount)
         {
-            yield return spawner.SpawnGroup(
+            yield return spawner.SpawnMixedGroup(
+                rangedEnemyPrefab,
                 group.enemyCount,
+                rangedEnemyCount,
                 group.spawnInterval,
                 group.healthMultiplier);
 
@@ -831,6 +869,27 @@ namespace DreamGuardians
                 $"[Dreamland] {group.label}의 모든 적 생성 완료. " +
                 $"진행 중인 스폰 코루틴: {runningSpawnRoutineCount}",
                 this);
+        }
+
+
+        private int GetRangedEnemyCount(int groupIndex)
+        {
+            if (rangedEnemyPrefab == null ||
+                groupIndex <= 0)
+            {
+                return 0;
+            }
+
+            if (groupIndex == 1)
+            {
+                return Mathf.Max(
+                    0,
+                    secondWaveRangedEnemyCount);
+            }
+
+            return Mathf.Max(
+                0,
+                finalWaveRangedEnemyCount);
         }
 
 
@@ -851,6 +910,16 @@ namespace DreamGuardians
         {
             RoleSynergyProgression.Unlock();
             SynergyUnlocked?.Invoke();
+
+            /*
+             * 일반 전투 안내와 달리 시너지 해금은 중요한 스토리 장면이므로
+             * 장난감 친구가 TalkPoint에서 잠시 다시 등장해 직접 설명합니다.
+             */
+            if (toyFriend != null)
+            {
+                yield return toyFriend.ShowForStory(
+                    toyFriendStoryTransitionDuration);
+            }
 
             missionUI?.ShowBanner(
                 dialogueData != null
@@ -915,12 +984,23 @@ namespace DreamGuardians
 
                 yield return new WaitForSeconds(4.5f);
             }
+
+            if (toyFriend != null)
+            {
+                yield return toyFriend.HideForCombat(
+                    toyFriendStoryTransitionDuration);
+            }
         }
 
 
         private float GetSynergyUnlockSequenceDuration()
         {
             float duration = 1.2f;
+
+            if (toyFriend != null)
+            {
+                duration += toyFriendStoryTransitionDuration * 2f;
+            }
 
             if (dialogueData == null ||
                 dialogueData.SynergyUnlockLines == null ||
@@ -1135,6 +1215,16 @@ namespace DreamGuardians
                 Mathf.Max(
                     1f,
                     preparationTimeout);
+
+            secondWaveRangedEnemyCount =
+                Mathf.Max(
+                    0,
+                    secondWaveRangedEnemyCount);
+
+            finalWaveRangedEnemyCount =
+                Mathf.Max(
+                    0,
+                    finalWaveRangedEnemyCount);
         }
     }
 }

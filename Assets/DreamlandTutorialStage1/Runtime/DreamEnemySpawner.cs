@@ -98,7 +98,45 @@ namespace DreamGuardians
             float spawnInterval,
             float healthMultiplier = 1f)
         {
-            int safeCount = Mathf.Max(0, enemyCount);
+            return SpawnMixedGroup(
+                null,
+                enemyCount,
+                0,
+                spawnInterval,
+                healthMultiplier);
+        }
+
+        /// <summary>
+        /// 기본 근접 적과 추가 프리팹을 한 웨이브 안에서 고르게 섞어
+        /// 동일한 포탈과 전투 추적 시스템으로 생성합니다.
+        /// </summary>
+        public IEnumerator SpawnMixedGroup(
+            GameObject additionalPrefab,
+            int primaryEnemyCount,
+            int additionalEnemyCount,
+            float spawnInterval,
+            float healthMultiplier = 1f)
+        {
+            int safePrimaryCount =
+                Mathf.Max(0, primaryEnemyCount);
+
+            int safeAdditionalCount =
+                additionalPrefab != null
+                    ? Mathf.Max(0, additionalEnemyCount)
+                    : 0;
+
+            if (additionalPrefab == null &&
+                additionalEnemyCount > 0)
+            {
+                Debug.LogWarning(
+                    "[DreamEnemySpawner] 추가 적 프리팹이 연결되지 않아 " +
+                    "기본 근접 적만 생성합니다.",
+                    this);
+            }
+
+            int safeCount =
+                safePrimaryCount + safeAdditionalCount;
+
             float safeInterval = Mathf.Max(0f, spawnInterval);
 
             List<Transform> waveSpawnPoints =
@@ -121,6 +159,8 @@ namespace DreamGuardians
             }
 
             int waveSpawnIndex = 0;
+            int additionalSpawned = 0;
+            int additionalAccumulator = 0;
 
             for (int i = 0; i < safeCount; i++)
             {
@@ -151,9 +191,25 @@ namespace DreamGuardians
                         GetNextSpawnPoint();
                 }
 
+                additionalAccumulator +=
+                    safeAdditionalCount;
+
+                bool spawnAdditional =
+                    additionalSpawned < safeAdditionalCount &&
+                    additionalAccumulator >= safeCount;
+
+                if (spawnAdditional)
+                {
+                    additionalAccumulator -= safeCount;
+                    additionalSpawned++;
+                }
+
                 SpawnCombatEnemyAtPoint(
                     selectedSpawnPoint,
-                    healthMultiplier);
+                    healthMultiplier,
+                    spawnAdditional
+                        ? additionalPrefab
+                        : null);
 
                 if (safeInterval > 0f &&
                     i < safeCount - 1)
@@ -189,7 +245,8 @@ namespace DreamGuardians
 
         private EnemyHealth SpawnCombatEnemyAtPoint(
             Transform spawnPoint,
-            float healthMultiplier)
+            float healthMultiplier,
+            GameObject prefabOverride = null)
         {
             Vector3 position;
             Quaternion rotation;
@@ -217,7 +274,8 @@ namespace DreamGuardians
                 rotation,
                 false,
                 healthMultiplier,
-                spawnPoint);
+                spawnPoint,
+                prefabOverride);
         }
 
         public EnemyHealth SpawnCombatEnemy(
@@ -244,7 +302,8 @@ namespace DreamGuardians
                 rotation,
                 false,
                 healthMultiplier,
-                spawnPoint);
+                spawnPoint,
+                null);
         }
 
         public EnemyHealth SpawnTutorialEnemy(
@@ -268,7 +327,8 @@ namespace DreamGuardians
                 rotation,
                 true,
                 1f,
-                tutorialSpawnPoint);
+                tutorialSpawnPoint,
+                null);
         }
 
         /// <summary>
@@ -315,15 +375,20 @@ namespace DreamGuardians
             Quaternion rotation,
             bool tutorialEnemy,
             float healthMultiplier,
-            Transform spawnPoint)
+            Transform spawnPoint,
+            GameObject prefabOverride)
         {
             GameObject enemyObject;
+            GameObject selectedPrefab =
+                prefabOverride != null
+                    ? prefabOverride
+                    : enemyPrefab;
 
-            if (enemyPrefab != null)
+            if (selectedPrefab != null)
             {
                 enemyObject =
                     Instantiate(
-                        enemyPrefab,
+                        selectedPrefab,
                         position,
                         rotation);
             }
@@ -369,6 +434,11 @@ namespace DreamGuardians
                 GetOrAdd<EnemyCoreMover>(
                     enemyObject);
 
+            // 원거리 미니건 적은 프리팹에 붙은 전용 설정값을 사용합니다.
+            // 해당 컴포넌트가 없으면 기존 근접 적 설정을 그대로 유지합니다.
+            RangedMinigunEnemy rangedEnemy =
+                enemyObject.GetComponent<RangedMinigunEnemy>();
+
             if (tutorialEnemy)
             {
                 mover.Configure(
@@ -387,16 +457,37 @@ namespace DreamGuardians
             }
             else
             {
+                float configuredMoveSpeed =
+                    rangedEnemy != null
+                        ? rangedEnemy.MoveSpeed
+                        : moveSpeed;
+
+                float configuredCoreDamage =
+                    rangedEnemy != null
+                        ? rangedEnemy.CoreDamage
+                        : coreDamage;
+
+                float configuredAttackInterval =
+                    rangedEnemy != null
+                        ? rangedEnemy.AttackInterval
+                        : attackInterval;
+
+                float configuredAttackRingRadius =
+                    rangedEnemy != null
+                        ? rangedEnemy.AttackRange
+                        : attackRingRadius;
+
                 Vector3 attackDestination =
                     CalculateAttackDestination(
-                        position);
+                        position,
+                        configuredAttackRingRadius);
 
                 mover.Configure(
                     targetCore,
                     attackDestination,
-                    moveSpeed,
-                    coreDamage,
-                    attackInterval);
+                    configuredMoveSpeed,
+                    configuredCoreDamage,
+                    configuredAttackInterval);
 
                 StartRiftSpawn(
                     enemyObject,
@@ -404,14 +495,32 @@ namespace DreamGuardians
                     spawnPoint,
                     position);
             }
-            // 프리팹 연결 상태와 관계없이 생성된 적에
-            // 걷기 동작을 강제로 추가하고 초기화합니다.
-            ToyRobotMotion robotMotion =
-                GetOrAdd<ToyRobotMotion>(
-                    enemyObject);
 
-            robotMotion.enabled = true;
-            robotMotion.ForceInitialize();
+            if (rangedEnemy != null)
+            {
+                // 실제 이동과 코어 피해는 기존 EnemyCoreMover가 담당하고,
+                // 전용 컴포넌트는 Animator 상태를 동기화합니다.
+                rangedEnemy.Configure(mover);
+
+                // 과거 저장본에 근접 전용 모션이 붙어 있어도 충돌하지 않게 합니다.
+                ToyRobotMotion oldRobotMotion =
+                    enemyObject.GetComponent<ToyRobotMotion>();
+
+                if (oldRobotMotion != null)
+                {
+                    oldRobotMotion.enabled = false;
+                }
+            }
+            else
+            {
+                // 기존 근접 로봇은 파츠 기반 걷기 동작을 그대로 사용합니다.
+                ToyRobotMotion robotMotion =
+                    GetOrAdd<ToyRobotMotion>(
+                        enemyObject);
+
+                robotMotion.enabled = true;
+                robotMotion.ForceInitialize();
+            }
 
 
             EnemyPurification purification =
@@ -445,7 +554,8 @@ namespace DreamGuardians
         }
 
         private Vector3 CalculateAttackDestination(
-            Vector3 spawnPosition)
+            Vector3 spawnPosition,
+            float desiredRingRadius)
         {
             if (targetCore == null)
             {
@@ -488,7 +598,7 @@ namespace DreamGuardians
             Vector3 destination =
                 corePosition +
                 outwardDirection *
-                attackRingRadius;
+                Mathf.Max(0.5f, desiredRingRadius);
 
             destination.y =
                 spawnPosition.y;
