@@ -1952,7 +1952,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_Layer
@@ -21199,7 +21199,7 @@ MonoBehaviour:
   weaponBuilder: {fileID: 936303221}
   dirtPrefab: {fileID: 6378157156313051141, guid: a2bce693e5de14482bc5aa783a92cd6e, type: 3}
   shovelFirePoint: {fileID: 1185693087}
-  dirtParticleSystem: {fileID: 2021688928}
+  dirtParticleSystem: {fileID: 0}
   dirtFlashLight: {fileID: 0}
   throwForce: 20
   builderCooldown: 0.5
@@ -21976,7 +21976,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 60cc3c07650e6c447b4a28512dad9844, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 60cc3c07650e6c447b4a28512dad9844, type: 3}
       propertyPath: m_Layer
@@ -22751,7 +22751,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: bdc85f637a63a7a4ba38cf3c0a17df98, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1877592074657632757, guid: bdc85f637a63a7a4ba38cf3c0a17df98, type: 3}
       propertyPath: m_IsActive
@@ -24655,6 +24655,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FireHoseController
   waterParticle: {fileID: 246857759}
+  firePoint: {fileID: 0}
+  maxDistance: 20
+  waterDamage: 10
+  targetLayer:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!120 &1098216458
 LineRenderer:
   serializedVersion: 3
@@ -25696,7 +25702,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 975f39bd024bb824990302eff7e92d8f, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -34495,6 +34501,7 @@ MonoBehaviour:
   gameFlowController: {fileID: 1926243287}
   enemySpawner: {fileID: 2125966794}
   core: {fileID: 2019763646}
+  rangedEnemyPrefab: {fileID: 0}
   stageStartDelay: 2
   portalAppearanceDelay: 1.6
   wave1EnemyCount: 6
@@ -34502,10 +34509,12 @@ MonoBehaviour:
   wave1HealthMultiplier: 1.5
   wave1ToWave2Delay: 15
   wave2EnemyCount: 8
+  wave2RangedEnemyCount: 3
   wave2SpawnInterval: 1.2
   wave2HealthMultiplier: 1.8
   wave2ToFinalDelay: 15
   finalWaveEnemyCount: 10
+  finalWaveRangedEnemyCount: 4
   finalWaveSpawnInterval: 1
   finalWaveHealthMultiplier: 2.2
 --- !u!114 &1926243289
@@ -46374,6 +46383,7 @@ MonoBehaviour:
   core: {fileID: 2019763646}
   dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
   toyFriend: {fileID: 0}
+  rangedEnemyPrefab: {fileID: 0}
   groups:
   - label: "1\uCC28 \uACF5\uACA9"
     enemyCount: 3
@@ -46396,9 +46406,12 @@ MonoBehaviour:
     preDelay: 3
     transitionDelay: 4
     minimumDuration: 0
+  secondWaveRangedEnemyCount: 3
+  finalWaveRangedEnemyCount: 4
   waveStartDelay: 3
   clearSequenceDuration: 3
   targetStageDurationSeconds: 240
+  toyFriendStoryTransitionDuration: 0.35
   preparationTimeout: 10
 --- !u!114 &2125966794
 MonoBehaviour:

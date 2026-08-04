@@ -319,12 +319,16 @@ MonoBehaviour:
   activationDelay: 0.4
   explosionRadius: 2
   explosionDamage: 30
+  explosionEffectPrefab: {fileID: 4994997792314849709, guid: 3dd50886582244645be87adb42aa8528, type: 3}
+  explosionEffectScale: 0.7
+  explosionEffectLifetime: 3
+  explosionEffectHeight: 0.05
   knockbackDistance: 0.7
   knockbackDuration: 0.15
   stunDuration: 0.15
   enemyLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
 --- !u!1 &3600401927570143104
 GameObject:
   m_ObjectHideFlags: 0

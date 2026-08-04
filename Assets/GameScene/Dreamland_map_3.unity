@@ -1983,7 +1983,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_Layer
@@ -22285,7 +22285,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 60cc3c07650e6c447b4a28512dad9844, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 60cc3c07650e6c447b4a28512dad9844, type: 3}
       propertyPath: m_Layer
@@ -25835,7 +25835,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 975f39bd024bb824990302eff7e92d8f, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -46654,6 +46654,7 @@ MonoBehaviour:
   core: {fileID: 2019763646}
   dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
   toyFriend: {fileID: 0}
+  rangedEnemyPrefab: {fileID: 0}
   groups:
   - label: "1\uCC28 \uACF5\uACA9"
     enemyCount: 3
@@ -46676,6 +46677,8 @@ MonoBehaviour:
     preDelay: 3
     transitionDelay: 4
     minimumDuration: 0
+  secondWaveRangedEnemyCount: 3
+  finalWaveRangedEnemyCount: 4
   waveStartDelay: 3
   clearSequenceDuration: 3
   targetStageDurationSeconds: 240
@@ -46897,7 +46900,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!23 &1711813855948850935
 MeshRenderer:
   m_ObjectHideFlags: 0
