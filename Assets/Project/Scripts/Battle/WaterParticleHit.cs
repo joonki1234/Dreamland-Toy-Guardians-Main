@@ -106,6 +106,18 @@ public sealed class WaterParticleHit : MonoBehaviour
                 $"{enemy.gameObject.name} / {damagePerTick}"
             );
         }
+
+        // 🌊 [원소 시너지] StatusReceiver를 찾아 물 상태(isWet & 물 오라) 적용!
+        StatusReceiver statusReceiver = enemy.GetComponentInParent<StatusReceiver>();
+        if (statusReceiver == null)
+        {
+            statusReceiver = enemy.GetComponentInChildren<StatusReceiver>();
+        }
+
+        if (statusReceiver != null)
+        {
+            statusReceiver.ApplyElementalAttack(ElementalType.Water, damagePerTick);
+        }
     }
 
 
