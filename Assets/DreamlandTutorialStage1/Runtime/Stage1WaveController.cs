@@ -382,9 +382,7 @@ namespace DreamGuardians
 
 
             missionUI?.ShowBanner(
-                dialogueData != null
-                    ? dialogueData.WaveStartTitle
-                    : "WAVE 1 START",
+                GetStage1StartTitle(),
 
                 dialogueData != null
                     ? dialogueData.WaveStartSubtitle
@@ -469,7 +467,7 @@ namespace DreamGuardians
 
 
                 missionUI?.ShowBanner(
-                    group.label,
+                    GetStage1WaveTitle(index),
                     $"악몽 {totalEnemyCount}마리 출현",
                     1.5f);
 
@@ -666,12 +664,6 @@ namespace DreamGuardians
                 this);
 
 
-            missionUI?.ShowBanner(
-                "FINAL PHASE",
-                "등장한 악몽을 모두 정화하라",
-                1.5f);
-
-
             while (!failed &&
                    spawner.ActiveEnemyCount > 0)
             {
@@ -699,9 +691,7 @@ namespace DreamGuardians
 
 
             missionUI?.ShowBanner(
-                dialogueData != null
-                    ? dialogueData.WaveClearTitle
-                    : "WAVE 1 CLEAR",
+                GetStage1ClearTitle(),
 
                 dialogueData != null
                     ? dialogueData.WaveClearSubtitle
@@ -1090,6 +1080,54 @@ namespace DreamGuardians
             combatCompleted = true;
 
             return true;
+        }
+
+
+        private static string GetStage1WaveTitle(
+            int zeroBasedWaveIndex)
+        {
+            return
+                $"STAGE 1 - WAVE {zeroBasedWaveIndex + 1}";
+        }
+
+
+        private string GetStage1StartTitle()
+        {
+            string configuredTitle =
+                dialogueData != null
+                    ? dialogueData.WaveStartTitle
+                    : string.Empty;
+
+            if (string.IsNullOrWhiteSpace(configuredTitle) ||
+                string.Equals(
+                    configuredTitle,
+                    "WAVE 1 START",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "STAGE 1 START";
+            }
+
+            return configuredTitle;
+        }
+
+
+        private string GetStage1ClearTitle()
+        {
+            string configuredTitle =
+                dialogueData != null
+                    ? dialogueData.WaveClearTitle
+                    : string.Empty;
+
+            if (string.IsNullOrWhiteSpace(configuredTitle) ||
+                string.Equals(
+                    configuredTitle,
+                    "WAVE 1 CLEAR",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return "STAGE 1 CLEAR";
+            }
+
+            return configuredTitle;
         }
 
 

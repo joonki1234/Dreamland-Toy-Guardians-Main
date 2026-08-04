@@ -34798,7 +34798,6 @@ MonoBehaviour:
   gameFlowController: {fileID: 1926243287}
   enemySpawner: {fileID: 2125966794}
   core: {fileID: 2019763646}
-  rangedEnemyPrefab: {fileID: 4376583669907981605, guid: 16e7f714445272c47af28662cf414ae5, type: 3}
   stageStartDelay: 2
   portalAppearanceDelay: 1.6
   wave1EnemyCount: 6
@@ -34806,12 +34805,10 @@ MonoBehaviour:
   wave1HealthMultiplier: 1.5
   wave1ToWave2Delay: 15
   wave2EnemyCount: 8
-  wave2RangedEnemyCount: 3
   wave2SpawnInterval: 1.2
   wave2HealthMultiplier: 1.8
   wave2ToFinalDelay: 15
   finalWaveEnemyCount: 10
-  finalWaveRangedEnemyCount: 4
   finalWaveSpawnInterval: 1
   finalWaveHealthMultiplier: 2.2
 --- !u!114 &1926243289
@@ -34833,9 +34830,9 @@ MonoBehaviour:
   stageObjective: "Stage 2 \xB7 \uCF54\uC5B4\uB97C \uC9C0\uD0A4\uBA70 \uBAA8\uB4E0
     \uC545\uBABD\uC744 \uC815\uD654\uD558\uB77C"
   stageStartBannerDuration: 2
-  firstWaveTitle: "1\uCC28 \uCE68\uC2DD"
-  secondWaveTitle: "2\uCC28 \uCE68\uC2DD"
-  finalWaveTitle: FINAL ATTACK
+  firstWaveTitle: STAGE 2 - WAVE 1
+  secondWaveTitle: STAGE 2 - WAVE 2
+  finalWaveTitle: STAGE 2 - WAVE 3
   finalPhaseTitle: FINAL PHASE
   finalPhaseSubtitle: "\uB0A8\uC740 \uC545\uBABD\uC744 \uBAA8\uB450 \uC815\uD654\uD558\uB77C"
   waveBannerDuration: 1.5
@@ -46654,6 +46651,7 @@ MonoBehaviour:
   core: {fileID: 2019763646}
   dialogueData: {fileID: 11400000, guid: eb6be0b77801502428259ebbcd031eb3, type: 2}
   toyFriend: {fileID: 0}
+  rangedEnemyPrefab: {fileID: 4376583669907981605, guid: 16e7f714445272c47af28662cf414ae5, type: 3}
   groups:
   - label: "1\uCC28 \uACF5\uACA9"
     enemyCount: 3
@@ -46676,6 +46674,8 @@ MonoBehaviour:
     preDelay: 3
     transitionDelay: 4
     minimumDuration: 0
+  secondWaveRangedEnemyCount: 3
+  finalWaveRangedEnemyCount: 4
   waveStartDelay: 3
   clearSequenceDuration: 3
   targetStageDurationSeconds: 240

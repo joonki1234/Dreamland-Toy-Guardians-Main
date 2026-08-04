@@ -24,6 +24,12 @@ namespace DreamGuardians
         [SerializeField, Min(0.1f)]
         private float attackInterval = 0.75f;
 
+        [Tooltip(
+            "모델이 이동 방향과 반대로 보일 때 사용하는 Y축 회전 보정값입니다. " +
+            "현재 미니건 로봇은 -Z 방향이 정면이므로 180도를 사용합니다.")]
+        [SerializeField]
+        private float modelYawOffset = 180f;
+
 
         [Header("애니메이션")]
 
@@ -34,6 +40,21 @@ namespace DreamGuardians
         [Tooltip("공격 지점에 도달했다고 판단할 여유 거리입니다.")]
         [SerializeField, Min(0.05f)]
         private float arrivalTolerance = 0.25f;
+
+        [Tooltip("Animator의 대기 상태 이름")]
+        [SerializeField]
+        private string idleStateName = "Idle";
+
+        [Tooltip("Animator의 걷기 상태 이름")]
+        [SerializeField]
+        private string walkingStateName = "Walking";
+
+        [Tooltip("Animator의 미니건 공격 상태 이름")]
+        [SerializeField]
+        private string attackStateName = "AttackMinigun";
+
+        [SerializeField, Min(0f)]
+        private float animationCrossFadeDuration = 0.08f;
 
 
         private static readonly int IsMovingHash =
@@ -46,12 +67,24 @@ namespace DreamGuardians
         private EnemyHealth health;
         private bool hasIsMovingParameter;
         private bool hasIsAttackingParameter;
+        private AnimationMode currentAnimationMode =
+            AnimationMode.Unknown;
+
+
+        private enum AnimationMode
+        {
+            Unknown,
+            Idle,
+            Moving,
+            Attacking
+        }
 
 
         public float AttackRange => attackRange;
         public float MoveSpeed => moveSpeed;
         public float CoreDamage => coreDamage;
         public float AttackInterval => attackInterval;
+        public float ModelYawOffset => modelYawOffset;
 
 
         private void Awake()
@@ -76,6 +109,12 @@ namespace DreamGuardians
             {
                 oldRobotMotion.enabled = false;
             }
+        }
+
+
+        private void OnEnable()
+        {
+            currentAnimationMode = AnimationMode.Unknown;
         }
 
 
@@ -119,13 +158,16 @@ namespace DreamGuardians
 
             toDestination.y = 0f;
 
+            bool isAttacking = mover.IsAttackingCore;
+
             bool isMoving =
+                !isAttacking &&
                 toDestination.sqrMagnitude >
                 arrivalTolerance * arrivalTolerance;
 
             SetAnimatorState(
                 isMoving,
-                !isMoving);
+                isAttacking);
         }
 
 
@@ -225,6 +267,65 @@ namespace DreamGuardians
                     IsAttackingHash,
                     isAttacking);
             }
+
+            AnimationMode nextMode = isAttacking
+                ? AnimationMode.Attacking
+                : isMoving
+                    ? AnimationMode.Moving
+                    : AnimationMode.Idle;
+
+            if (nextMode == currentAnimationMode)
+            {
+                return;
+            }
+
+            currentAnimationMode = nextMode;
+
+            string stateName = idleStateName;
+
+            if (nextMode == AnimationMode.Attacking)
+            {
+                stateName = attackStateName;
+            }
+            else if (nextMode == AnimationMode.Moving)
+            {
+                stateName = walkingStateName;
+            }
+
+            CrossFadeToStateIfPresent(stateName);
+        }
+
+
+        /// <summary>
+        /// Bool 조건 전환이 누락되어도 공격/걷기 상태가 보이도록
+        /// 실제 Animator 상태를 한 번 직접 전환합니다.
+        /// </summary>
+        private void CrossFadeToStateIfPresent(string stateName)
+        {
+            if (string.IsNullOrWhiteSpace(stateName) ||
+                animator == null ||
+                animator.runtimeAnimatorController == null)
+            {
+                return;
+            }
+
+            int fullPathHash = Animator.StringToHash(
+                "Base Layer." + stateName);
+
+            if (!animator.HasState(0, fullPathHash))
+            {
+                Debug.LogWarning(
+                    "[RangedMinigunEnemy] Animator에서 상태를 찾지 못했습니다: " +
+                    stateName,
+                    this);
+
+                return;
+            }
+
+            animator.CrossFadeInFixedTime(
+                fullPathHash,
+                animationCrossFadeDuration,
+                0);
         }
 
 
@@ -245,6 +346,8 @@ namespace DreamGuardians
             attackInterval = Mathf.Max(0.1f, attackInterval);
             arrivalTolerance =
                 Mathf.Max(0.05f, arrivalTolerance);
+            animationCrossFadeDuration =
+                Mathf.Max(0f, animationCrossFadeDuration);
         }
     }
 }

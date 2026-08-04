@@ -84,7 +84,7 @@ MonoBehaviour:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
     message: "\uC88B\uC558\uC5B4! \uC774\uC81C \uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uC744 \uC815\uD654\uD558\uBA74\uC11C \uAFC8\uBE5B \uCF54\uC5B4\uB97C \uB05D\uAE4C\uC9C0 \uC9C0\uCF1C\uC918!"
     duration: 3.5
-  waveStartTitle: WAVE 1 START
+  waveStartTitle: STAGE 1 START
   waveStartSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uB77C"
   waveObjective: "Stage 1 \xB7 \uCF54\uC5B4 \uBC29\uC5B4"
   afterFirstGroupLine:
@@ -104,7 +104,7 @@ MonoBehaviour:
   - speaker: "장난감 친구"
     message: "동료의 행동에 맞춰 직업 능력을 이어 써 봐. 혼자일 때보다 훨씬 강한 효과가 나타날 거야!"
     duration: 4.5
-  waveClearTitle: WAVE 1 CLEAR
+  waveClearTitle: STAGE 1 CLEAR
   waveClearSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4 \uBC29\uC5B4 \uC131\uACF5"
   coreUpgradeTitle: CORE UPGRADE
   coreUpgradeSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4\uAC00 \uBB34\uAE30\uB97C \uAC15\uD654\uD569\uB2C8\uB2E4"

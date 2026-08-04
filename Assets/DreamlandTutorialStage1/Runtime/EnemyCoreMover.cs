@@ -52,6 +52,11 @@ namespace DreamGuardians
         [SerializeField, Min(0f)]
         private float turnSpeed = 8f;
 
+        [Tooltip(
+            "모델의 정면 축이 Unity +Z와 다를 때 적용할 Y축 회전 보정값")]
+        [SerializeField]
+        private float modelYawOffset;
+
 
         private EnemyHealth health;
         private float nextAttackTime;
@@ -63,6 +68,7 @@ namespace DreamGuardians
 
         public CoreState TargetCore => targetCore;
         public Vector3 AttackDestination => attackDestination;
+        public bool IsAttackingCore { get; private set; }
 
 
         private void Awake()
@@ -92,6 +98,8 @@ namespace DreamGuardians
 
         private void OnDisable()
         {
+            IsAttackingCore = false;
+
             if (health != null)
             {
                 health.Died -= HandleDied;
@@ -103,22 +111,26 @@ namespace DreamGuardians
         {
             if (health != null && health.IsDead)
             {
+                IsAttackingCore = false;
                 return;
             }
 
             // 넉백 중에는 코어 방향으로 이동하지 않는다.
             if (isBeingKnockedBack)
             {
+                IsAttackingCore = false;
                 return;
             }
 
             if (targetCore == null)
             {
+                IsAttackingCore = false;
                 return;
             }
 
             if (Time.time < stunnedUntil)
             {
+                IsAttackingCore = false;
                 return;
             }
 
@@ -151,6 +163,8 @@ namespace DreamGuardians
 
             if (distance > arrivalDistance)
             {
+                IsAttackingCore = false;
+
                 Vector3 direction =
                     toDestination /
                     Mathf.Max(distance, 0.0001f);
@@ -179,6 +193,8 @@ namespace DreamGuardians
         /// </summary>
         private void AttackCore()
         {
+            IsAttackingCore = true;
+
             Vector3 toCore =
                 targetCore.transform.position -
                 transform.position;
@@ -206,7 +222,8 @@ namespace DreamGuardians
             Vector3 destination,
             float speed = 0.35f,
             float damage = 10f,
-            float interval = 1.5f)
+            float interval = 1.5f,
+            float yawOffset = 0f)
         {
             targetCore = core;
 
@@ -218,6 +235,8 @@ namespace DreamGuardians
             moveSpeed = Mathf.Max(0f, speed);
             coreDamage = Mathf.Max(0f, damage);
             attackInterval = Mathf.Max(0.1f, interval);
+            modelYawOffset = yawOffset;
+            IsAttackingCore = false;
         }
 
 
@@ -228,13 +247,16 @@ namespace DreamGuardians
             CoreState core,
             float speed = 0.35f,
             float damage = 10f,
-            float interval = 1.5f)
+            float interval = 1.5f,
+            float yawOffset = 0f)
         {
             targetCore = core;
             useAttackDestination = false;
             moveSpeed = Mathf.Max(0f, speed);
             coreDamage = Mathf.Max(0f, damage);
             attackInterval = Mathf.Max(0.1f, interval);
+            modelYawOffset = yawOffset;
+            IsAttackingCore = false;
         }
 
 
@@ -344,7 +366,11 @@ namespace DreamGuardians
             Quaternion targetRotation =
                 Quaternion.LookRotation(
                     direction.normalized,
-                    Vector3.up);
+                    Vector3.up) *
+                Quaternion.Euler(
+                    0f,
+                    modelYawOffset,
+                    0f);
 
             transform.rotation =
                 Quaternion.Slerp(
@@ -358,6 +384,7 @@ namespace DreamGuardians
             EnemyHealth _,
             DamageInfo __)
         {
+            IsAttackingCore = false;
             enabled = false;
         }
 

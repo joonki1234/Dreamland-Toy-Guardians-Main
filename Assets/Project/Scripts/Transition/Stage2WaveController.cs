@@ -47,13 +47,6 @@ public sealed class Stage2WaveController : MonoBehaviour
     [SerializeField]
     private CoreState core;
 
-    [Tooltip(
-        "Stage 2 두 번째 공격부터 추가로 생성할 " +
-        "미니건 원거리 적 프리팹")]
-    [SerializeField]
-    private GameObject rangedEnemyPrefab;
-
-
     [Header("Stage 2 시작")]
 
     [Tooltip(
@@ -99,11 +92,6 @@ public sealed class Stage2WaveController : MonoBehaviour
     [SerializeField]
     private int wave2EnemyCount = 8;
 
-    [Tooltip("기존 근접 적 수에 추가되는 원거리 적 수")]
-    [Min(0)]
-    [SerializeField]
-    private int wave2RangedEnemyCount = 3;
-
     [Min(0f)]
     [SerializeField]
     private float wave2SpawnInterval = 1.2f;
@@ -125,11 +113,6 @@ public sealed class Stage2WaveController : MonoBehaviour
     [Min(1)]
     [SerializeField]
     private int finalWaveEnemyCount = 10;
-
-    [Tooltip("기존 근접 적 수에 추가되는 원거리 적 수")]
-    [Min(0)]
-    [SerializeField]
-    private int finalWaveRangedEnemyCount = 4;
 
     [Min(0f)]
     [SerializeField]
@@ -314,11 +297,6 @@ public sealed class Stage2WaveController : MonoBehaviour
 
             case DreamlandGameFlowController.GameFlowState.Stage2Wave2:
             case DreamlandGameFlowController.GameFlowState.Stage2Final:
-                Debug.LogWarning(
-                    "[Stage2Wave] Stage 2 내부 웨이브는 " +
-                    "Stage2WaveController가 직접 진행하므로 " +
-                    "수동 상태 변경을 무시합니다.",
-                    this);
                 break;
 
             case DreamlandGameFlowController.GameFlowState.EnemyAbsorption:
@@ -433,7 +411,6 @@ public sealed class Stage2WaveController : MonoBehaviour
             Stage2WavePhase.First,
             "Stage 2 첫 번째 공격",
             wave1EnemyCount,
-            0,
             wave1SpawnInterval,
             wave1HealthMultiplier);
 
@@ -453,7 +430,6 @@ public sealed class Stage2WaveController : MonoBehaviour
             Stage2WavePhase.Second,
             "Stage 2 두 번째 공격",
             wave2EnemyCount,
-            wave2RangedEnemyCount,
             wave2SpawnInterval,
             wave2HealthMultiplier);
 
@@ -473,7 +449,6 @@ public sealed class Stage2WaveController : MonoBehaviour
             Stage2WavePhase.Final,
             "Stage 2 최종 공격",
             finalWaveEnemyCount,
-            finalWaveRangedEnemyCount,
             finalWaveSpawnInterval,
             finalWaveHealthMultiplier);
 
@@ -522,10 +497,11 @@ public sealed class Stage2WaveController : MonoBehaviour
         Stage2WavePhase phase,
         string waveLabel,
         int enemyCount,
-        int rangedEnemyCount,
         float spawnInterval,
         float healthMultiplier)
     {
+        gameFlowController?.NotifyStage2WaveStarted(phase);
+
         runningSpawnRoutineCount++;
 
         StartCoroutine(
@@ -533,7 +509,6 @@ public sealed class Stage2WaveController : MonoBehaviour
                 phase,
                 waveLabel,
                 enemyCount,
-                rangedEnemyCount,
                 spawnInterval,
                 healthMultiplier));
     }
@@ -547,18 +522,10 @@ public sealed class Stage2WaveController : MonoBehaviour
         Stage2WavePhase phase,
         string waveLabel,
         int enemyCount,
-        int rangedEnemyCount,
         float spawnInterval,
         float healthMultiplier)
     {
-        int safeRangedEnemyCount =
-            rangedEnemyPrefab != null
-                ? Mathf.Max(0, rangedEnemyCount)
-                : 0;
-
-        int totalEnemyCount =
-            Mathf.Max(0, enemyCount) +
-            safeRangedEnemyCount;
+        int totalEnemyCount = Mathf.Max(0, enemyCount);
 
         // EnemyPortalStageController가 이 이벤트를 받아
         // 해당 웨이브의 포탈을 활성화하거나 확장합니다.
@@ -588,17 +555,13 @@ public sealed class Stage2WaveController : MonoBehaviour
         Debug.Log(
             "[Stage2Wave] " + waveLabel +
             " 포탈 등장 완료 후 스폰 시작 / 총 " +
-            totalEnemyCount + "마리 (근접 " +
-            enemyCount + ", 원거리 " +
-            safeRangedEnemyCount + ") / 생성 간격 " +
+            totalEnemyCount + "마리 / 생성 간격 " +
             spawnInterval.ToString("0.0") + "초",
             this);
 
         // 현재 웨이브의 모든 몹이 생성될 때까지 기다립니다.
-        yield return enemySpawner.SpawnMixedGroup(
-            rangedEnemyPrefab,
+        yield return enemySpawner.SpawnGroup(
             enemyCount,
-            safeRangedEnemyCount,
             spawnInterval,
             healthMultiplier);
 
@@ -776,9 +739,6 @@ public sealed class Stage2WaveController : MonoBehaviour
         wave2EnemyCount =
             Mathf.Max(1, wave2EnemyCount);
 
-        wave2RangedEnemyCount =
-            Mathf.Max(0, wave2RangedEnemyCount);
-
         wave2SpawnInterval =
             Mathf.Max(0f, wave2SpawnInterval);
 
@@ -790,9 +750,6 @@ public sealed class Stage2WaveController : MonoBehaviour
 
         finalWaveEnemyCount =
             Mathf.Max(1, finalWaveEnemyCount);
-
-        finalWaveRangedEnemyCount =
-            Mathf.Max(0, finalWaveRangedEnemyCount);
 
         finalWaveSpawnInterval =
             Mathf.Max(0f, finalWaveSpawnInterval);

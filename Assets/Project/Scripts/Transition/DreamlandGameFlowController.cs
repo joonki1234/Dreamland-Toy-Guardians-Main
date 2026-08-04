@@ -301,8 +301,7 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             return;
         }
 
-        if (currentState !=
-            GameFlowState.Stage2Wave1)
+        if (!IsStage2WaveState(currentState))
         {
             return;
         }
@@ -453,6 +452,52 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
         Debug.Log(
             "[GameFlow] Stage 2 전투 상태를 시작했습니다.",
             this);
+    }
+
+    public void NotifyStage2WaveStarted(
+        Stage2WaveController.Stage2WavePhase phase)
+    {
+        if (!IsStage2WaveState(currentState))
+        {
+            Debug.LogWarning(
+                "[GameFlow] Stage 2 웨이브 상태가 아닌 동안 " +
+                "웨이브 변경 요청을 받았습니다. 현재 상태: " +
+                currentState,
+                this);
+
+            return;
+        }
+
+        GameFlowState nextState;
+
+        switch (phase)
+        {
+            case Stage2WaveController.Stage2WavePhase.First:
+                nextState = GameFlowState.Stage2Wave1;
+                break;
+
+            case Stage2WaveController.Stage2WavePhase.Second:
+                nextState = GameFlowState.Stage2Wave2;
+                break;
+
+            case Stage2WaveController.Stage2WavePhase.Final:
+                nextState = GameFlowState.Stage2Final;
+                break;
+
+            default:
+                return;
+        }
+
+        ChangeState(nextState);
+    }
+
+    private static bool IsStage2WaveState(
+        GameFlowState state)
+    {
+        return
+            state == GameFlowState.Stage2Wave1 ||
+            state == GameFlowState.Stage2Wave2 ||
+            state == GameFlowState.Stage2Final;
     }
 
     public void NotifyBossDefeated()

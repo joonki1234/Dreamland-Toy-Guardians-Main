@@ -47,13 +47,13 @@ public sealed class Stage2Director : MonoBehaviour
 
     [Header("웨이브 UI")]
     [SerializeField]
-    private string firstWaveTitle = "1차 침식";
+    private string firstWaveTitle = "STAGE 2 - WAVE 1";
 
     [SerializeField]
-    private string secondWaveTitle = "2차 침식";
+    private string secondWaveTitle = "STAGE 2 - WAVE 2";
 
     [SerializeField]
-    private string finalWaveTitle = "FINAL ATTACK";
+    private string finalWaveTitle = "STAGE 2 - WAVE 3";
 
     [SerializeField]
     private string finalPhaseTitle = "FINAL PHASE";
@@ -151,6 +151,7 @@ public sealed class Stage2Director : MonoBehaviour
 
     private void Awake()
     {
+        NormalizeLegacyWaveTitles();
         ResolveReferences();
     }
 
@@ -313,14 +314,30 @@ public sealed class Stage2Director : MonoBehaviour
         }
 
         allSpawnsCompleted = true;
-        currentPhaseLabel = "최종 정화";
-
-        missionUI?.ShowBanner(
-            finalPhaseTitle,
-            finalPhaseSubtitle,
-            waveBannerDuration);
+        currentPhaseLabel = "남은 적 정리";
 
         RefreshProgressText();
+    }
+
+    private void NormalizeLegacyWaveTitles()
+    {
+        if (string.IsNullOrWhiteSpace(firstWaveTitle) ||
+            firstWaveTitle == "1차 침식")
+        {
+            firstWaveTitle = "STAGE 2 - WAVE 1";
+        }
+
+        if (string.IsNullOrWhiteSpace(secondWaveTitle) ||
+            secondWaveTitle == "2차 침식")
+        {
+            secondWaveTitle = "STAGE 2 - WAVE 2";
+        }
+
+        if (string.IsNullOrWhiteSpace(finalWaveTitle) ||
+            finalWaveTitle == "FINAL ATTACK")
+        {
+            finalWaveTitle = "STAGE 2 - WAVE 3";
+        }
     }
 
     private void HandleCombatCompleted()
@@ -468,6 +485,8 @@ public sealed class Stage2Director : MonoBehaviour
 
     private void OnValidate()
     {
+        NormalizeLegacyWaveTitles();
+
         stageStartBannerDuration = Mathf.Max(0.1f, stageStartBannerDuration);
         waveBannerDuration = Mathf.Max(0.1f, waveBannerDuration);
         progressRefreshInterval = Mathf.Max(0.05f, progressRefreshInterval);

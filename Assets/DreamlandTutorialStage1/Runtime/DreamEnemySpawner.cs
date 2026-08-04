@@ -477,6 +477,11 @@ namespace DreamGuardians
                         ? rangedEnemy.AttackRange
                         : attackRingRadius;
 
+                float configuredModelYawOffset =
+                    rangedEnemy != null
+                        ? rangedEnemy.ModelYawOffset
+                        : 0f;
+
                 Vector3 attackDestination =
                     CalculateAttackDestination(
                         position,
@@ -487,7 +492,8 @@ namespace DreamGuardians
                     attackDestination,
                     configuredMoveSpeed,
                     configuredCoreDamage,
-                    configuredAttackInterval);
+                    configuredAttackInterval,
+                    configuredModelYawOffset);
 
                 StartRiftSpawn(
                     enemyObject,
