@@ -1,41 +1,44 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.AI;
 
 public enum ElementalType { None, Mud, Fire, Water, Electric }
 
-public class StatusReceiver : MonoBehaviour
+[DisallowMultipleComponent]
+public sealed class StatusReceiver : MonoBehaviour
 {
-    [Header("상태 이상 여부")]
-    public bool isMuddy = false;     // 빌더: 진흙 묻음
-    public bool isWet = false;       // 소방관: 물 오라 감쌈
-    public bool isOnFire = false;    // [시너지] 불붙음
-    public bool isShocked = false;   // [시너지] 감전 중
+    [Header("상태 이상 여부 (디버그용)")]
+    [SerializeField] private bool isMuddy = false;
+    [SerializeField] private bool isWet = false;
+    [SerializeField] private bool isOnFire = false;
+    [SerializeField] private bool isShocked = false;
+
+    [Header("고정된 넉백 연출 세팅")]
+    [SerializeField] private float shockDuration = 0.5f;     // 감전 넉백 연출 시간 (0.5초)
+    [SerializeField] private float knockbackDistance = 0.07f;// 뒤로 슬라이딩하는 거리 (0.07m)
 
     [Header("시각 이펙트 프리팹 (VFX)")]
-    [Tooltip("FlexUnit > WaterSpell > Prefabs 안의 물 오라 프리팹")]
-    public GameObject waterEffectPrefab;    
-    public GameObject electricSynergyVFX;   
-    public GameObject fireSynergyVFX;       
+    [SerializeField] private GameObject waterEffectPrefab;
+    [SerializeField] private GameObject electricSynergyVFX;
+    [SerializeField] private GameObject fireSynergyVFX;
 
-    [Header("감전 연출 옵션")]
-    public float shockDuration = 0.1f;      // 0.1초 순간 경직/어두워짐
-    public float knockbackForce = 1.5f;     // 넉백 세기
-    [Range(0f, 1f)]
-    public float darkFactor = 0.3f;         // 감전 시 순간 밝기 비율 (0.3 = 30%로 어두워짐)
+    [Header("속성 밸런스 옵션")]
+    [SerializeField, Min(1)] private int maxShockCount = 3;  // 물 상태에서 넉백 가능한 최대 횟수
+    [SerializeField, Min(1f)] private float wetDuration = 20f; // 물 오라 유지 시간
+    [SerializeField, Range(0f, 1f)] private float darkFactor = 0.32f; // 감전 시 밝기 비율
 
+    [Header("모델 루트 설정")]
+    [SerializeField] private Transform modelRoot;
+
+    private int currentShockCount = 0;
     private GameObject currentWaterEffectInstance;
     private Renderer[] monsterRenderers;
     private Color[] originalColors;
-    private Rigidbody rb;
-    private NavMeshAgent agent;
 
     private Coroutine wetCoroutine;
     private Coroutine shockCoroutine;
 
     private void Awake()
     {
-        // 몬스터의 Renderer와 기본 머티리얼 색상 저장
         monsterRenderers = GetComponentsInChildren<Renderer>();
         if (monsterRenderers != null && monsterRenderers.Length > 0)
         {
@@ -49,24 +52,35 @@ public class StatusReceiver : MonoBehaviour
             }
         }
 
-        rb = GetComponent<Rigidbody>();
-        agent = GetComponent<NavMeshAgent>();
+        // 자동 루트 탐색
+        if (modelRoot == null)
+        {
+            Transform foundRoot = transform.Find("BrickToy_3D_LP_Warrior_Robots_2_1");
+            if (foundRoot != null) modelRoot = foundRoot;
+            else if (transform.childCount > 0) modelRoot = transform.GetChild(0);
+            else modelRoot = transform;
+        }
     }
 
-    // 피격 로직 (속성 전달)
     public void ApplyElementalAttack(ElementalType type, float damage, Vector3 attackerPosition = default)
     {
         switch (type)
         {
             case ElementalType.Water:
-                ApplyWetStatus(5f, damage);
+                ApplyWetStatus(wetDuration, damage);
                 break;
 
             case ElementalType.Electric:
                 if (isWet)
                 {
-                    // ⚡ 물 오라 상태에서 총알 적중 ➡️ 감전 시너지 연출
-                    TriggerElectricShockSynergy(damage * 2.0f, attackerPosition);
+                    if (currentShockCount < maxShockCount)
+                    {
+                        TriggerElectricShockSynergy(damage * 1.5f, attackerPosition);
+                    }
+                    else
+                    {
+                        TakeDamage(damage);
+                    }
                 }
                 else
                 {
@@ -86,10 +100,10 @@ public class StatusReceiver : MonoBehaviour
         }
     }
 
-    // 🌊 1. 물 오라 감싸기
     private void ApplyWetStatus(float duration, float damage)
     {
         isWet = true;
+        currentShockCount = 0;
         TakeDamage(damage);
 
         if (currentWaterEffectInstance == null && waterEffectPrefab != null)
@@ -103,48 +117,53 @@ public class StatusReceiver : MonoBehaviour
         wetCoroutine = StartCoroutine(RemoveWetRoutine(duration));
     }
 
-    // ⚡ 2. 감전 (어두워짐 + 넉백)
     private void TriggerElectricShockSynergy(float bonusDamage, Vector3 attackerPosition)
     {
+        currentShockCount++;
         TakeDamage(bonusDamage);
 
         if (electricSynergyVFX != null)
         {
             GameObject spark = Instantiate(electricSynergyVFX, transform.position, Quaternion.identity);
             spark.transform.SetParent(transform);
-            Destroy(spark, 0.5f);
+            Destroy(spark, 0.4f);
         }
 
         if (shockCoroutine != null) StopCoroutine(shockCoroutine);
-        shockCoroutine = StartCoroutine(ElectricShockStutterRoutine(attackerPosition));
+        shockCoroutine = StartCoroutine(SafeSlidingKnockbackRoutine());
+
+        if (currentShockCount >= maxShockCount)
+        {
+            ClearWetStatus();
+        }
     }
 
-    // ⏱️ 0.1초 순간 연출
-    private IEnumerator ElectricShockStutterRoutine(Vector3 attackerPosition)
+    // ⚡ [안전한 슬라이딩 넉백] 위로 뜨지 않고 뒤로만 살짝 슥 밀렸다 원복됨 (충돌 겹침 방지)
+    private IEnumerator SafeSlidingKnockbackRoutine()
     {
         isShocked = true;
-
-        // [넉백] 총알 위치 반대 방향으로 추진력 전달
-        Vector3 knockbackDir = (transform.position - attackerPosition).normalized;
-        knockbackDir.y = 0;
-
-        if (agent != null && agent.enabled)
-        {
-            agent.velocity = knockbackDir * knockbackForce;
-        }
-        else if (rb != null && !rb.isKinematic)
-        {
-            rb.AddForce(knockbackDir * knockbackForce, ForceMode.Impulse);
-        }
-
-        // [밝기 감소] 0.1초간 색상 어둡게 변경
         SetMonsterBrightness(darkFactor);
 
-        yield return new WaitForSeconds(shockDuration);
+        Transform targetModel = modelRoot != null ? modelRoot : transform;
+        Vector3 originalLocalPos = targetModel.localPosition;
 
-        // [복원] 원래 밝기 및 이동 속도 재개
+        float elapsed = 0f;
+        while (elapsed < shockDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / shockDuration;
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            // 💡 Y축 점프 높이 제거 -> 로컬 뒤쪽(-Z)으로만 슬라이딩 후 복원
+            float currentZOffset = -Mathf.Sin(smoothT * Mathf.PI) * knockbackDistance;
+
+            targetModel.localPosition = originalLocalPos + new Vector3(0, 0, currentZOffset);
+
+            yield return null;
+        }
+
+        targetModel.localPosition = originalLocalPos;
         SetMonsterBrightness(1.0f);
-        if (agent != null) agent.velocity = Vector3.zero;
 
         isShocked = false;
     }
@@ -163,16 +182,20 @@ public class StatusReceiver : MonoBehaviour
         }
     }
 
-    private IEnumerator RemoveWetRoutine(float duration)
+    private void ClearWetStatus()
     {
-        yield return new WaitForSeconds(duration);
-
         isWet = false;
         if (currentWaterEffectInstance != null)
         {
             Destroy(currentWaterEffectInstance);
             currentWaterEffectInstance = null;
         }
+    }
+
+    private IEnumerator RemoveWetRoutine(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        ClearWetStatus();
     }
 
     private void TriggerFireSynergy(float bonusDamage)
@@ -185,6 +208,6 @@ public class StatusReceiver : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
-        Debug.Log($"{gameObject.name}이(가) {amount} 데미지를 입었습니다.");
+        Debug.Log($"{gameObject.name}이(가) {amount} 데미지를 입었습니다. (현재 감전 넉백 횟수: {currentShockCount}/{maxShockCount})");
     }
 }
