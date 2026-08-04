@@ -7,8 +7,9 @@ namespace DreamGuardians
     /// 적이 바닥 높이를 유지하면서 코어 방향으로 이동하고,
     /// 도착하면 일정 간격으로 코어를 공격한다.
     ///
-    /// 이동과 회전은 XZ 평면에서만 처리하므로
-    /// 코어나 공격 지점의 Y 위치가 달라도 적이 공중으로 뜨지 않는다.
+    /// 미끼 시너지가 적용되면 일정 시간 동안
+    /// 코어 대신 미끼 위치로 이동한 뒤,
+    /// 시간이 끝나면 원래 코어 이동으로 복귀한다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class EnemyCoreMover : MonoBehaviour
@@ -62,14 +63,25 @@ namespace DreamGuardians
         private float nextAttackTime;
         private float stunnedUntil;
         private float fixedHeight;
+
         private bool isBeingKnockedBack;
         private Coroutine knockbackRoutine;
+
+
+        // 현재 미끼에 유인되고 있는지 여부
+        private bool isLured;
+
+        // 적이 이동할 미끼의 월드 위치
+        private Vector3 lurePosition;
+
+        // 미끼 유인이 끝나는 시각
+        private float lureEndTime;
 
 
         public CoreState TargetCore => targetCore;
         public Vector3 AttackDestination => attackDestination;
         public bool IsAttackingCore { get; private set; }
-
+        public bool IsLured => isLured;
 
         private void Awake()
         {
@@ -88,6 +100,9 @@ namespace DreamGuardians
             // 현재 높이를 새 기준 높이로 저장한다.
             fixedHeight = transform.position.y;
 
+            // 이전 활성화 상태의 유인 정보를 초기화한다.
+            ClearLure();
+
             if (health != null)
             {
                 health.Died -= HandleDied;
@@ -104,21 +119,44 @@ namespace DreamGuardians
             {
                 health.Died -= HandleDied;
             }
+
+            ClearLure();
         }
 
 
         private void Update()
         {
-            if (health != null && health.IsDead)
+            if (health != null &&
+                health.IsDead)
             {
                 IsAttackingCore = false;
                 return;
             }
 
-            // 넉백 중에는 코어 방향으로 이동하지 않는다.
+            // 넉백 중에는 다른 이동을 하지 않는다.
             if (isBeingKnockedBack)
             {
                 IsAttackingCore = false;
+                return;
+            }
+
+            // 스턴 중에는 이동과 공격을 멈춘다.
+            if (Time.time < stunnedUntil)
+            {
+                return;
+            }
+
+            // 미끼 시간이 끝났다면 원래 목표로 복귀한다.
+            if (isLured &&
+                Time.time >= lureEndTime)
+            {
+                ClearLure();
+            }
+
+            // 미끼에 유인 중이면 코어 대신 미끼로 이동한다.
+            if (isLured)
+            {
+                MoveTowardsLure();
                 return;
             }
 
@@ -133,89 +171,211 @@ namespace DreamGuardians
                 IsAttackingCore = false;
                 return;
             }
+            Vector3 destination =
+                useAttackDestination
+                    ? attackDestination
+                    : targetCore.transform.position;
 
-            Vector3 destination = useAttackDestination
-                ? attackDestination
-                : targetCore.transform.position;
-
-            MoveTowardsDestination(destination);
+            MoveTowardsCoreDestination(
+                destination
+            );
         }
 
 
         /// <summary>
-        /// 목표 지점을 향해 XZ 평면으로만 이동한다.
+        /// 코어 또는 코어 공격 지점을 향해 이동한다.
+        /// 목적지에 도착하면 코어를 공격한다.
         /// </summary>
-        private void MoveTowardsDestination(Vector3 destination)
+        private void MoveTowardsCoreDestination(
+            Vector3 destination)
         {
-            Vector3 currentPosition = transform.position;
+            bool arrived = MoveTowardsPosition(
+                destination
+            );
 
-            // 목표 높이를 현재 적 높이와 동일하게 만들어
-            // 위아래 이동을 완전히 제거한다.
-            destination.y = currentPosition.y;
-
-            Vector3 toDestination =
-                destination - currentPosition;
-
-            // 안전하게 한 번 더 Y축을 제거한다.
-            toDestination.y = 0f;
-
-            float distance = toDestination.magnitude;
-
-            if (distance > arrivalDistance)
+            if (arrived)
             {
-                IsAttackingCore = false;
+                AttackCore();
+            }
+        }
 
-                Vector3 direction =
-                    toDestination /
-                    Mathf.Max(distance, 0.0001f);
 
-                Vector3 nextPosition =
-                    currentPosition +
-                    direction * moveSpeed * Time.deltaTime;
+        /// <summary>
+        /// 미끼 위치를 향해 이동한다.
+        /// 도착하더라도 코어는 공격하지 않고
+        /// 미끼 위치 근처에서 대기한다.
+        /// </summary>
+        private void MoveTowardsLure()
+        {
+            bool arrived = MoveTowardsPosition(
+                lurePosition
+            );
 
-                if (keepSpawnHeight)
-                {
-                    nextPosition.y = fixedHeight;
-                }
-
-                transform.position = nextPosition;
-
-                RotateTowards(direction);
+            if (!arrived)
+            {
                 return;
             }
 
-            AttackCore();
+            Vector3 toLure =
+                lurePosition -
+                transform.position;
+
+            toLure.y = 0f;
+
+            RotateTowards(
+                toLure.normalized
+            );
         }
 
 
         /// <summary>
-        /// 코어를 수평 방향으로 바라보고 일정 간격으로 공격한다.
+        /// 지정한 위치를 향해 XZ 평면으로 이동한다.
+        /// 목적지에 도착했으면 true를 반환한다.
+        /// </summary>
+        private bool MoveTowardsPosition(
+            Vector3 destination)
+        {
+            Vector3 currentPosition =
+                transform.position;
+
+            // 목표 높이를 현재 적 높이와 같게 만들어
+            // 위아래 이동을 방지한다.
+            destination.y =
+                currentPosition.y;
+
+            Vector3 toDestination =
+                destination -
+                currentPosition;
+
+            toDestination.y = 0f;
+
+            float distance =
+                toDestination.magnitude;
+
+            if (distance <= arrivalDistance)
+            {
+                return true;
+            }
+
+            Vector3 direction =
+                toDestination /
+                Mathf.Max(
+                    distance,
+                    0.0001f
+                );
+
+            Vector3 nextPosition =
+                currentPosition +
+                direction *
+                moveSpeed *
+                Time.deltaTime;
+
+            if (keepSpawnHeight)
+            {
+                nextPosition.y =
+                    fixedHeight;
+            }
+
+            transform.position =
+                nextPosition;
+
+            RotateTowards(direction);
+
+            return false;
+        }
+
+
+        /// <summary>
+        /// 코어를 수평 방향으로 바라보고
+        /// 일정 간격으로 공격한다.
         /// </summary>
         private void AttackCore()
         {
+            if (targetCore == null)
+            {
+                IsAttackingCore = false;
+                return;
+            }
+
             IsAttackingCore = true;
 
             Vector3 toCore =
                 targetCore.transform.position -
                 transform.position;
 
-            // 적이 위나 아래로 기울어지지 않게 수평 방향만 사용한다.
             toCore.y = 0f;
 
-            RotateTowards(toCore.normalized);
+            RotateTowards(
+                toCore.normalized
+            );
 
-            if (Time.time >= nextAttackTime)
+            if (Time.time <
+                nextAttackTime)
             {
-                nextAttackTime =
-                    Time.time + attackInterval;
-
-                targetCore.TakeDamage(coreDamage);
+                return;
             }
+
+            nextAttackTime =
+                Time.time +
+                attackInterval;
+
+            targetCore.TakeDamage(
+                coreDamage
+            );
         }
 
 
         /// <summary>
-        /// 공격 지점을 사용하는 방식으로 적을 설정한다.
+        /// 지정한 위치로 적을 일정 시간 유인한다.
+        /// 시간이 끝나면 기존 코어 목표로 자동 복귀한다.
+        /// </summary>
+        public void ApplyLure(
+            Vector3 position,
+            float duration)
+        {
+            if (health != null &&
+                health.IsDead)
+            {
+                return;
+            }
+
+            float safeDuration =
+                Mathf.Max(
+                    0.01f,
+                    duration
+                );
+
+            lurePosition = position;
+
+            // 적이 위아래로 움직이지 않도록
+            // 미끼 위치의 높이는 적의 높이에 맞춘다.
+            lurePosition.y =
+                keepSpawnHeight
+                    ? fixedHeight
+                    : transform.position.y;
+
+            isLured = true;
+
+            lureEndTime =
+                Time.time +
+                safeDuration;
+        }
+
+
+        /// <summary>
+        /// 현재 적용된 미끼 유인을 즉시 해제한다.
+        /// </summary>
+        public void ClearLure()
+        {
+            isLured = false;
+            lurePosition = Vector3.zero;
+            lureEndTime = 0f;
+        }
+
+
+        /// <summary>
+        /// 공격 지점을 사용하는 방식으로
+        /// 적을 설정한다.
         /// </summary>
         public void Configure(
             CoreState core,
@@ -226,9 +386,6 @@ namespace DreamGuardians
             float yawOffset = 0f)
         {
             targetCore = core;
-
-            // 공격 지점의 Y값은 이동에 사용하지 않지만
-            // 원래 전달된 값은 그대로 저장한다.
             attackDestination = destination;
 
             useAttackDestination = true;
@@ -241,7 +398,8 @@ namespace DreamGuardians
 
 
         /// <summary>
-        /// 코어의 위치를 직접 목표로 사용하는 방식으로 적을 설정한다.
+        /// 코어 위치를 직접 목표로 사용하는 방식으로
+        /// 적을 설정한다.
         /// </summary>
         public void Configure(
             CoreState core,
@@ -263,17 +421,25 @@ namespace DreamGuardians
         /// <summary>
         /// 지정한 시간 동안 적의 이동과 공격을 멈춘다.
         /// </summary>
-        public void ApplyStun(float duration)
+        public void ApplyStun(
+            float duration)
         {
-            stunnedUntil = Mathf.Max(
-                stunnedUntil,
-                Time.time + Mathf.Max(0f, duration));
+            stunnedUntil =
+                Mathf.Max(
+                    stunnedUntil,
+                    Time.time +
+                    Mathf.Max(
+                        0f,
+                        duration
+                    )
+                );
         }
+
 
         /// <summary>
         /// 적을 지정한 방향으로 짧게 밀어낸다.
-        /// 기존 적 이동이 Transform 방식이므로 Rigidbody 힘 대신
-        /// 코루틴으로 위치를 이동한다.
+        /// 기존 적 이동이 Transform 방식이므로
+        /// Rigidbody 힘 대신 코루틴으로 이동한다.
         /// </summary>
         public void ApplyKnockback(
             Vector3 direction,
@@ -282,24 +448,36 @@ namespace DreamGuardians
         {
             direction.y = 0f;
 
-            if (direction.sqrMagnitude <= 0.0001f)
+            if (direction.sqrMagnitude <=
+                0.0001f)
             {
-                direction = -transform.forward;
+                direction =
+                    -transform.forward;
             }
 
             if (knockbackRoutine != null)
             {
-                StopCoroutine(knockbackRoutine);
+                StopCoroutine(
+                    knockbackRoutine
+                );
             }
 
-            knockbackRoutine = StartCoroutine(
-                KnockbackRoutine(
-                    direction.normalized,
-                    Mathf.Max(0f, distance),
-                    Mathf.Max(0.01f, duration)
-                )
-            );
+            knockbackRoutine =
+                StartCoroutine(
+                    KnockbackRoutine(
+                        direction.normalized,
+                        Mathf.Max(
+                            0f,
+                            distance
+                        ),
+                        Mathf.Max(
+                            0.01f,
+                            duration
+                        )
+                    )
+                );
         }
+
 
         private IEnumerator KnockbackRoutine(
             Vector3 direction,
@@ -308,42 +486,53 @@ namespace DreamGuardians
         {
             isBeingKnockedBack = true;
 
-            Vector3 startPosition = transform.position;
-            Vector3 targetPosition =
-                startPosition + direction * distance;
+            Vector3 startPosition =
+                transform.position;
 
-            // 적이 위아래로 뜨지 않도록 기존 높이를 유지한다.
-            targetPosition.y = keepSpawnHeight
-                ? fixedHeight
-                : startPosition.y;
+            Vector3 targetPosition =
+                startPosition +
+                direction *
+                distance;
+
+            targetPosition.y =
+                keepSpawnHeight
+                    ? fixedHeight
+                    : startPosition.y;
 
             float elapsedTime = 0f;
 
             while (elapsedTime < duration)
             {
-                if (health != null && health.IsDead)
+                if (health != null &&
+                    health.IsDead)
                 {
                     break;
                 }
 
-                elapsedTime += Time.deltaTime;
+                elapsedTime +=
+                    Time.deltaTime;
 
-                float progress = Mathf.Clamp01(
-                    elapsedTime / duration
-                );
+                float progress =
+                    Mathf.Clamp01(
+                        elapsedTime /
+                        duration
+                    );
 
-                transform.position = Vector3.Lerp(
-                    startPosition,
-                    targetPosition,
-                    progress
-                );
+                transform.position =
+                    Vector3.Lerp(
+                        startPosition,
+                        targetPosition,
+                        progress
+                    );
 
                 yield return null;
             }
 
-            if (health == null || !health.IsDead)
+            if (health == null ||
+                !health.IsDead)
             {
-                transform.position = targetPosition;
+                transform.position =
+                    targetPosition;
             }
 
             isBeingKnockedBack = false;
@@ -354,11 +543,13 @@ namespace DreamGuardians
         /// <summary>
         /// 적을 XZ 평면에서 목표 방향으로 회전시킨다.
         /// </summary>
-        private void RotateTowards(Vector3 direction)
+        private void RotateTowards(
+            Vector3 direction)
         {
             direction.y = 0f;
 
-            if (direction.sqrMagnitude <= 0.0001f)
+            if (direction.sqrMagnitude <=
+                0.0001f)
             {
                 return;
             }
@@ -376,7 +567,9 @@ namespace DreamGuardians
                 Quaternion.Slerp(
                     transform.rotation,
                     targetRotation,
-                    turnSpeed * Time.deltaTime);
+                    turnSpeed *
+                    Time.deltaTime
+                );
         }
 
 
@@ -385,19 +578,43 @@ namespace DreamGuardians
             DamageInfo __)
         {
             IsAttackingCore = false;
+            ClearLure();
+
             enabled = false;
         }
 
 
         private void OnValidate()
         {
-            moveSpeed = Mathf.Max(0f, moveSpeed);
+            moveSpeed =
+                Mathf.Max(
+                    0f,
+                    moveSpeed
+                );
+
             arrivalDistance =
-                Mathf.Max(0.05f, arrivalDistance);
-            coreDamage = Mathf.Max(0f, coreDamage);
+                Mathf.Max(
+                    0.05f,
+                    arrivalDistance
+                );
+
+            coreDamage =
+                Mathf.Max(
+                    0f,
+                    coreDamage
+                );
+
             attackInterval =
-                Mathf.Max(0.1f, attackInterval);
-            turnSpeed = Mathf.Max(0f, turnSpeed);
+                Mathf.Max(
+                    0.1f,
+                    attackInterval
+                );
+
+            turnSpeed =
+                Mathf.Max(
+                    0f,
+                    turnSpeed
+                );
         }
     }
 }

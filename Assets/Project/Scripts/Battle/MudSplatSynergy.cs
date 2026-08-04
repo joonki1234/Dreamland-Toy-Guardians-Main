@@ -4,29 +4,78 @@ using UnityEngine;
 using DreamGuardians;
 
 /// <summary>
-/// 건축가의 MudSplat에 요리사 음식이 닿으면
-/// 잠시 후 주변 적에게 범위 피해를 주고 함정을 제거한다.
+/// 건축가의 흙 장판에 요리사 음식이 닿으면
+/// 주변 적을 장판으로 유인한 뒤 범위 폭발을 일으킨다.
 /// </summary>
 public class MudSplatSynergy : MonoBehaviour
 {
-    [Header("시너지 준비 시간")]
-    [SerializeField] private float activationDelay = 0.4f;
+    [Header("유인 설정")]
+
+    [Tooltip("음식이 닿은 뒤 유인이 시작되기까지의 시간")]
+    [SerializeField]
+    private float lureStartDelay = 0.1f;
+
+    [Tooltip("주변 적을 검색하는 유인 범위")]
+    [SerializeField]
+    private float lureRadius = 5f;
+
+    [Tooltip("적을 장판 쪽으로 유인하는 시간")]
+    [SerializeField]
+    private float lureDuration = 2f;
+
 
     [Header("폭발 설정")]
-    [SerializeField] private float explosionRadius = 2f;
-    [SerializeField] private float explosionDamage = 30f;
+
+    [Tooltip("폭발 피해가 적용되는 범위")]
+    [SerializeField]
+    private float explosionRadius = 2f;
+
+    [Tooltip("폭발 피해량")]
+    [SerializeField]
+    private float explosionDamage = 30f;
+
+
+    [Header("폭발 이펙트")]
+
+    [Tooltip("시너지 폭발 순간 생성할 이펙트 프리팹")]
+    [SerializeField]
+    private GameObject explosionEffectPrefab;
+
+    [Tooltip("생성된 폭발 이펙트의 크기 배율")]
+    [SerializeField]
+    private float explosionEffectScale = 0.7f;
+
+    [Tooltip("생성된 폭발 이펙트를 삭제하기까지의 시간")]
+    [SerializeField]
+    private float explosionEffectLifetime = 3f;
+
+    [Tooltip("폭발 이펙트가 바닥에 묻히지 않도록 올리는 높이")]
+    [SerializeField]
+    private float explosionEffectHeight = 0.05f;
+
 
     [Header("넉백 설정")]
-    [SerializeField] private float knockbackDistance = 0.7f;
-    [SerializeField] private float knockbackDuration = 0.15f;
-    [SerializeField] private float stunDuration = 0.15f;
+
+    [SerializeField]
+    private float knockbackDistance = 0.7f;
+
+    [SerializeField]
+    private float knockbackDuration = 0.15f;
+
+    [SerializeField]
+    private float stunDuration = 0.15f;
+
 
     [Header("적 레이어")]
-    [SerializeField] private LayerMask enemyLayer;
+
+    [SerializeField]
+    private LayerMask enemyLayer;
+
 
     private bool synergyActivated;
 
     private static int nextShotId = 100000;
+
 
     private void OnTriggerEnter(Collider other)
     {
@@ -46,35 +95,154 @@ public class MudSplatSynergy : MonoBehaviour
 
         synergyActivated = true;
 
-        Debug.Log("요리사 + 건축가 시너지: 미끼 함정 준비!");
+        Debug.Log(
+            "요리사 + 건축가 시너지: 미끼 함정 준비!"
+        );
 
+        // 장판에 닿은 음식은 제거한다.
         Destroy(food.gameObject);
 
-        StartCoroutine(ActivateSynergyRoutine());
+        StartCoroutine(
+            ActivateSynergyRoutine()
+        );
     }
 
+
+    /// <summary>
+    /// 잠시 기다린 뒤 적을 유인하고,
+    /// 유인 시간이 끝나면 폭발한다.
+    /// </summary>
     private IEnumerator ActivateSynergyRoutine()
     {
-        yield return new WaitForSeconds(activationDelay);
+        yield return new WaitForSeconds(
+            lureStartDelay
+        );
 
+        int luredEnemyCount =
+            LureNearbyEnemies();
+
+        Debug.Log(
+            $"미끼에 유인된 적 수: {luredEnemyCount}"
+        );
+
+        yield return new WaitForSeconds(
+            lureDuration
+        );
+
+        CreateExplosionEffect();
         Explode();
 
-        Debug.Log("요리사 + 건축가 시너지: 미끼 폭발!");
+        Debug.Log(
+            "요리사 + 건축가 시너지: 미끼 폭발!"
+        );
 
         Destroy(gameObject);
     }
 
-    private void Explode()
+
+    /// <summary>
+    /// 유인 범위 안의 적을 찾아
+    /// 일정 시간 동안 장판 위치로 이동시킨다.
+    /// </summary>
+    private int LureNearbyEnemies()
     {
-        Collider[] hitColliders = Physics.OverlapSphere(
-            transform.position,
-            explosionRadius,
-            enemyLayer,
-            QueryTriggerInteraction.Collide
+        Collider[] hitColliders =
+            Physics.OverlapSphere(
+                transform.position,
+                lureRadius,
+                enemyLayer,
+                QueryTriggerInteraction.Collide
+            );
+
+        // Collider가 여러 개인 적을 중복 처리하지 않는다.
+        HashSet<EnemyCoreMover> luredMovers =
+            new HashSet<EnemyCoreMover>();
+
+        foreach (Collider hitCollider in hitColliders)
+        {
+            EnemyHealth enemy =
+                hitCollider.GetComponentInParent<EnemyHealth>();
+
+            if (enemy == null ||
+                enemy.IsDead)
+            {
+                continue;
+            }
+
+            EnemyCoreMover mover =
+                enemy.GetComponent<EnemyCoreMover>();
+
+            if (mover == null)
+            {
+                continue;
+            }
+
+            if (!luredMovers.Add(mover))
+            {
+                continue;
+            }
+
+            mover.ApplyLure(
+                transform.position,
+                lureDuration
+            );
+        }
+
+        return luredMovers.Count;
+    }
+
+
+    /// <summary>
+    /// 장판 위치에 폭발 이펙트를 생성한다.
+    /// </summary>
+    private void CreateExplosionEffect()
+    {
+        if (explosionEffectPrefab == null)
+        {
+            Debug.LogWarning(
+                $"{gameObject.name}: " +
+                "폭발 이펙트 프리팹이 연결되지 않았습니다."
+            );
+
+            return;
+        }
+
+        Vector3 effectPosition =
+            transform.position +
+            Vector3.up * explosionEffectHeight;
+
+        GameObject effect = Instantiate(
+            explosionEffectPrefab,
+            effectPosition,
+            Quaternion.identity
         );
 
-        // 한 적에게 Collider가 여러 개 있어도 피해는 한 번만 주기 위한 목록
-        HashSet<EnemyHealth> damagedEnemies = new HashSet<EnemyHealth>();
+        effect.transform.localScale *=
+            explosionEffectScale;
+
+        Destroy(
+            effect,
+            explosionEffectLifetime
+        );
+    }
+
+
+    /// <summary>
+    /// 폭발 범위 안의 적에게
+    /// 피해와 넉백을 적용한다.
+    /// </summary>
+    private void Explode()
+    {
+        Collider[] hitColliders =
+            Physics.OverlapSphere(
+                transform.position,
+                explosionRadius,
+                enemyLayer,
+                QueryTriggerInteraction.Collide
+            );
+
+        HashSet<EnemyHealth> damagedEnemies =
+            new HashSet<EnemyHealth>();
 
         int shotId = nextShotId++;
 
@@ -83,7 +251,8 @@ public class MudSplatSynergy : MonoBehaviour
             EnemyHealth enemy =
                 hitCollider.GetComponentInParent<EnemyHealth>();
 
-            if (enemy == null)
+            if (enemy == null ||
+                enemy.IsDead)
             {
                 continue;
             }
@@ -93,62 +262,110 @@ public class MudSplatSynergy : MonoBehaviour
                 continue;
             }
 
-            DamageInfo damageInfo = new DamageInfo(
-                explosionDamage,
-                "CHEF_BUILDER_SYNERGY",
-                PlayerRole.Architect,
-                shotId,
-                enemy.transform.position,
-                false
-            );
+            DamageInfo damageInfo =
+                new DamageInfo(
+                    explosionDamage,
+                    "CHEF_BUILDER_SYNERGY",
+                    PlayerRole.Architect,
+                    shotId,
+                    enemy.transform.position,
+                    false
+                );
 
-            bool damageApplied = enemy.TakeDamage(damageInfo);
+            bool damageApplied =
+                enemy.TakeDamage(damageInfo);
 
-            if (damageApplied)
+            if (!damageApplied)
             {
-                EnemyCoreMover mover =
-                    enemy.GetComponent<EnemyCoreMover>();
+                continue;
+            }
 
-                if (mover != null && !enemy.IsDead)
-                {
-                    // 폭발 중심에서 적 바깥쪽으로 향하는 방향
-                    Vector3 knockbackDirection =
-                        enemy.transform.position - transform.position;
+            EnemyCoreMover mover =
+                enemy.GetComponent<EnemyCoreMover>();
 
-                    knockbackDirection.y = 0f;
+            if (mover != null &&
+                !enemy.IsDead)
+            {
+                Vector3 knockbackDirection =
+                    enemy.transform.position -
+                    transform.position;
 
-                    mover.ApplyStun(stunDuration);
+                knockbackDirection.y = 0f;
 
-                    mover.ApplyKnockback(
-                        knockbackDirection,
-                        knockbackDistance,
-                        knockbackDuration
-                    );
-                }
+                mover.ApplyStun(
+                    stunDuration
+                );
 
-                Debug.Log(
-                    $"미끼 폭발 피해 및 넉백: " +
-                    $"{enemy.gameObject.name} / {explosionDamage}"
+                mover.ApplyKnockback(
+                    knockbackDirection,
+                    knockbackDistance,
+                    knockbackDuration
                 );
             }
+
+            Debug.Log(
+                $"미끼 폭발 피해 및 넉백: " +
+                $"{enemy.gameObject.name} / " +
+                $"{explosionDamage}"
+            );
         }
 
-        Debug.Log($"미끼 폭발에 맞은 적 수: {damagedEnemies.Count}");
+        Debug.Log(
+            $"미끼 폭발에 맞은 적 수: " +
+            $"{damagedEnemies.Count}"
+        );
     }
 
+
+    /// <summary>
+    /// Scene 창에서 유인 범위와 폭발 범위를 표시한다.
+    /// </summary>
     private void OnDrawGizmosSelected()
     {
-        Gizmos.DrawWireSphere(transform.position, explosionRadius);
+        // 큰 원: 유인 범위
+        Gizmos.DrawWireSphere(
+            transform.position,
+            lureRadius
+        );
+
+        // 작은 원: 폭발 범위
+        Gizmos.DrawWireSphere(
+            transform.position,
+            explosionRadius
+        );
     }
+
 
     private void OnValidate()
     {
-        activationDelay = Mathf.Max(0f, activationDelay);
-        explosionRadius = Mathf.Max(0.1f, explosionRadius);
-        explosionDamage = Mathf.Max(0f, explosionDamage);
+        lureStartDelay =
+            Mathf.Max(0f, lureStartDelay);
 
-        knockbackDistance = Mathf.Max(0f, knockbackDistance);
-        knockbackDuration = Mathf.Max(0.01f, knockbackDuration);
-        stunDuration = Mathf.Max(0f, stunDuration);
+        lureRadius =
+            Mathf.Max(0.1f, lureRadius);
+
+        lureDuration =
+            Mathf.Max(0.1f, lureDuration);
+
+        explosionRadius =
+            Mathf.Max(0.1f, explosionRadius);
+
+        explosionDamage =
+            Mathf.Max(0f, explosionDamage);
+
+        explosionEffectScale =
+            Mathf.Max(0.01f, explosionEffectScale);
+
+        explosionEffectLifetime =
+            Mathf.Max(0.1f, explosionEffectLifetime);
+
+        knockbackDistance =
+            Mathf.Max(0f, knockbackDistance);
+
+        knockbackDuration =
+            Mathf.Max(0.01f, knockbackDuration);
+
+        stunDuration =
+            Mathf.Max(0f, stunDuration);
     }
 }
