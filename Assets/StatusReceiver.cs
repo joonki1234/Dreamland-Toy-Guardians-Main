@@ -13,8 +13,8 @@ public sealed class StatusReceiver : MonoBehaviour
     [SerializeField] private bool isShocked = false;
 
     [Header("고정된 넉백 연출 세팅")]
-    [SerializeField] private float shockDuration = 0.5f;     // 감전 넉백 연출 시간 (0.5초)
-    [SerializeField] private float knockbackDistance = 0.07f;// 뒤로 슬라이딩하는 거리 (0.07m)
+    [SerializeField] private float shockDuration = 0.25f;     // 감전 넉백 진행 시간 (0.25초)
+    [SerializeField] private float knockbackDistance = 0.3f; // 뒤로 최종 밀려나는 거리 (0.3m)
 
     [Header("시각 이펙트 프리팹 (VFX)")]
     [SerializeField] private GameObject waterEffectPrefab;
@@ -22,8 +22,8 @@ public sealed class StatusReceiver : MonoBehaviour
     [SerializeField] private GameObject fireSynergyVFX;
 
     [Header("속성 밸런스 옵션")]
-    [SerializeField, Min(1)] private int maxShockCount = 3;  // 물 상태에서 넉백 가능한 최대 횟수
-    [SerializeField, Min(1f)] private float wetDuration = 20f; // 물 오라 유지 시간
+    [SerializeField, Min(1)] private int maxShockCount = 3;   // 물 상태에서 넉백 가능한 최대 횟수
+    [SerializeField, Min(1f)] private float wetDuration = 20f;// 물 오라 유지 시간 (20초)
     [SerializeField, Range(0f, 1f)] private float darkFactor = 0.32f; // 감전 시 밝기 비율
 
     [Header("모델 루트 설정")]
@@ -130,7 +130,7 @@ public sealed class StatusReceiver : MonoBehaviour
         }
 
         if (shockCoroutine != null) StopCoroutine(shockCoroutine);
-        shockCoroutine = StartCoroutine(SafeSlidingKnockbackRoutine());
+        shockCoroutine = StartCoroutine(PermanentKnockbackRoutine());
 
         if (currentShockCount >= maxShockCount)
         {
@@ -138,14 +138,18 @@ public sealed class StatusReceiver : MonoBehaviour
         }
     }
 
-    // ⚡ [안전한 슬라이딩 넉백] 위로 뜨지 않고 뒤로만 살짝 슥 밀렸다 원복됨 (충돌 겹침 방지)
-    private IEnumerator SafeSlidingKnockbackRoutine()
+    // ⚡ [위치 유지 넉백 연출] 밀려난 후 원래 위치로 돌아오지 않고 밀린 자리에 고정됨
+    private IEnumerator PermanentKnockbackRoutine()
     {
         isShocked = true;
         SetMonsterBrightness(darkFactor);
 
-        Transform targetModel = modelRoot != null ? modelRoot : transform;
-        Vector3 originalLocalPos = targetModel.localPosition;
+        Vector3 backwardDir = -transform.forward;
+        backwardDir.y = 0;
+        backwardDir.Normalize();
+
+        Vector3 startPos = transform.position;
+        Vector3 targetPos = startPos + (backwardDir * knockbackDistance);
 
         float elapsed = 0f;
         while (elapsed < shockDuration)
@@ -154,17 +158,13 @@ public sealed class StatusReceiver : MonoBehaviour
             float t = elapsed / shockDuration;
             float smoothT = Mathf.SmoothStep(0f, 1f, t);
 
-            // 💡 Y축 점프 높이 제거 -> 로컬 뒤쪽(-Z)으로만 슬라이딩 후 복원
-            float currentZOffset = -Mathf.Sin(smoothT * Mathf.PI) * knockbackDistance;
-
-            targetModel.localPosition = originalLocalPos + new Vector3(0, 0, currentZOffset);
+            transform.position = Vector3.Lerp(startPos, targetPos, smoothT);
 
             yield return null;
         }
 
-        targetModel.localPosition = originalLocalPos;
+        transform.position = targetPos;
         SetMonsterBrightness(1.0f);
-
         isShocked = false;
     }
 
@@ -185,6 +185,14 @@ public sealed class StatusReceiver : MonoBehaviour
     private void ClearWetStatus()
     {
         isWet = false;
+        currentShockCount = 0;
+
+        if (wetCoroutine != null)
+        {
+            StopCoroutine(wetCoroutine);
+            wetCoroutine = null;
+        }
+
         if (currentWaterEffectInstance != null)
         {
             Destroy(currentWaterEffectInstance);
@@ -202,7 +210,7 @@ public sealed class StatusReceiver : MonoBehaviour
     {
         isMuddy = false;
         isOnFire = true;
-        TakeDamage(bonusDamage);
+        TakeDamage(bonusDamage); // ⭕ 수정 완료
         if (fireSynergyVFX != null) Instantiate(fireSynergyVFX, transform.position, Quaternion.identity);
     }
 

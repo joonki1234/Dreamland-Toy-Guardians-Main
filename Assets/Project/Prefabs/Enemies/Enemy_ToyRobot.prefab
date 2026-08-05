@@ -1093,15 +1093,15 @@ MonoBehaviour:
   isWet: 0
   isOnFire: 0
   isShocked: 0
+  shockDuration: 0.4
+  knockbackDistance: 0.3
   waterEffectPrefab: {fileID: 2334455049011862081, guid: c1335396aea434a6ab7bf94c401421a0, type: 3}
   electricSynergyVFX: {fileID: 0}
   fireSynergyVFX: {fileID: 0}
-  shockDuration: 0.4
-  knockbackDistance: 0.005
-  jumpHeight: 1.5
   maxShockCount: 3
   wetDuration: 20
   darkFactor: 0.32
+  modelRoot: {fileID: 433235940742062736}
 --- !u!65 &-5322426905391787775
 BoxCollider:
   m_ObjectHideFlags: 0
