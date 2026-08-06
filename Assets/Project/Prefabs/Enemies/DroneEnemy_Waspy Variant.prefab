@@ -56,6 +56,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3991375454132728119, guid: 85906bcee8198914c9be08c27a11bace, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2519595772779651928}
     - targetCorrespondingSourceObject: {fileID: 1513641464550010793, guid: 85906bcee8198914c9be08c27a11bace, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6058832595345033059}
@@ -63,6 +66,40 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 7380388041115858793}
   m_SourcePrefab: {fileID: 100100000, guid: 85906bcee8198914c9be08c27a11bace, type: 3}
+--- !u!1 &409757499555815942 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3991375454132728119, guid: 85906bcee8198914c9be08c27a11bace, type: 3}
+  m_PrefabInstance: {fileID: 3660290230467482417}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2519595772779651928
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 409757499555815942}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f5ebcf88d3459c4e83f7c6283b293d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.DroneEnemyWaspy
+  attackRange: 8
+  flightHeight: 3
+  moveSpeed: 1.8
+  turnSpeed: 6
+  modelYawOffset: 0
+  arrivalTolerance: 0.35
+  hoverAmplitude: 0.12
+  hoverFrequency: 2
+  coreDamage: 5
+  attackInterval: 1.25
+  muzzle: {fileID: 0}
+  beamColor: {r: 0.2, g: 0.95, b: 1, a: 1}
+  beamWidth: 0.04
+  beamDuration: 0.12
+  animator: {fileID: 0}
+  hitTriggerName: Hit
+  dieTriggerName: Die
 --- !u!1 &2867243158617914520 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1513641464550010793, guid: 85906bcee8198914c9be08c27a11bace, type: 3}

@@ -414,6 +414,18 @@ namespace DreamGuardians
                     ? "TutorialEnemy"
                     : "WaveEnemy";
 
+            DroneEnemyWaspy droneEnemy =
+                enemyObject.GetComponent<DroneEnemyWaspy>();
+
+            if (droneEnemy != null && !tutorialEnemy)
+            {
+                enemyObject.name = "WaveEnemy_DroneWaspy";
+
+                // 원본 Waspy 프리팹에 Collider가 없어도
+                // 기존 무기 Raycast가 드론을 맞힐 수 있게 합니다.
+                droneEnemy.EnsureHitCollider();
+            }
+
             if (tutorialEnemy)
             {
                 MakeTutorialEnemyHighlyVisible(
@@ -439,7 +451,14 @@ namespace DreamGuardians
             RangedMinigunEnemy rangedEnemy =
                 enemyObject.GetComponent<RangedMinigunEnemy>();
 
-            if (tutorialEnemy)
+            if (droneEnemy != null && !tutorialEnemy)
+            {
+                // 비행 높이와 원거리 공격은 드론 전용 컴포넌트가
+                // 처리하므로 지상 적 이동 컴포넌트는 실행하지 않습니다.
+                mover.enabled = false;
+                droneEnemy.Configure(targetCore);
+            }
+            else if (tutorialEnemy)
             {
                 mover.Configure(
                     targetCore,
@@ -502,7 +521,19 @@ namespace DreamGuardians
                     position);
             }
 
-            if (rangedEnemy != null)
+            if (droneEnemy != null && !tutorialEnemy)
+            {
+                // 과거 저장본에 근접 전용 모션이 붙어 있어도
+                // 드론 Animator와 충돌하지 않게 합니다.
+                ToyRobotMotion oldRobotMotion =
+                    enemyObject.GetComponent<ToyRobotMotion>();
+
+                if (oldRobotMotion != null)
+                {
+                    oldRobotMotion.enabled = false;
+                }
+            }
+            else if (rangedEnemy != null)
             {
                 // 실제 이동과 코어 피해는 기존 EnemyCoreMover가 담당하고,
                 // 전용 컴포넌트는 Animator 상태를 동기화합니다.
