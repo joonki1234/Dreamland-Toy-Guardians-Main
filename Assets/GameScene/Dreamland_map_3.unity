@@ -1983,7 +1983,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_Layer
@@ -9517,7 +9517,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 42b78c06e9a375d44a22157d416a831d, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 957556477700834583, guid: 42b78c06e9a375d44a22157d416a831d, type: 3}
       propertyPath: m_Layer
@@ -21000,6 +21000,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3925678453792752139, guid: a3b798421dc4d19498df476ced323b0a, type: 3}
   m_PrefabInstance: {fileID: 834261275}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &835803354
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 835803355}
+  m_Layer: 0
+  m_Name: BossSpawnPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &835803355
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 835803354}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3.10976, y: 0.05, z: -3.32637}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &836444093
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -34813,6 +34844,7 @@ MonoBehaviour:
   gameFlowController: {fileID: 1926243287}
   enemySpawner: {fileID: 2125966794}
   core: {fileID: 2019763646}
+  droneEnemyPrefab: {fileID: 409757499555815942, guid: fe26514e00927534089e35fff1bedd6e, type: 3}
   stageStartDelay: 2
   portalAppearanceDelay: 1.6
   wave1EnemyCount: 6
@@ -34820,10 +34852,12 @@ MonoBehaviour:
   wave1HealthMultiplier: 1.5
   wave1ToWave2Delay: 15
   wave2EnemyCount: 8
+  wave2DroneEnemyCount: 2
   wave2SpawnInterval: 1.2
   wave2HealthMultiplier: 1.8
   wave2ToFinalDelay: 15
   finalWaveEnemyCount: 10
+  finalWaveDroneEnemyCount: 4
   finalWaveSpawnInterval: 1
   finalWaveHealthMultiplier: 2.2
 --- !u!114 &1926243289
@@ -34916,12 +34950,12 @@ MonoBehaviour:
   gameFlowController: {fileID: 1926243287}
   missionUI: {fileID: 2125966795}
   core: {fileID: 2019763646}
-  bossPrefab: {fileID: 0}
-  bossSpawnPoint: {fileID: 0}
+  bossPrefab: {fileID: 3477862570842861952, guid: ac7f89ce3cee45e409900d0eb1f63603, type: 3}
+  bossSpawnPoint: {fileID: 835803355}
   createPrototypeBossWhenPrefabMissing: 1
   fallbackSpawnDistance: 12
   prototypeBossScale: {x: 2.5, y: 2.5, z: 2.5}
-  bossMaxHealth: 100
+  bossMaxHealth: 500
   bossCoreDamage: 20
   bossAttackInterval: 2.5
   firstAttackDelay: 4
@@ -47039,3 +47073,4 @@ SceneRoots:
   - {fileID: 2121735302}
   - {fileID: 5436777484550130224}
   - {fileID: 1208015192}
+  - {fileID: 835803355}
