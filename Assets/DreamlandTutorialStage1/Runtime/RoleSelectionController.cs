@@ -27,8 +27,11 @@ namespace DreamGuardians
             PlayerRole.Architect
         };
 
+        private const int MaxSupportedPlayers = 8;
+
         [Header("Selection Rule")]
-        [SerializeField, Min(1)] private int playerCount = 8;
+        [Tooltip("현재 로비에 참가한 플레이어 수입니다. 1명부터 최대 8명까지 가능합니다.")]
+        [SerializeField, Range(1, MaxSupportedPlayers)] private int playerCount = 1;
         [SerializeField, Min(1)] private int maxPlayersPerRole = 2;
         [SerializeField] private string localPlayerId = "PLAYER_1";
         [SerializeField, Min(0f)] private float completionHoldDuration = 1.2f;
@@ -63,7 +66,7 @@ namespace DreamGuardians
 
         private void Awake()
         {
-            playerCount = Mathf.Max(1, playerCount);
+            playerCount = Mathf.Clamp(playerCount, 1, MaxSupportedPlayers);
             maxPlayersPerRole = Mathf.Max(1, maxPlayersPerRole);
             BuildPrototypePlayerList();
 
@@ -159,14 +162,16 @@ namespace DreamGuardians
 
         /// <summary>
         /// 실제 멀티플레이어의 목록이 준비되었을 때 호출합니다.
-        /// playerIds의 개수는 현재 설정된 8명과 같아야 합니다.
+        /// 1명부터 최대 8명까지 전달할 수 있습니다.
         /// </summary>
         public bool ConfigurePlayers(IReadOnlyList<string> networkPlayerIds)
         {
-            if (networkPlayerIds == null || networkPlayerIds.Count != playerCount)
+            if (networkPlayerIds == null ||
+                networkPlayerIds.Count < 1 ||
+                networkPlayerIds.Count > MaxSupportedPlayers)
             {
                 Debug.LogWarning(
-                    $"[RoleSelection] 플레이어 목록은 정확히 {playerCount}명이어야 합니다.",
+                    $"[RoleSelection] 플레이어 목록은 1명부터 최대 {MaxSupportedPlayers}명까지 가능합니다.",
                     this);
                 return false;
             }
@@ -189,6 +194,7 @@ namespace DreamGuardians
                 playerIds.Add(id);
             }
 
+            playerCount = playerIds.Count;
             ResetSelection();
             return true;
         }
@@ -245,17 +251,11 @@ namespace DreamGuardians
 
         private void CheckCompletion()
         {
-            if (selections.Count != playerCount)
+            // 최대 8명이 모두 들어올 때까지 기다리는 것이 아니라,
+            // 현재 참가 중인 플레이어가 전부 선택했는지만 확인합니다.
+            if (selections.Count != playerIds.Count)
             {
                 return;
-            }
-
-            for (int i = 0; i < SelectableRoles.Length; i++)
-            {
-                if (GetRoleCount(SelectableRoles[i]) != maxPlayersPerRole)
-                {
-                    return;
-                }
             }
 
             IsComplete = true;
@@ -338,7 +338,7 @@ namespace DreamGuardians
             if (currentPlayerText != null)
             {
                 currentPlayerText.text = IsComplete
-                    ? "8 / 8 선택 완료"
+                    ? $"{playerIds.Count} / {playerIds.Count} 선택 완료"
                     : $"플레이어 {currentSeatIndex + 1}의 직업을 선택하세요";
             }
 
@@ -417,7 +417,7 @@ namespace DreamGuardians
             CreateText(
                 "Rule",
                 runtimeRoot.transform,
-                "총 8명 · 직업별 2명   |   버튼 또는 숫자 1~4로 선택",
+                $"현재 {playerIds.Count}명 / 최대 {MaxSupportedPlayers}명 · 직업별 최대 {maxPlayersPerRole}명   |   버튼 또는 숫자 1~4로 선택",
                 26,
                 FontStyle.Normal,
                 TextAnchor.MiddleCenter,
@@ -462,7 +462,7 @@ namespace DreamGuardians
             statusText = CreateText(
                 "Status",
                 runtimeRoot.transform,
-                "플레이어 1부터 차례로 직업을 선택해 줘.",
+                $"현재 참가한 {playerIds.Count}명이 차례로 직업을 선택해 줘.",
                 26,
                 FontStyle.Bold,
                 TextAnchor.MiddleCenter,
@@ -667,7 +667,7 @@ namespace DreamGuardians
 
         private void OnValidate()
         {
-            playerCount = Mathf.Max(1, playerCount);
+            playerCount = Mathf.Clamp(playerCount, 1, MaxSupportedPlayers);
             maxPlayersPerRole = Mathf.Max(1, maxPlayersPerRole);
             completionHoldDuration = Mathf.Max(0f, completionHoldDuration);
         }
