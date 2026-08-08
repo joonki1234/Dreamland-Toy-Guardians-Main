@@ -34950,26 +34950,38 @@ MonoBehaviour:
   gameFlowController: {fileID: 1926243287}
   missionUI: {fileID: 2125966795}
   core: {fileID: 2019763646}
+  enemySpawner: {fileID: 2125966794}
   bossPrefab: {fileID: 3477862570842861952, guid: ac7f89ce3cee45e409900d0eb1f63603, type: 3}
   bossSpawnPoint: {fileID: 835803355}
+  castleAnchor: {fileID: 91751293}
   createPrototypeBossWhenPrefabMissing: 1
   fallbackSpawnDistance: 12
   prototypeBossScale: {x: 2.5, y: 2.5, z: 2.5}
+  castleBreakDuration: 0.65
+  castleDebrisLifetime: 2.8
+  castleDebrisCount: 48
+  bossRevealDuration: 0.8
   bossMaxHealth: 500
   bossCoreDamage: 20
   bossAttackInterval: 2.5
   firstAttackDelay: 4
+  rangedEnemyPrefab: {fileID: 4376583669907981605, guid: 16e7f714445272c47af28662cf414ae5, type: 3}
+  droneEnemyPrefab: {fileID: 409757499555815942, guid: fe26514e00927534089e35fff1bedd6e, type: 3}
+  minionSpawnInterval: 3.5
+  firstMinionSpawnDelay: 2
+  maxActiveMinions: 10
+  minionHealthMultiplier: 1.15
+  minionSpawnRadius: 2.4
+  minionGroundHeight: 0.8
+  droneSpawnHeight: 2.5
   introTitle: FINAL BOSS
-  introSubtitle: "\uC545\uBABD\uC758 \uADFC\uC6D0\uC744 \uC815\uD654\uD558\uB77C"
-  objectiveText: "\uCD5C\uC885 \uBCF4\uC2A4\uB97C \uC4F0\uB7EC\uB728\uB9AC\uACE0
-    \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uB77C"
+  introSubtitle: "\uc624\uc5fc\ub41c \uc7a5\ub09c\uac10 \uc0c1\uc790\ub97c \ud30c\uad34\ud558\ub77c"
+  objectiveText: "\uc624\uc5fc\ub41c \uc0c1\uc790\ub97c \ud30c\uad34\ud558\uace0 \ucf54\uc5b4\ub97c \uc9c0\ucf1c\ub77c"
   introSpeaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-  introMessage: "\uC800 \uAC80\uC740 \uD615\uCCB4\uAC00 \uBAA8\uB4E0 \uC545\uBABD\uC758
-    \uADFC\uC6D0\uC774\uC57C. \uD568\uAED8 \uB05D\uB0B4\uC790!"
+  introMessage: "\uc800 \uc0c1\uc790\uac00 \uc624\uc5fc\ub41c \uc7a5\ub09c\uac10\uc744 \uacc4\uc18d \ub9cc\ub4e4\uc5b4\ub0b4\uace0 \uc788\uc5b4! \uc0c1\uc790\ub97c \ubd80\uc218\uba74 \ubc14\uc774\ub7ec\uc2a4\ub3c4 \uc0ac\ub77c\uc9c8 \uac70\uc57c!"
   defeatedTitle: BOSS DEFEATED
-  defeatedSubtitle: "\uC545\uBABD\uC758 \uADFC\uC6D0\uC774 \uC815\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4"
-  defeatedMessage: "\uD574\uB0C8\uC5B4! \uAFC8\uB098\uB77C\uC758 \uBE5B\uC774 \uB2E4\uC2DC
-    \uB3CC\uC544\uC624\uACE0 \uC788\uC5B4!"
+  defeatedSubtitle: "\uc624\uc5fc\uc758 \uadfc\uc6d0\uc774 \uc815\ud654\ub418\uc5c8\uc2b5\ub2c8\ub2e4"
+  defeatedMessage: "\uc0c1\uc790\uac00 \ubd80\uc11c\uc84c\uc5b4! \uc624\uc5fc\ub41c \uae30\uc6b4\ub3c4 \uc0ac\ub77c\uc9c0\uace0 \uc788\uc5b4!"
   failedTitle: MISSION FAILED
   failedSubtitle: "\uCD5C\uC885 \uC804\uD22C\uC5D0\uC11C \uCF54\uC5B4\uAC00 \uBB34\uB108\uC84C\uC2B5\uB2C8\uB2E4"
   introDuration: 3
@@ -40558,8 +40570,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1d022a0acf0a3e45b0102372e22e6e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.CoreState
-  maxHealth: 1000
-  currentHealth: 1000
+  maxHealth: 100
+  currentHealth: 100
   currentEnergy: 0
   energyTarget: {fileID: 1419444766}
 --- !u!1 &2021688925
@@ -46748,7 +46760,7 @@ MonoBehaviour:
   moveSpeed: 0.35
   attackRingRadius: 4.2
   attackSlotSpreadAngle: 12
-  coreDamage: 10
+  coreDamage: 1
   attackInterval: 1.5
   useFloorRift: 1
   enemyGroundOffset: 0.8

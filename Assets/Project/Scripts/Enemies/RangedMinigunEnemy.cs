@@ -4,7 +4,9 @@ namespace DreamGuardians
 {
     /// <summary>
     /// 미니건 원거리 적의 전투 설정과 Animator 상태를 관리합니다.
-    /// 이동, 회전, 코어 피해, 넉백은 기존 EnemyCoreMover가 담당합니다.
+    /// 이동, 회전, 넉백은 기존 EnemyCoreMover가 담당하고,
+    /// 공격 애니메이션 중 실제 탄환을 코어로 발사합니다.
+    /// 탄환이 코어에 도착했을 때만 코어 체력이 감소합니다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RangedMinigunEnemy : MonoBehaviour
@@ -19,10 +21,30 @@ namespace DreamGuardians
         private float moveSpeed = 0.32f;
 
         [SerializeField, Min(0f)]
-        private float coreDamage = 4f;
+        private float coreDamage = 1f;
 
         [SerializeField, Min(0.1f)]
-        private float attackInterval = 0.75f;
+        private float attackInterval = 1f;
+
+        [Tooltip("공격 애니메이션 진입 후 첫 탄환이 나가기까지의 짧은 지연입니다.")]
+        [SerializeField, Min(0f)]
+        private float firstShotDelay = 0.2f;
+
+        [Tooltip("코어로 날아가는 탄환 속도입니다.")]
+        [SerializeField, Min(0.1f)]
+        private float bulletSpeed = 16f;
+
+        [Tooltip(
+            "비워두면 자식 중 이름에 minigun/gun/barrel/muzzle이 포함된 Transform을 자동으로 찾습니다.")]
+        [SerializeField]
+        private Transform muzzle;
+
+        [Tooltip("찾은 총구 위치에서 코어 방향으로 조금 앞당겨 발사하는 거리입니다.")]
+        [SerializeField, Min(0f)]
+        private float muzzleForwardOffset = 0.18f;
+
+        [SerializeField]
+        private Color bulletColor = new Color(1f, 0.72f, 0.18f, 1f);
 
         [Tooltip(
             "모델이 이동 방향과 반대로 보일 때 사용하는 Y축 회전 보정값입니다. " +
@@ -69,6 +91,8 @@ namespace DreamGuardians
         private bool hasIsAttackingParameter;
         private AnimationMode currentAnimationMode =
             AnimationMode.Unknown;
+        private float nextShotTime;
+        private bool wasAttacking;
 
 
         private enum AnimationMode
@@ -115,6 +139,8 @@ namespace DreamGuardians
         private void OnEnable()
         {
             currentAnimationMode = AnimationMode.Unknown;
+            nextShotTime = 0f;
+            wasAttacking = false;
         }
 
 
@@ -125,6 +151,8 @@ namespace DreamGuardians
                 health.Died -= HandleDied;
             }
 
+            wasAttacking = false;
+            nextShotTime = 0f;
             SetAnimatorState(false, false);
         }
 
@@ -168,6 +196,8 @@ namespace DreamGuardians
             SetAnimatorState(
                 isMoving,
                 isAttacking);
+
+            UpdateRangedAttack(isAttacking);
         }
 
 
@@ -179,6 +209,8 @@ namespace DreamGuardians
             mover = configuredMover;
             CacheReferences();
             CacheAnimatorParameters();
+            nextShotTime = 0f;
+            wasAttacking = false;
         }
 
 
@@ -204,6 +236,113 @@ namespace DreamGuardians
                     SubscribeToHealth();
                 }
             }
+
+            ResolveMuzzle();
+        }
+
+
+        private void UpdateRangedAttack(bool isAttacking)
+        {
+            if (!isAttacking)
+            {
+                wasAttacking = false;
+                nextShotTime = 0f;
+                return;
+            }
+
+            CoreState core = mover != null ? mover.TargetCore : null;
+
+            if (core == null || core.IsDestroyed)
+            {
+                return;
+            }
+
+            if (!wasAttacking)
+            {
+                wasAttacking = true;
+                nextShotTime = Time.time + firstShotDelay;
+                return;
+            }
+
+            if (Time.time < nextShotTime)
+            {
+                return;
+            }
+
+            FireProjectile(core);
+            nextShotTime = Time.time + attackInterval;
+        }
+
+
+        private void FireProjectile(CoreState core)
+        {
+            if (core == null || core.IsDestroyed)
+            {
+                return;
+            }
+
+            ResolveMuzzle();
+
+            Vector3 targetPosition = core.EnergyTarget.position;
+            Vector3 origin = muzzle != null
+                ? muzzle.position
+                : transform.position + Vector3.up * 0.8f;
+
+            Vector3 shotDirection = targetPosition - origin;
+
+            if (shotDirection.sqrMagnitude > 0.0001f)
+            {
+                origin += shotDirection.normalized * muzzleForwardOffset;
+            }
+
+            CoreEnemyProjectile.Spawn(
+                origin,
+                core,
+                coreDamage,
+                bulletSpeed,
+                bulletColor);
+        }
+
+
+        private void ResolveMuzzle()
+        {
+            if (muzzle != null)
+            {
+                return;
+            }
+
+            Transform fallback = null;
+            Transform[] children = GetComponentsInChildren<Transform>(true);
+
+            foreach (Transform child in children)
+            {
+                if (child == null || child == transform)
+                {
+                    continue;
+                }
+
+                string lowerName = child.name.ToLowerInvariant();
+
+                if (lowerName.Contains("muzzle") ||
+                    (lowerName.Contains("end") &&
+                     (lowerName.Contains("minigun") ||
+                      lowerName.Contains("barrel") ||
+                      lowerName.Contains("gun"))))
+                {
+                    muzzle = child;
+                    return;
+                }
+
+                if (fallback == null &&
+                    (lowerName.Contains("minigun") ||
+                     lowerName.Contains("barrel") ||
+                     lowerName.Contains("gun")))
+                {
+                    fallback = child;
+                }
+            }
+
+            muzzle = fallback;
         }
 
 
@@ -344,6 +483,9 @@ namespace DreamGuardians
             moveSpeed = Mathf.Max(0f, moveSpeed);
             coreDamage = Mathf.Max(0f, coreDamage);
             attackInterval = Mathf.Max(0.1f, attackInterval);
+            firstShotDelay = Mathf.Max(0f, firstShotDelay);
+            bulletSpeed = Mathf.Max(0.1f, bulletSpeed);
+            muzzleForwardOffset = Mathf.Max(0f, muzzleForwardOffset);
             arrivalTolerance =
                 Mathf.Max(0.05f, arrivalTolerance);
             animationCrossFadeDuration =

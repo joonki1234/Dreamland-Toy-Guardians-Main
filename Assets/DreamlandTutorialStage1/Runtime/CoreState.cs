@@ -7,8 +7,8 @@ namespace DreamGuardians
     public sealed class CoreState : MonoBehaviour
     {
         [Header("Core Health")]
-        [SerializeField, Min(1f)] private float maxHealth = 1000f;
-        [SerializeField, Min(0f)] private float currentHealth = 1000f;
+        [SerializeField, Min(1f)] private float maxHealth = 100f;
+        [SerializeField, Min(0f)] private float currentHealth = 100f;
 
         [Header("Dream Energy")]
         [SerializeField, Min(0f)] private float currentEnergy;
@@ -29,6 +29,7 @@ namespace DreamGuardians
             maxHealth = Mathf.Max(1f, maxHealth);
             currentHealth = Mathf.Clamp(currentHealth <= 0f ? maxHealth : currentHealth, 0f, maxHealth);
             EnsureEnergyTarget();
+            EnsureHealthHud();
         }
 
         public void Configure(float newMaxHealth, Transform newEnergyTarget = null)
@@ -84,6 +85,14 @@ namespace DreamGuardians
             currentEnergy = 0f;
             HealthChanged?.Invoke(currentHealth, maxHealth);
             EnergyChanged?.Invoke(currentEnergy);
+        }
+
+        private void EnsureHealthHud()
+        {
+            if (GetComponent<CoreHealthHUD>() == null)
+            {
+                gameObject.AddComponent<CoreHealthHUD>();
+            }
         }
 
         private void EnsureEnergyTarget()

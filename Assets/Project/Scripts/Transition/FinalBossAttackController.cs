@@ -4,17 +4,18 @@ using DreamGuardians;
 using UnityEngine;
 
 /// <summary>
-/// 선물상자 최종 보스의 이동과 공격을 담당합니다.
+/// 선물상자 최종 보스의 전투 연출을 담당합니다.
 ///
-/// FinalBossDirector가 보스를 생성한 뒤 Configure를 호출하면
-/// 코어 쪽으로 통통 뛰어 접근하고, 내려찍기와 회전 공격을
-/// 번갈아 사용합니다. 피격 시에는 머티리얼을 잠시 밝게 점멸합니다.
+/// - 평소에는 제자리에서 불규칙하게 날뛰는 느낌의 바운스 모션
+/// - HP 2/3, 1/3 구간에서 Director 요청을 받아 코어 쪽으로 돌진/회전 이동
+/// - 코어 근처까지 도달하면 내려찍기/회전 직접 공격
+/// - 보라/적색 오염 팔레트와 검은 기운 ParticleSystem
+/// - 소환 시 오염 기운 펄스
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class FinalBossAttackController : MonoBehaviour
 {
     [Header("선물상자 모델 방향")]
-
     [Tooltip(
         "GiftBox FBX의 축 보정값입니다. 보스가 옆으로 누우면 -90, " +
         "이미 똑바로 서 있으면 0으로 변경하세요.")]
@@ -25,26 +26,39 @@ public sealed class FinalBossAttackController : MonoBehaviour
     [SerializeField]
     private float modelYawOffset;
 
-    [Header("통통 뛰기 이동")]
-
-    [Tooltip("코어에서 이 거리만큼 떨어진 곳까지 접근합니다.")]
+    [Header("페이즈 이동")]
+    [Tooltip("코어 근처에서 직접 공격을 시작하는 거리")]
     [SerializeField, Min(0.5f)]
     private float attackRange = 5.5f;
 
-    [SerializeField, Min(0f)]
-    private float moveSpeed = 1.7f;
+    [Tooltip("HP 1/3이 깎일 때마다 현재 코어 거리의 이 비율만큼 전진합니다.")]
+    [SerializeField, Range(0.1f, 0.8f)]
+    private float phaseAdvanceFraction = 0.35f;
 
-    [SerializeField, Min(0f)]
-    private float turnSpeed = 240f;
-
-    [SerializeField, Min(0f)]
-    private float moveHopHeight = 0.45f;
+    [Tooltip("페이즈 이동 후에도 코어와 최소한 유지할 거리")]
+    [SerializeField, Min(0.5f)]
+    private float phaseMinimumCoreDistance = 7.5f;
 
     [SerializeField, Min(0.1f)]
-    private float moveHopFrequency = 1.6f;
+    private float phaseAdvanceDuration = 2.15f;
+
+    [SerializeField, Min(0f)]
+    private float phaseHopHeight = 0.9f;
+
+    [SerializeField, Min(0f)]
+    private float turnSpeed = 260f;
+
+    [Header("날뛰는 대기 모션")]
+    [SerializeField, Min(0f)]
+    private float rageHopHeight = 0.10f;
+
+    [SerializeField, Min(0f)]
+    private float rageScaleAmount = 0.035f;
+
+    [SerializeField, Min(0.1f)]
+    private float rageFrequency = 4.2f;
 
     [Header("내려찍기 공격")]
-
     [SerializeField, Min(0f)]
     private float slamWindupDuration = 0.55f;
 
@@ -55,7 +69,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private float slamJumpHeight = 1.4f;
 
     [Header("회전 공격")]
-
     [SerializeField, Min(0f)]
     private float spinWindupDuration = 0.4f;
 
@@ -68,8 +81,30 @@ public sealed class FinalBossAttackController : MonoBehaviour
     [SerializeField, Min(0f)]
     private float spinLungeDistance = 0.8f;
 
-    [Header("피격 표시")]
+    [Header("오염된 보스 색상")]
+    [SerializeField]
+    private Color corruptedBodyColor =
+        new Color(0.20f, 0.035f, 0.28f, 1f);
 
+    [SerializeField]
+    private Color corruptedRibbonColor =
+        new Color(0.62f, 0.035f, 0.11f, 1f);
+
+    [SerializeField]
+    private Color corruptedAccentColor =
+        new Color(0.34f, 0.02f, 0.42f, 1f);
+
+    [Header("검은 오염 기운")]
+    [SerializeField, Min(0f)]
+    private float auraHeightOffset = 0.9f;
+
+    [SerializeField, Min(0f)]
+    private float auraRadius = 1.05f;
+
+    [SerializeField, Min(1f)]
+    private float auraEmissionRate = 22f;
+
+    [Header("피격 표시")]
     [SerializeField]
     private Color hitFlashColor =
         new Color(1f, 0.25f, 0.45f, 1f);
@@ -78,7 +113,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private float hitFlashDuration = 0.12f;
 
     [Header("Director에서 전달되는 전투 수치")]
-
     [SerializeField]
     private CoreState targetCore;
 
@@ -98,16 +132,24 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private Rigidbody body;
     private Vector3 baseScale;
     private float groundY;
-    private float moveHopTime;
     private float nextAttackTime;
+    private float rageTime;
     private int nextAttackIndex;
     private bool configured;
     private bool attacking;
+    private bool phaseMoving;
     private bool isDead;
     private bool orientationApplied;
 
     private Coroutine attackRoutine;
+    private Coroutine phaseRoutine;
     private Coroutine flashRoutine;
+
+    private GameObject auraObject;
+    private ParticleSystem auraParticles;
+    private Material auraMaterial;
+
+    public bool IsPhaseMoving => phaseMoving;
 
     private static readonly int BaseColorId =
         Shader.PropertyToID("_BaseColor");
@@ -115,6 +157,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private static readonly int ColorId =
         Shader.PropertyToID("_Color");
 
+    private static readonly int EmissionColorId =
+        Shader.PropertyToID("_EmissionColor");
 
     private struct MaterialColorState
     {
@@ -122,7 +166,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
         public int PropertyId;
         public Color OriginalColor;
     }
-
 
     private void Awake()
     {
@@ -133,9 +176,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
         baseScale = transform.localScale;
         groundY = transform.position.y;
 
+        ApplyCorruptedPalette();
         CacheMaterialColors();
+        CreateCorruptionAura();
     }
-
 
     private void OnEnable()
     {
@@ -144,6 +188,11 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         isDead = health != null && health.IsDead;
 
+        if (auraObject != null)
+        {
+            auraObject.SetActive(true);
+        }
+
         if (configured)
         {
             nextAttackTime =
@@ -151,19 +200,36 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
     }
 
-
     private void OnDisable()
     {
         UnsubscribeFromHealth();
         StopOwnedRoutines();
         RestoreVisualState(false);
+
+        if (auraObject != null)
+        {
+            auraObject.SetActive(false);
+        }
     }
 
+    private void OnDestroy()
+    {
+        if (auraObject != null)
+        {
+            Destroy(auraObject);
+        }
+
+        if (auraMaterial != null)
+        {
+            Destroy(auraMaterial);
+        }
+    }
 
     private void Update()
     {
+        UpdateAuraPosition();
+
         if (!configured ||
-            attacking ||
             isDead ||
             targetCore == null ||
             targetCore.IsDestroyed ||
@@ -172,36 +238,30 @@ public sealed class FinalBossAttackController : MonoBehaviour
             return;
         }
 
-        Vector3 corePosition =
-            targetCore.transform.position;
-
-        Vector3 toCore =
-            corePosition - transform.position;
-
-        toCore.y = 0f;
-
-        FaceDirection(toCore);
-
-        if (toCore.magnitude > attackRange)
+        if (phaseMoving || attacking)
         {
-            MoveTowardCore(corePosition, toCore);
             return;
         }
 
-        SetPosition(new Vector3(
-            transform.position.x,
-            Mathf.MoveTowards(
-                transform.position.y,
-                groundY,
-                moveSpeed * Time.deltaTime),
-            transform.position.z));
+        Vector3 corePosition = targetCore.transform.position;
+        Vector3 toCore = corePosition - transform.position;
+        toCore.y = 0f;
+
+        FaceDirection(toCore);
+        UpdateRageMotion();
+
+        // 기존처럼 전투 시작과 동시에 코어까지 자동 이동하지 않습니다.
+        // HP가 1/3씩 감소할 때 Director가 AdvanceTowardCore를 호출합니다.
+        if (toCore.magnitude > attackRange)
+        {
+            return;
+        }
 
         if (Time.time >= nextAttackTime)
         {
             StartNextAttack();
         }
     }
-
 
     /// <summary>
     /// FinalBossDirector가 보스 등장 연출을 마친 뒤 호출합니다.
@@ -223,68 +283,161 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         groundY = transform.position.y;
         baseScale = transform.localScale;
-        moveHopTime = 0f;
+        rageTime = 0f;
         nextAttackIndex = 0;
         isDead = false;
         configured = true;
         enabled = true;
 
-        nextAttackTime =
-            Time.time + firstAttackDelay;
+        nextAttackTime = Time.time + firstAttackDelay;
 
         if (targetCore == null)
         {
             Debug.LogWarning(
                 "[FinalBoss] Target Core가 연결되지 않아 " +
-                "선물상자 보스가 움직일 수 없습니다.",
+                "선물상자 보스가 코어를 바라볼 수 없습니다.",
                 this);
         }
     }
 
-
-    private void MoveTowardCore(
-        Vector3 corePosition,
-        Vector3 toCore)
+    /// <summary>
+    /// 보스 HP 페이즈가 바뀔 때 호출됩니다.
+    /// 1페이즈는 뛰어가고, 2페이즈는 회전하며 더 가까이 접근합니다.
+    /// </summary>
+    public void AdvanceTowardCore(int phaseIndex)
     {
-        Vector3 planarDirection =
-            toCore.sqrMagnitude > 0.0001f
-                ? toCore.normalized
-                : Vector3.forward;
+        if (!configured ||
+            isDead ||
+            targetCore == null ||
+            targetCore.IsDestroyed ||
+            phaseRoutine != null)
+        {
+            return;
+        }
 
-        Vector3 destination =
-            corePosition - planarDirection * attackRange;
+        if (attackRoutine != null)
+        {
+            StopCoroutine(attackRoutine);
+            attackRoutine = null;
+            attacking = false;
+            transform.localScale = baseScale;
+        }
 
-        Vector3 currentPlanarPosition =
-            new Vector3(
-                transform.position.x,
-                0f,
-                transform.position.z);
-
-        Vector3 destinationPlanarPosition =
-            new Vector3(
-                destination.x,
-                0f,
-                destination.z);
-
-        Vector3 nextPlanarPosition =
-            Vector3.MoveTowards(
-                currentPlanarPosition,
-                destinationPlanarPosition,
-                moveSpeed * Time.deltaTime);
-
-        moveHopTime +=
-            Time.deltaTime * moveHopFrequency * Mathf.PI;
-
-        float hopOffset =
-            Mathf.Abs(Mathf.Sin(moveHopTime)) *
-            moveHopHeight;
-
-        SetPosition(new Vector3(
-            nextPlanarPosition.x,
-            groundY + hopOffset,
-            nextPlanarPosition.z));
+        phaseRoutine = StartCoroutine(
+            PhaseAdvanceRoutine(Mathf.Max(1, phaseIndex)));
     }
 
+    /// <summary>
+    /// 하수인 소환 순간 검은 기운을 강하게 한 번 뿜습니다.
+    /// </summary>
+    public void PlaySummonPulse()
+    {
+        if (auraParticles == null)
+        {
+            return;
+        }
+
+        auraParticles.Emit(26);
+    }
+
+    private IEnumerator PhaseAdvanceRoutine(int phaseIndex)
+    {
+        phaseMoving = true;
+        transform.localScale = baseScale;
+
+        Vector3 startPosition = transform.position;
+        startPosition.y = groundY;
+
+        Vector3 corePosition = targetCore.transform.position;
+        Vector3 toCore = corePosition - startPosition;
+        toCore.y = 0f;
+
+        float currentDistance = toCore.magnitude;
+        Vector3 direction =
+            currentDistance > 0.001f
+                ? toCore / currentDistance
+                : Vector3.forward;
+
+        float desiredDistance = Mathf.Max(
+            phaseMinimumCoreDistance,
+            currentDistance * (1f - phaseAdvanceFraction));
+
+        float moveDistance = Mathf.Max(
+            0f,
+            currentDistance - desiredDistance);
+
+        Vector3 targetPosition = startPosition + direction * moveDistance;
+        targetPosition.y = groundY;
+
+        Quaternion startRotation = transform.rotation;
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.1f, phaseAdvanceDuration);
+
+        PlaySummonPulse();
+
+        while (elapsed < duration && CanContinueAttack())
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float smoothT = t * t * (3f - 2f * t);
+
+            Vector3 next = Vector3.Lerp(startPosition, targetPosition, smoothT);
+
+            float hopCycles = phaseIndex == 1 ? 3f : 5f;
+            next.y = groundY +
+                     Mathf.Abs(Mathf.Sin(t * Mathf.PI * hopCycles)) *
+                     phaseHopHeight;
+
+            SetPosition(next);
+
+            if (phaseIndex >= 2)
+            {
+                float spinAngle = t * 720f;
+                transform.rotation =
+                    Quaternion.AngleAxis(spinAngle, Vector3.up) *
+                    startRotation;
+            }
+            else
+            {
+                FaceDirection(direction);
+            }
+
+            yield return null;
+        }
+
+        SetPosition(targetPosition);
+        groundY = targetPosition.y;
+        transform.localScale = baseScale;
+
+        Vector3 finalToCore = targetCore.transform.position - transform.position;
+        finalToCore.y = 0f;
+        FaceDirection(finalToCore);
+
+        phaseMoving = false;
+        phaseRoutine = null;
+        nextAttackTime = Time.time + attackInterval;
+    }
+
+    private void UpdateRageMotion()
+    {
+        rageTime += Time.deltaTime * rageFrequency;
+
+        float pulse = 1f + Mathf.Sin(rageTime * 1.7f) * rageScaleAmount;
+        float squash = 1f - Mathf.Sin(rageTime * 2.3f) * rageScaleAmount * 0.65f;
+
+        transform.localScale = Vector3.Scale(
+            baseScale,
+            new Vector3(pulse, squash, pulse));
+
+        float hop =
+            Mathf.Abs(Mathf.Sin(rageTime * 1.35f)) *
+            rageHopHeight;
+
+        SetPosition(new Vector3(
+            transform.position.x,
+            groundY + hop,
+            transform.position.z));
+    }
 
     private void FaceDirection(Vector3 direction)
     {
@@ -313,7 +466,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 turnSpeed * Time.deltaTime);
     }
 
-
     private void StartNextAttack()
     {
         if (attackRoutine != null)
@@ -322,21 +474,23 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
 
         attacking = true;
+        transform.localScale = baseScale;
+        SetPosition(new Vector3(
+            transform.position.x,
+            groundY,
+            transform.position.z));
 
         if (nextAttackIndex % 2 == 0)
         {
-            attackRoutine =
-                StartCoroutine(SlamAttackRoutine());
+            attackRoutine = StartCoroutine(SlamAttackRoutine());
         }
         else
         {
-            attackRoutine =
-                StartCoroutine(SpinAttackRoutine());
+            attackRoutine = StartCoroutine(SpinAttackRoutine());
         }
 
         nextAttackIndex++;
     }
-
 
     private IEnumerator SlamAttackRoutine()
     {
@@ -361,16 +515,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
         while (elapsed < slamDuration && CanContinueAttack())
         {
             elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / slamDuration);
+            float jumpOffset = Mathf.Sin(t * Mathf.PI) * slamJumpHeight;
 
-            float t =
-                Mathf.Clamp01(elapsed / slamDuration);
-
-            float jumpOffset =
-                Mathf.Sin(t * Mathf.PI) * slamJumpHeight;
-
-            SetPosition(
-                startPosition +
-                Vector3.up * jumpOffset);
+            SetPosition(startPosition + Vector3.up * jumpOffset);
 
             transform.localScale =
                 Vector3.Lerp(
@@ -388,7 +536,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
         FinishAttack();
     }
 
-
     private IEnumerator SpinAttackRoutine()
     {
         Vector3 startPosition =
@@ -397,8 +544,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 groundY,
                 transform.position.z);
 
-        Vector3 pulseScale =
-            baseScale * 1.1f;
+        Vector3 pulseScale = baseScale * 1.1f;
 
         yield return AnimateScale(
             baseScale,
@@ -407,8 +553,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         transform.localScale = baseScale;
 
-        Quaternion startRotation =
-            transform.rotation;
+        Quaternion startRotation = transform.rotation;
 
         Vector3 lungeDirection =
             targetCore != null
@@ -429,26 +574,18 @@ public sealed class FinalBossAttackController : MonoBehaviour
         while (elapsed < spinDuration && CanContinueAttack())
         {
             elapsed += Time.deltaTime;
-
-            float t =
-                Mathf.Clamp01(elapsed / spinDuration);
-
-            float spinAngle =
-                t * spinTurns * 360f;
+            float t = Mathf.Clamp01(elapsed / spinDuration);
+            float spinAngle = t * spinTurns * 360f;
 
             transform.rotation =
-                Quaternion.AngleAxis(
-                    spinAngle,
-                    Vector3.up) *
+                Quaternion.AngleAxis(spinAngle, Vector3.up) *
                 startRotation;
 
             float lunge =
                 Mathf.Sin(t * Mathf.PI) *
                 spinLungeDistance;
 
-            SetPosition(
-                startPosition +
-                lungeDirection * lunge);
+            SetPosition(startPosition + lungeDirection * lunge);
 
             yield return null;
         }
@@ -460,7 +597,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
         DamageCore(0.8f);
         FinishAttack();
     }
-
 
     private IEnumerator AnimateScale(
         Vector3 from,
@@ -478,19 +614,13 @@ public sealed class FinalBossAttackController : MonoBehaviour
         while (elapsed < duration && CanContinueAttack())
         {
             elapsed += Time.deltaTime;
-
-            float t =
-                Mathf.Clamp01(elapsed / duration);
-
+            float t = Mathf.Clamp01(elapsed / duration);
             t = t * t * (3f - 2f * t);
 
-            transform.localScale =
-                Vector3.Lerp(from, to, t);
-
+            transform.localScale = Vector3.Lerp(from, to, t);
             yield return null;
         }
     }
-
 
     private bool CanContinueAttack()
     {
@@ -500,7 +630,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
                !targetCore.IsDestroyed &&
                (health == null || !health.IsDead);
     }
-
 
     private void DamageCore(float damageMultiplier)
     {
@@ -521,22 +650,18 @@ public sealed class FinalBossAttackController : MonoBehaviour
             this);
     }
 
-
     private void FinishAttack()
     {
         attackRoutine = null;
         attacking = false;
-        nextAttackTime =
-            Time.time + attackInterval;
+        nextAttackTime = Time.time + attackInterval;
     }
-
 
     private void CacheReferences()
     {
         health ??= GetComponent<EnemyHealth>();
         body ??= GetComponent<Rigidbody>();
     }
-
 
     private void ConfigureRigidbody()
     {
@@ -550,10 +675,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
         body.interpolation = RigidbodyInterpolation.Interpolate;
         body.collisionDetectionMode =
             CollisionDetectionMode.ContinuousSpeculative;
-        body.constraints =
-            RigidbodyConstraints.FreezeRotation;
+        body.constraints = RigidbodyConstraints.FreezeRotation;
     }
-
 
     private void ApplyInitialModelOrientation()
     {
@@ -571,7 +694,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 0f);
     }
 
-
     private void SetPosition(Vector3 position)
     {
         if (body != null && body.isKinematic)
@@ -583,7 +705,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
             transform.position = position;
         }
     }
-
 
     private void SubscribeToHealth()
     {
@@ -599,7 +720,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
         health.Died += HandleDied;
     }
 
-
     private void UnsubscribeFromHealth()
     {
         if (health == null)
@@ -611,10 +731,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         health.Died -= HandleDied;
     }
 
-
-    private void HandleHit(
-        EnemyHealth _,
-        DamageInfo __)
+    private void HandleHit(EnemyHealth _, DamageInfo __)
     {
         if (isDead)
         {
@@ -626,21 +743,23 @@ public sealed class FinalBossAttackController : MonoBehaviour
             StopCoroutine(flashRoutine);
         }
 
-        flashRoutine =
-            StartCoroutine(HitFlashRoutine());
+        flashRoutine = StartCoroutine(HitFlashRoutine());
     }
 
-
-    private void HandleDied(
-        EnemyHealth _,
-        DamageInfo __)
+    private void HandleDied(EnemyHealth _, DamageInfo __)
     {
         isDead = true;
         configured = false;
         StopOwnedRoutines();
         RestoreVisualState(true);
-    }
 
+        if (auraParticles != null)
+        {
+            ParticleSystem.EmissionModule emission = auraParticles.emission;
+            emission.enabled = false;
+            auraParticles.Emit(40);
+        }
+    }
 
     private IEnumerator HitFlashRoutine()
     {
@@ -655,13 +774,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
         flashRoutine = null;
     }
 
-
-    private void CacheMaterialColors()
+    private void ApplyCorruptedPalette()
     {
-        materialColorStates.Clear();
-
-        Renderer[] renderers =
-            GetComponentsInChildren<Renderer>(true);
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
 
         foreach (Renderer modelRenderer in renderers)
         {
@@ -672,8 +787,78 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 continue;
             }
 
-            Material[] materials =
-                modelRenderer.materials;
+            string rendererName = modelRenderer.gameObject.name.ToLowerInvariant();
+            Color targetColor;
+
+            if (rendererName.Contains("bow") ||
+                rendererName.Contains("ribbon"))
+            {
+                targetColor = corruptedRibbonColor;
+            }
+            else if (rendererName.Contains("gift") ||
+                     rendererName.Contains("box") ||
+                     rendererName.Contains("cube") ||
+                     rendererName.Contains("body") ||
+                     rendererName.Contains("lid"))
+            {
+                targetColor = corruptedBodyColor;
+            }
+            else
+            {
+                targetColor = corruptedAccentColor;
+            }
+
+            Material[] materials = modelRenderer.materials;
+
+            foreach (Material material in materials)
+            {
+                if (material == null)
+                {
+                    continue;
+                }
+
+                Color applied = targetColor;
+
+                if (material.HasProperty(BaseColorId))
+                {
+                    Color old = material.GetColor(BaseColorId);
+                    applied.a = old.a;
+                    material.SetColor(BaseColorId, applied);
+                }
+                else if (material.HasProperty(ColorId))
+                {
+                    Color old = material.GetColor(ColorId);
+                    applied.a = old.a;
+                    material.SetColor(ColorId, applied);
+                }
+
+                if (material.HasProperty(EmissionColorId))
+                {
+                    material.EnableKeyword("_EMISSION");
+                    material.SetColor(
+                        EmissionColorId,
+                        targetColor * 0.35f);
+                }
+            }
+        }
+    }
+
+    private void CacheMaterialColors()
+    {
+        materialColorStates.Clear();
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+
+        foreach (Renderer modelRenderer in renderers)
+        {
+            if (modelRenderer == null ||
+                modelRenderer is ParticleSystemRenderer ||
+                modelRenderer is LineRenderer)
+            {
+                continue;
+            }
+
+            Material[] materials = modelRenderer.materials;
 
             foreach (Material material in materials)
             {
@@ -702,18 +887,15 @@ public sealed class FinalBossAttackController : MonoBehaviour
                     {
                         Material = material,
                         PropertyId = propertyId,
-                        OriginalColor =
-                            material.GetColor(propertyId)
+                        OriginalColor = material.GetColor(propertyId)
                     });
             }
         }
     }
 
-
     private void SetMaterialColor(Color color)
     {
-        foreach (MaterialColorState state
-                 in materialColorStates)
+        foreach (MaterialColorState state in materialColorStates)
         {
             if (state.Material == null)
             {
@@ -729,11 +911,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
     }
 
-
     private void RestoreMaterialColors()
     {
-        foreach (MaterialColorState state
-                 in materialColorStates)
+        foreach (MaterialColorState state in materialColorStates)
         {
             if (state.Material == null)
             {
@@ -746,6 +926,159 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
     }
 
+    private void CreateCorruptionAura()
+    {
+        if (auraObject != null)
+        {
+            return;
+        }
+
+        auraObject = new GameObject("FinalBoss_CorruptionAura");
+        auraObject.transform.position =
+            transform.position + Vector3.up * auraHeightOffset;
+
+        auraParticles = auraObject.AddComponent<ParticleSystem>();
+
+        ParticleSystem.MainModule main = auraParticles.main;
+        main.duration = 5f;
+        main.loop = true;
+        main.playOnAwake = true;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 180;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.18f, 0.65f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.58f);
+        main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        main.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(0.01f, 0.005f, 0.015f, 0.58f),
+            new Color(0.18f, 0.01f, 0.24f, 0.42f));
+
+        ParticleSystem.EmissionModule emission = auraParticles.emission;
+        emission.rateOverTime = auraEmissionRate;
+
+        ParticleSystem.ShapeModule shape = auraParticles.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = auraRadius;
+        shape.radiusThickness = 1f;
+
+        ParticleSystem.VelocityOverLifetimeModule velocity =
+            auraParticles.velocityOverLifetime;
+        velocity.enabled = true;
+        velocity.space = ParticleSystemSimulationSpace.World;
+        velocity.y = new ParticleSystem.MinMaxCurve(0.65f, 1.45f);
+        velocity.x = new ParticleSystem.MinMaxCurve(-0.18f, 0.18f);
+        velocity.z = new ParticleSystem.MinMaxCurve(-0.18f, 0.18f);
+
+        ParticleSystem.NoiseModule noise = auraParticles.noise;
+        noise.enabled = true;
+        noise.strength = 0.55f;
+        noise.frequency = 0.45f;
+        noise.scrollSpeed = 0.35f;
+
+        ParticleSystem.ColorOverLifetimeModule colorOverLifetime =
+            auraParticles.colorOverLifetime;
+        colorOverLifetime.enabled = true;
+
+        Gradient gradient = new Gradient();
+        gradient.SetKeys(
+            new[]
+            {
+                new GradientColorKey(new Color(0.08f, 0.005f, 0.10f), 0f),
+                new GradientColorKey(new Color(0.01f, 0.005f, 0.015f), 1f)
+            },
+            new[]
+            {
+                new GradientAlphaKey(0f, 0f),
+                new GradientAlphaKey(0.55f, 0.18f),
+                new GradientAlphaKey(0.35f, 0.72f),
+                new GradientAlphaKey(0f, 1f)
+            });
+        colorOverLifetime.color = new ParticleSystem.MinMaxGradient(gradient);
+
+        ParticleSystemRenderer particleRenderer =
+            auraObject.GetComponent<ParticleSystemRenderer>();
+        particleRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+        particleRenderer.sortingOrder = 20;
+
+        auraMaterial = CreateAuraMaterial();
+        if (auraMaterial != null)
+        {
+            particleRenderer.material = auraMaterial;
+        }
+
+        auraParticles.Play();
+    }
+
+    private Material CreateAuraMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        shader ??= Shader.Find("Particles/Standard Unlit");
+        shader ??= Shader.Find("Unlit/Color");
+
+        if (shader == null)
+        {
+            return null;
+        }
+
+        Material material = new Material(shader)
+        {
+            name = "FinalBoss_CorruptionAura_Runtime"
+        };
+
+        Color white = Color.white;
+
+        if (material.HasProperty(BaseColorId))
+        {
+            material.SetColor(BaseColorId, white);
+        }
+        else if (material.HasProperty(ColorId))
+        {
+            material.SetColor(ColorId, white);
+        }
+
+        // URP particle shader가 투명 모드 속성을 지원할 경우 검은 연기가
+        // 사각형으로 가려지지 않도록 알파 블렌딩으로 전환합니다.
+        if (material.HasProperty("_Surface"))
+        {
+            material.SetFloat("_Surface", 1f);
+        }
+
+        if (material.HasProperty("_SrcBlend"))
+        {
+            material.SetFloat(
+                "_SrcBlend",
+                (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        }
+
+        if (material.HasProperty("_DstBlend"))
+        {
+            material.SetFloat(
+                "_DstBlend",
+                (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        }
+
+        if (material.HasProperty("_ZWrite"))
+        {
+            material.SetFloat("_ZWrite", 0f);
+        }
+
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.renderQueue = 3000;
+
+        return material;
+    }
+
+    private void UpdateAuraPosition()
+    {
+        if (auraObject == null)
+        {
+            return;
+        }
+
+        auraObject.transform.position =
+            transform.position + Vector3.up * auraHeightOffset;
+    }
 
     private void StopOwnedRoutines()
     {
@@ -755,6 +1088,12 @@ public sealed class FinalBossAttackController : MonoBehaviour
             attackRoutine = null;
         }
 
+        if (phaseRoutine != null)
+        {
+            StopCoroutine(phaseRoutine);
+            phaseRoutine = null;
+        }
+
         if (flashRoutine != null)
         {
             StopCoroutine(flashRoutine);
@@ -762,8 +1101,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
 
         attacking = false;
+        phaseMoving = false;
     }
-
 
     private void RestoreVisualState(bool restorePosition)
     {
@@ -783,14 +1122,17 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
     }
 
-
     private void OnValidate()
     {
         attackRange = Mathf.Max(0.5f, attackRange);
-        moveSpeed = Mathf.Max(0f, moveSpeed);
+        phaseAdvanceFraction = Mathf.Clamp(phaseAdvanceFraction, 0.1f, 0.8f);
+        phaseMinimumCoreDistance = Mathf.Max(0.5f, phaseMinimumCoreDistance);
+        phaseAdvanceDuration = Mathf.Max(0.1f, phaseAdvanceDuration);
+        phaseHopHeight = Mathf.Max(0f, phaseHopHeight);
         turnSpeed = Mathf.Max(0f, turnSpeed);
-        moveHopHeight = Mathf.Max(0f, moveHopHeight);
-        moveHopFrequency = Mathf.Max(0.1f, moveHopFrequency);
+        rageHopHeight = Mathf.Max(0f, rageHopHeight);
+        rageScaleAmount = Mathf.Max(0f, rageScaleAmount);
+        rageFrequency = Mathf.Max(0.1f, rageFrequency);
         slamWindupDuration = Mathf.Max(0f, slamWindupDuration);
         slamDuration = Mathf.Max(0.1f, slamDuration);
         slamJumpHeight = Mathf.Max(0f, slamJumpHeight);
@@ -798,6 +1140,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
         spinDuration = Mathf.Max(0.1f, spinDuration);
         spinTurns = Mathf.Max(0.25f, spinTurns);
         spinLungeDistance = Mathf.Max(0f, spinLungeDistance);
+        auraHeightOffset = Mathf.Max(0f, auraHeightOffset);
+        auraRadius = Mathf.Max(0f, auraRadius);
+        auraEmissionRate = Mathf.Max(1f, auraEmissionRate);
         hitFlashDuration = Mathf.Max(0.02f, hitFlashDuration);
         coreDamage = Mathf.Max(0f, coreDamage);
         attackInterval = Mathf.Max(0.1f, attackInterval);

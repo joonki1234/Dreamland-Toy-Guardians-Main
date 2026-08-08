@@ -1,11 +1,18 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using DreamGuardians;
 using UnityEngine;
 
 /// <summary>
-/// 최종 보스의 등장, 전투 UI, 처치 판정, 실패 판정을 담당합니다.
-/// Boss Prefab이 비어 있으면 테스트 가능한 런타임 프로토타입 보스를 생성합니다.
+/// 최종 선물상자 보스의 등장, 페이즈, 하수인 소환, 전투 UI,
+/// 처치/실패 판정을 담당합니다.
+///
+/// 보스전 컨셉:
+/// 오염된 장난감을 계속 만들어내는 선물상자가 성을 부수고 등장합니다.
+/// 보스는 근접/원거리/비행 적을 계속 생성하며 저항하고,
+/// HP가 2/3, 1/3 남는 지점마다 코어 쪽으로 날뛰며 접근합니다.
+/// 상자를 파괴하면 보스가 생성한 적들도 함께 사라집니다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class FinalBossDirector : MonoBehaviour
@@ -30,12 +37,19 @@ public sealed class FinalBossDirector : MonoBehaviour
     [SerializeField]
     private CoreState core;
 
-    [Header("Boss Spawn")]
+    [SerializeField]
+    private DreamEnemySpawner enemySpawner;
+
+    [Header("Boss Spawn / Castle")]
     [SerializeField]
     private GameObject bossPrefab;
 
     [SerializeField]
     private Transform bossSpawnPoint;
+
+    [Tooltip("맵의 Castle 오브젝트. 연결되어 있으면 기존 BossSpawnPoint보다 우선합니다.")]
+    [SerializeField]
+    private Transform castleAnchor;
 
     [SerializeField]
     private bool createPrototypeBossWhenPrefabMissing = true;
@@ -46,6 +60,19 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     [SerializeField]
     private Vector3 prototypeBossScale = new Vector3(2.5f, 2.5f, 2.5f);
+
+    [Header("Castle Break Intro")]
+    [SerializeField, Min(0.1f)]
+    private float castleBreakDuration = 0.65f;
+
+    [SerializeField, Min(0f)]
+    private float castleDebrisLifetime = 2.8f;
+
+    [SerializeField, Min(1)]
+    private int castleDebrisCount = 48;
+
+    [SerializeField, Min(0.1f)]
+    private float bossRevealDuration = 0.8f;
 
     [Header("Boss Stats")]
     [Min(1f)]
@@ -64,15 +91,45 @@ public sealed class FinalBossDirector : MonoBehaviour
     [SerializeField]
     private float firstAttackDelay = 4f;
 
+    [Header("Boss Minion Spawning")]
+    [Tooltip("Stage 1에서 사용하던 미니건 원거리 적")]
+    [SerializeField]
+    private GameObject rangedEnemyPrefab;
+
+    [Tooltip("Stage 2에서 사용하던 Waspy 비행 적")]
+    [SerializeField]
+    private GameObject droneEnemyPrefab;
+
+    [SerializeField, Min(0.5f)]
+    private float minionSpawnInterval = 3.5f;
+
+    [SerializeField, Min(0f)]
+    private float firstMinionSpawnDelay = 2.0f;
+
+    [SerializeField, Min(1)]
+    private int maxActiveMinions = 10;
+
+    [SerializeField, Min(0.1f)]
+    private float minionHealthMultiplier = 1.15f;
+
+    [SerializeField, Min(0.5f)]
+    private float minionSpawnRadius = 2.4f;
+
+    [SerializeField, Min(0f)]
+    private float minionGroundHeight = 0.8f;
+
+    [SerializeField, Min(0f)]
+    private float droneSpawnHeight = 2.5f;
+
     [Header("Boss UI")]
     [SerializeField]
     private string introTitle = "FINAL BOSS";
 
     [SerializeField]
-    private string introSubtitle = "악몽의 근원을 정화하라";
+    private string introSubtitle = "오염된 장난감 상자를 파괴하라";
 
     [SerializeField]
-    private string objectiveText = "최종 보스를 쓰러뜨리고 코어를 지켜라";
+    private string objectiveText = "오염된 상자를 파괴하고 코어를 지켜라";
 
     [SerializeField]
     private string introSpeaker = "장난감 친구";
@@ -80,18 +137,18 @@ public sealed class FinalBossDirector : MonoBehaviour
     [TextArea(2, 4)]
     [SerializeField]
     private string introMessage =
-        "저 검은 형체가 모든 악몽의 근원이야. 함께 끝내자!";
+        "저 상자가 오염된 장난감을 계속 만들어내고 있어! 상자를 부수면 바이러스도 사라질 거야!";
 
     [SerializeField]
     private string defeatedTitle = "BOSS DEFEATED";
 
     [SerializeField]
-    private string defeatedSubtitle = "악몽의 근원이 정화되었습니다";
+    private string defeatedSubtitle = "오염의 근원이 정화되었습니다";
 
     [TextArea(2, 4)]
     [SerializeField]
     private string defeatedMessage =
-        "해냈어! 꿈나라의 빛이 다시 돌아오고 있어!";
+        "상자가 부서졌어! 오염된 기운도 사라지고 있어!";
 
     [SerializeField]
     private string failedTitle = "MISSION FAILED";
@@ -117,11 +174,24 @@ public sealed class FinalBossDirector : MonoBehaviour
     private FinalBossState currentState = FinalBossState.Idle;
 
     private Coroutine bossRoutine;
+    private Coroutine minionRoutine;
     private GameObject bossObject;
     private EnemyHealth bossHealth;
     private FinalBossAttackController bossAttack;
     private bool bossDefeatedEventRaised;
     private bool bossFailedEventRaised;
+    private bool firstPhaseAdvanceTriggered;
+    private bool secondPhaseAdvanceTriggered;
+    private int minionSpawnIndex;
+    private bool hasCachedCastleSpawnPose;
+    private Vector3 cachedCastleSpawnPosition;
+    private Quaternion cachedCastleSpawnRotation;
+
+    private readonly List<EnemyHealth> bossSpawnedEnemies =
+        new List<EnemyHealth>();
+
+    private static Material summonBurstMaterial;
+    private static Material fallbackDebrisMaterial;
 
     public FinalBossState CurrentState => currentState;
     public EnemyHealth BossHealth => bossHealth;
@@ -144,6 +214,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     {
         UnsubscribeEvents();
         StopBossRoutine();
+        StopMinionRoutine();
         UnsubscribeBossHealth();
         CleanupBossObject();
     }
@@ -165,6 +236,21 @@ public sealed class FinalBossDirector : MonoBehaviour
         if (core == null)
         {
             core = UnityEngine.Object.FindAnyObjectByType<CoreState>();
+        }
+
+        if (enemySpawner == null)
+        {
+            enemySpawner =
+                UnityEngine.Object.FindAnyObjectByType<DreamEnemySpawner>();
+        }
+
+        if (castleAnchor == null)
+        {
+            GameObject castle = GameObject.Find("Castle");
+            if (castle != null)
+            {
+                castleAnchor = castle.transform;
+            }
         }
     }
 
@@ -208,6 +294,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         if (newState == DreamlandGameFlowController.GameFlowState.GameOver)
         {
             StopBossRoutine();
+            StopMinionRoutine();
 
             if (bossAttack != null)
             {
@@ -232,10 +319,21 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         bossDefeatedEventRaised = false;
         bossFailedEventRaised = false;
+        firstPhaseAdvanceTriggered = false;
+        secondPhaseAdvanceTriggered = false;
+        minionSpawnIndex = 0;
 
         StopBossRoutine();
+        StopMinionRoutine();
+        CleanupBossSpawnedEnemies();
         UnsubscribeBossHealth();
         CleanupBossObject();
+
+        if (castleAnchor != null &&
+            !castleAnchor.gameObject.activeSelf)
+        {
+            castleAnchor.gameObject.SetActive(true);
+        }
 
         if (core != null && core.IsDestroyed)
         {
@@ -249,18 +347,6 @@ public sealed class FinalBossDirector : MonoBehaviour
     private IEnumerator BossIntroRoutine()
     {
         currentState = FinalBossState.Intro;
-
-        bossObject = SpawnBossObject();
-        if (bossObject == null)
-        {
-            Debug.LogError(
-                "[FinalBoss] 보스 오브젝트를 생성하지 못했습니다.",
-                this);
-            FailBossBattle();
-            yield break;
-        }
-
-        ConfigureBossComponents();
 
         missionUI?.ClearPersistentText();
         missionUI?.ShowBanner(
@@ -276,9 +362,37 @@ public sealed class FinalBossDirector : MonoBehaviour
                 Mathf.Max(0.1f, introDuration));
         }
 
-        if (introDuration > 0f)
+        float introElapsed = 0f;
+        CacheCastleBossPose();
+
+        if (castleAnchor != null &&
+            castleAnchor.gameObject.activeInHierarchy)
         {
-            yield return new WaitForSeconds(introDuration);
+            float start = Time.time;
+            yield return CastleBreakRoutine();
+            introElapsed += Time.time - start;
+        }
+
+        bossObject = SpawnBossObject();
+        if (bossObject == null)
+        {
+            Debug.LogError(
+                "[FinalBoss] 보스 오브젝트를 생성하지 못했습니다.",
+                this);
+            FailBossBattle();
+            yield break;
+        }
+
+        ConfigureBossComponents();
+
+        float revealStart = Time.time;
+        yield return BossRevealRoutine();
+        introElapsed += Time.time - revealStart;
+
+        float remainingIntro = Mathf.Max(0f, introDuration - introElapsed);
+        if (remainingIntro > 0f)
+        {
+            yield return new WaitForSeconds(remainingIntro);
         }
 
         if (currentState != FinalBossState.Intro ||
@@ -301,15 +415,72 @@ public sealed class FinalBossDirector : MonoBehaviour
                 firstAttackDelay);
         }
 
+        StartMinionRoutine();
+
         missionUI?.SetObjective(objectiveText);
         RefreshBossProgress();
 
         Debug.Log(
-            "[FinalBoss] 최종 보스전이 시작됐습니다. 보스 HP: " +
-            bossMaxHealth.ToString("0"),
+            "[FinalBoss] 오염된 선물상자 보스전 시작. 보스 HP: " +
+            bossMaxHealth.ToString("0") +
+            " / 근접·원거리·비행 적 순환 소환 활성화",
             this);
 
         bossRoutine = null;
+    }
+
+    private IEnumerator CastleBreakRoutine()
+    {
+        if (castleAnchor == null)
+        {
+            yield break;
+        }
+
+        GameObject castleObject = castleAnchor.gameObject;
+        Bounds castleBounds = CalculateRendererBounds(castleAnchor);
+
+        CreateCastleDebrisEffect(castleBounds, castleAnchor);
+
+        Vector3 originalLocalPosition = castleAnchor.localPosition;
+        Quaternion originalLocalRotation = castleAnchor.localRotation;
+        Vector3 originalLocalScale = castleAnchor.localScale;
+
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.1f, castleBreakDuration);
+
+        while (elapsed < duration && castleObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float shake = (1f - t) * 0.22f;
+
+            castleAnchor.localPosition =
+                originalLocalPosition +
+                new Vector3(
+                    Mathf.Sin(elapsed * 58f) * shake,
+                    Mathf.Abs(Mathf.Sin(elapsed * 43f)) * shake * 0.35f,
+                    Mathf.Cos(elapsed * 51f) * shake);
+
+            castleAnchor.localRotation =
+                originalLocalRotation *
+                Quaternion.Euler(
+                    Mathf.Sin(elapsed * 37f) * shake * 8f,
+                    Mathf.Sin(elapsed * 31f) * shake * 12f,
+                    Mathf.Cos(elapsed * 41f) * shake * 8f);
+
+            float pulse = 1f + Mathf.Sin(t * Mathf.PI * 4f) * 0.015f;
+            castleAnchor.localScale = originalLocalScale * pulse;
+
+            yield return null;
+        }
+
+        if (castleObject != null)
+        {
+            castleAnchor.localPosition = originalLocalPosition;
+            castleAnchor.localRotation = originalLocalRotation;
+            castleAnchor.localScale = originalLocalScale;
+            castleObject.SetActive(false);
+        }
     }
 
     private GameObject SpawnBossObject()
@@ -357,10 +528,57 @@ public sealed class FinalBossDirector : MonoBehaviour
         }
 
         bossAttack = GetOrAdd<FinalBossAttackController>(bossObject);
-        bossAttack.enabled = false;
+        bossAttack.enabled = true;
 
         bossHealth.Configure(bossMaxHealth, false);
         SubscribeBossHealth();
+    }
+
+    private IEnumerator BossRevealRoutine()
+    {
+        if (bossObject == null)
+        {
+            yield break;
+        }
+
+        Transform bossTransform = bossObject.transform;
+        Vector3 finalScale = bossTransform.localScale;
+        Vector3 startScale = finalScale * 0.18f;
+        Vector3 basePosition = bossTransform.position;
+
+        bossTransform.localScale = startScale;
+        bossTransform.position = basePosition - Vector3.up * 0.45f;
+
+        bossAttack?.PlaySummonPulse();
+
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.1f, bossRevealDuration);
+
+        while (elapsed < duration && bossObject != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float smooth = t * t * (3f - 2f * t);
+            float overshoot = Mathf.Sin(t * Mathf.PI) * 0.12f;
+
+            bossTransform.localScale =
+                Vector3.Lerp(startScale, finalScale, smooth) *
+                (1f + overshoot);
+
+            bossTransform.position =
+                Vector3.Lerp(
+                    basePosition - Vector3.up * 0.45f,
+                    basePosition,
+                    smooth);
+
+            yield return null;
+        }
+
+        if (bossObject != null)
+        {
+            bossTransform.localScale = finalScale;
+            bossTransform.position = basePosition;
+        }
     }
 
     private void SubscribeBossHealth()
@@ -394,6 +612,179 @@ public sealed class FinalBossDirector : MonoBehaviour
         float maximum)
     {
         RefreshBossProgress(current, maximum);
+
+        if (currentState != FinalBossState.Fighting ||
+            maximum <= 0f ||
+            bossAttack == null)
+        {
+            return;
+        }
+
+        float normalized = Mathf.Clamp01(current / maximum);
+
+        if (!firstPhaseAdvanceTriggered && normalized <= (2f / 3f))
+        {
+            firstPhaseAdvanceTriggered = true;
+            StartCoroutine(RequestPhaseAdvanceWhenReady(1));
+        }
+
+        if (!secondPhaseAdvanceTriggered && normalized <= (1f / 3f))
+        {
+            secondPhaseAdvanceTriggered = true;
+            StartCoroutine(RequestPhaseAdvanceWhenReady(2));
+        }
+    }
+
+    private IEnumerator RequestPhaseAdvanceWhenReady(int phaseIndex)
+    {
+        while (currentState == FinalBossState.Fighting &&
+               bossAttack != null &&
+               bossAttack.IsPhaseMoving)
+        {
+            yield return null;
+        }
+
+        if (currentState != FinalBossState.Fighting ||
+            bossAttack == null ||
+            bossHealth == null ||
+            bossHealth.IsDead)
+        {
+            yield break;
+        }
+
+        bossAttack.AdvanceTowardCore(phaseIndex);
+        bossAttack.PlaySummonPulse();
+
+        missionUI?.SetObjective(
+            phaseIndex == 1
+                ? "보스가 코어 쪽으로 접근한다! 오염된 장난감을 막아라"
+                : "보스가 광폭화했다! 상자를 파괴하라");
+    }
+
+    private void StartMinionRoutine()
+    {
+        StopMinionRoutine();
+
+        if (enemySpawner == null)
+        {
+            Debug.LogWarning(
+                "[FinalBoss] DreamEnemySpawner가 없어 보스 하수인을 생성할 수 없습니다.",
+                this);
+            return;
+        }
+
+        minionRoutine = StartCoroutine(BossMinionSpawnRoutine());
+    }
+
+    private IEnumerator BossMinionSpawnRoutine()
+    {
+        if (firstMinionSpawnDelay > 0f)
+        {
+            yield return new WaitForSeconds(firstMinionSpawnDelay);
+        }
+
+        while (currentState == FinalBossState.Fighting &&
+               bossObject != null &&
+               bossHealth != null &&
+               !bossHealth.IsDead &&
+               core != null &&
+               !core.IsDestroyed)
+        {
+            bossSpawnedEnemies.RemoveAll(enemy => enemy == null || enemy.IsDead);
+
+            // 보스가 직접 생성한 적만 제한합니다. 이전 웨이브에 남은 적 때문에
+            // 보스 소환이 멈추는 현상을 방지합니다.
+            int activeCount = bossSpawnedEnemies.Count;
+
+            if (activeCount < maxActiveMinions)
+            {
+                SpawnNextBossMinion();
+            }
+
+            float healthRatio = bossHealth.MaxHealth > 0f
+                ? bossHealth.CurrentHealth / bossHealth.MaxHealth
+                : 0f;
+
+            float phaseSpeedMultiplier =
+                healthRatio > 2f / 3f
+                    ? 1f
+                    : healthRatio > 1f / 3f
+                        ? 0.86f
+                        : 0.72f;
+
+            yield return new WaitForSeconds(
+                Mathf.Max(0.5f, minionSpawnInterval * phaseSpeedMultiplier));
+        }
+
+        minionRoutine = null;
+    }
+
+    private void SpawnNextBossMinion()
+    {
+        if (enemySpawner == null || bossObject == null)
+        {
+            return;
+        }
+
+        int typeIndex = minionSpawnIndex % 3;
+        GameObject prefabOverride = null;
+        string typeLabel = "MELEE";
+
+        if (typeIndex == 1 && rangedEnemyPrefab != null)
+        {
+            prefabOverride = rangedEnemyPrefab;
+            typeLabel = "RANGED";
+        }
+        else if (typeIndex == 2 && droneEnemyPrefab != null)
+        {
+            prefabOverride = droneEnemyPrefab;
+            typeLabel = "DRONE";
+        }
+
+        float angle = minionSpawnIndex * 137.5f * Mathf.Deg2Rad;
+        Vector3 radial =
+            new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) *
+            minionSpawnRadius;
+
+        Vector3 spawnPosition = bossObject.transform.position + radial;
+        spawnPosition.y +=
+            typeLabel == "DRONE"
+                ? droneSpawnHeight
+                : minionGroundHeight;
+
+        Vector3 faceDirection =
+            core != null
+                ? core.transform.position - spawnPosition
+                : -radial;
+        faceDirection.y = 0f;
+
+        Quaternion rotation =
+            faceDirection.sqrMagnitude > 0.0001f
+                ? Quaternion.LookRotation(faceDirection.normalized, Vector3.up)
+                : Quaternion.identity;
+
+        EnemyHealth spawned = enemySpawner.SpawnCombatEnemyAtPosition(
+            spawnPosition,
+            rotation,
+            prefabOverride,
+            minionHealthMultiplier);
+
+        if (spawned != null)
+        {
+            bossSpawnedEnemies.Add(spawned);
+        }
+
+        bossAttack?.PlaySummonPulse();
+        CreateSummonBurst(spawnPosition);
+
+        minionSpawnIndex++;
+
+        Debug.Log(
+            "[FinalBoss] 오염된 상자에서 " +
+            typeLabel +
+            " 적 생성 / 보스 소환 순번 " +
+            minionSpawnIndex,
+            this);
     }
 
     private void HandleBossDied(EnemyHealth _, DamageInfo __)
@@ -405,17 +796,14 @@ public sealed class FinalBossDirector : MonoBehaviour
         }
 
         StopBossRoutine();
+        StopMinionRoutine();
+        CleanupBossSpawnedEnemies();
         bossRoutine = StartCoroutine(BossDefeatRoutine());
     }
 
     private IEnumerator BossDefeatRoutine()
     {
         currentState = FinalBossState.Defeating;
-
-        if (bossAttack != null)
-        {
-            bossAttack.enabled = false;
-        }
 
         DisableBossColliders();
         missionUI?.ClearPersistentText();
@@ -450,7 +838,7 @@ public sealed class FinalBossDirector : MonoBehaviour
                     startPosition + Vector3.up * (t * 2f);
                 bossObject.transform.Rotate(
                     Vector3.up,
-                    240f * Time.deltaTime,
+                    360f * Time.deltaTime,
                     Space.World);
 
                 yield return null;
@@ -479,7 +867,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         currentState = FinalBossState.Completed;
 
         Debug.Log(
-            "[FinalBoss] 보스 처치 연출 완료. " +
+            "[FinalBoss] 오염 상자 파괴 완료. " +
             "BossDefeated 이벤트를 발생시킵니다.",
             this);
 
@@ -506,6 +894,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         }
 
         StopBossRoutine();
+        StopMinionRoutine();
         currentState = FinalBossState.Failed;
 
         if (bossAttack != null)
@@ -553,10 +942,68 @@ public sealed class FinalBossDirector : MonoBehaviour
             Mathf.CeilToInt(maximum));
     }
 
+    private void CacheCastleBossPose()
+    {
+        hasCachedCastleSpawnPose = false;
+
+        if (castleAnchor == null)
+        {
+            return;
+        }
+
+        Bounds bounds = CalculateRendererBounds(castleAnchor);
+        cachedCastleSpawnPosition = new Vector3(
+            bounds.center.x,
+            bounds.min.y + 0.05f,
+            bounds.center.z);
+
+        Vector3 faceDirection =
+            core != null
+                ? core.transform.position - cachedCastleSpawnPosition
+                : Vector3.forward;
+        faceDirection.y = 0f;
+
+        cachedCastleSpawnRotation =
+            faceDirection.sqrMagnitude > 0.0001f
+                ? Quaternion.LookRotation(faceDirection.normalized, Vector3.up)
+                : castleAnchor.rotation;
+
+        hasCachedCastleSpawnPose = true;
+    }
+
+
     private void CalculateBossPose(
         out Vector3 position,
         out Quaternion rotation)
     {
+        if (hasCachedCastleSpawnPose)
+        {
+            position = cachedCastleSpawnPosition;
+            rotation = cachedCastleSpawnRotation;
+            return;
+        }
+
+        if (castleAnchor != null)
+        {
+            Bounds bounds = CalculateRendererBounds(castleAnchor);
+            position = new Vector3(
+                bounds.center.x,
+                bounds.min.y + 0.05f,
+                bounds.center.z);
+
+            Vector3 faceDirection =
+                core != null
+                    ? core.transform.position - position
+                    : Vector3.forward;
+            faceDirection.y = 0f;
+
+            rotation =
+                faceDirection.sqrMagnitude > 0.0001f
+                    ? Quaternion.LookRotation(faceDirection.normalized, Vector3.up)
+                    : castleAnchor.rotation;
+            return;
+        }
+
         if (bossSpawnPoint != null)
         {
             position = bossSpawnPoint.position;
@@ -578,8 +1025,6 @@ public sealed class FinalBossDirector : MonoBehaviour
             forward.Normalize();
             position = camera.transform.position +
                        forward * fallbackSpawnDistance;
-
-            // 기본 캡슐의 하단이 지면 근처에 오도록 카메라 높이를 사용합니다.
             position.y = Mathf.Max(1.5f, camera.transform.position.y);
 
             Vector3 faceDirection = camera.transform.position - position;
@@ -597,6 +1042,261 @@ public sealed class FinalBossDirector : MonoBehaviour
         position = anchor + Vector3.forward * fallbackSpawnDistance;
         position.y = Mathf.Max(1.5f, anchor.y + 1.5f);
         rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
+    }
+
+    private static Bounds CalculateRendererBounds(Transform root)
+    {
+        if (root == null)
+        {
+            return new Bounds(Vector3.zero, Vector3.one * 2f);
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool hasBounds = false;
+        Bounds bounds = new Bounds(root.position, Vector3.one * 2f);
+
+        foreach (Renderer modelRenderer in renderers)
+        {
+            if (modelRenderer == null ||
+                modelRenderer is ParticleSystemRenderer ||
+                modelRenderer is LineRenderer)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = modelRenderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(modelRenderer.bounds);
+            }
+        }
+
+        return bounds;
+    }
+
+    private void CreateCastleDebrisEffect(Bounds bounds, Transform castleRoot)
+    {
+        GameObject debrisObject = new GameObject("CastleBreak_Debris");
+        debrisObject.transform.position = bounds.center;
+
+        ParticleSystem particles = debrisObject.AddComponent<ParticleSystem>();
+        ParticleSystem.MainModule main = particles.main;
+        main.duration = 0.35f;
+        main.loop = false;
+        main.playOnAwake = false;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = Mathf.Max(16, castleDebrisCount + 8);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.4f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(3.5f, 7.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.65f);
+        main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        main.gravityModifier = 1.25f;
+
+        ParticleSystem.EmissionModule emission = particles.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new[]
+        {
+            new ParticleSystem.Burst(
+                0f,
+                (short)Mathf.Clamp(castleDebrisCount, 1, short.MaxValue))
+        });
+
+        ParticleSystem.ShapeModule shape = particles.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = new Vector3(
+            Mathf.Max(1f, bounds.size.x * 0.65f),
+            Mathf.Max(1f, bounds.size.y * 0.55f),
+            Mathf.Max(1f, bounds.size.z * 0.65f));
+
+        ParticleSystem.RotationOverLifetimeModule rotation =
+            particles.rotationOverLifetime;
+        rotation.enabled = true;
+        rotation.separateAxes = true;
+        rotation.x = new ParticleSystem.MinMaxCurve(-4f, 4f);
+        rotation.y = new ParticleSystem.MinMaxCurve(-5f, 5f);
+        rotation.z = new ParticleSystem.MinMaxCurve(-4f, 4f);
+
+        ParticleSystemRenderer particleRenderer =
+            debrisObject.GetComponent<ParticleSystemRenderer>();
+        particleRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+        particleRenderer.mesh = GetCubeMesh();
+
+        Material sourceMaterial = FindCastleMaterial(castleRoot);
+        if (sourceMaterial != null)
+        {
+            particleRenderer.material = sourceMaterial;
+        }
+        else
+        {
+            particleRenderer.material = CreateFallbackDebrisMaterial();
+        }
+
+        particles.Play();
+        Destroy(debrisObject, Mathf.Max(2f, castleDebrisLifetime));
+    }
+
+    private static Mesh GetCubeMesh()
+    {
+        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Mesh mesh = cube.GetComponent<MeshFilter>().sharedMesh;
+        UnityEngine.Object.Destroy(cube);
+        return mesh;
+    }
+
+    private static Material FindCastleMaterial(Transform castleRoot)
+    {
+        if (castleRoot == null)
+        {
+            return null;
+        }
+
+        Renderer[] renderers = castleRoot.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer modelRenderer in renderers)
+        {
+            if (modelRenderer != null && modelRenderer.sharedMaterial != null)
+            {
+                return modelRenderer.sharedMaterial;
+            }
+        }
+
+        return null;
+    }
+
+    private static Material CreateFallbackDebrisMaterial()
+    {
+        if (fallbackDebrisMaterial != null)
+        {
+            return fallbackDebrisMaterial;
+        }
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        shader ??= Shader.Find("Standard");
+
+        if (shader == null)
+        {
+            return null;
+        }
+
+        fallbackDebrisMaterial = new Material(shader)
+        {
+            name = "CastleDebris_Runtime",
+            color = new Color(0.35f, 0.22f, 0.18f, 1f),
+            hideFlags = HideFlags.DontSave
+        };
+
+        if (fallbackDebrisMaterial.HasProperty("_BaseColor"))
+        {
+            fallbackDebrisMaterial.SetColor(
+                "_BaseColor",
+                new Color(0.35f, 0.22f, 0.18f, 1f));
+        }
+
+        return fallbackDebrisMaterial;
+    }
+
+    private void CreateSummonBurst(Vector3 position)
+    {
+        GameObject effectObject = new GameObject("BossMinion_SummonBurst");
+        effectObject.transform.position = position;
+
+        ParticleSystem particles = effectObject.AddComponent<ParticleSystem>();
+        ParticleSystem.MainModule main = particles.main;
+        main.duration = 0.25f;
+        main.loop = false;
+        main.playOnAwake = false;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 36;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.85f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, 2.4f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.24f);
+        main.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(0.03f, 0.005f, 0.04f, 0.9f),
+            new Color(0.55f, 0.02f, 0.65f, 0.8f));
+
+        ParticleSystem.EmissionModule emission = particles.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new[]
+        {
+            new ParticleSystem.Burst(0f, 28)
+        });
+
+        ParticleSystem.ShapeModule shape = particles.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.35f;
+
+        ParticleSystemRenderer renderer =
+            effectObject.GetComponent<ParticleSystemRenderer>();
+        renderer.renderMode = ParticleSystemRenderMode.Billboard;
+        renderer.material = CreateSummonMaterial();
+
+        particles.Play();
+        Destroy(effectObject, 1.2f);
+    }
+
+    private static Material CreateSummonMaterial()
+    {
+        if (summonBurstMaterial != null)
+        {
+            return summonBurstMaterial;
+        }
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        shader ??= Shader.Find("Particles/Standard Unlit");
+        shader ??= Shader.Find("Unlit/Color");
+
+        if (shader == null)
+        {
+            return null;
+        }
+
+        summonBurstMaterial = new Material(shader)
+        {
+            name = "BossSummonBurst_Runtime",
+            hideFlags = HideFlags.DontSave
+        };
+
+        if (summonBurstMaterial.HasProperty("_BaseColor"))
+        {
+            summonBurstMaterial.SetColor("_BaseColor", Color.white);
+        }
+        else if (summonBurstMaterial.HasProperty("_Color"))
+        {
+            summonBurstMaterial.SetColor("_Color", Color.white);
+        }
+
+        if (summonBurstMaterial.HasProperty("_Surface"))
+        {
+            summonBurstMaterial.SetFloat("_Surface", 1f);
+        }
+
+        if (summonBurstMaterial.HasProperty("_SrcBlend"))
+        {
+            summonBurstMaterial.SetFloat(
+                "_SrcBlend",
+                (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        }
+
+        if (summonBurstMaterial.HasProperty("_DstBlend"))
+        {
+            summonBurstMaterial.SetFloat(
+                "_DstBlend",
+                (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        }
+
+        if (summonBurstMaterial.HasProperty("_ZWrite"))
+        {
+            summonBurstMaterial.SetFloat("_ZWrite", 0f);
+        }
+
+        summonBurstMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        summonBurstMaterial.renderQueue = 3000;
+        return summonBurstMaterial;
     }
 
     private static void ApplyPrototypeBossMaterial(GameObject target)
@@ -652,35 +1352,34 @@ public sealed class FinalBossDirector : MonoBehaviour
         {
             UnityEngine.Object.Destroy(crownCollider);
         }
+    }
 
-        Renderer crownRenderer = crown.GetComponent<Renderer>();
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-        shader ??= Shader.Find("Standard");
-
-        if (crownRenderer == null || shader == null)
+    private void CleanupBossSpawnedEnemies()
+    {
+        if (bossSpawnedEnemies.Count == 0)
         {
             return;
         }
 
-        Color crownColor = new Color(1f, 0.3f, 0.05f, 1f);
-        Material crownMaterial = new Material(shader)
+        for (int i = bossSpawnedEnemies.Count - 1; i >= 0; i--)
         {
-            name = "PrototypeBossCrown_Runtime",
-            color = crownColor
-        };
+            EnemyHealth enemy = bossSpawnedEnemies[i];
+            if (enemy == null)
+            {
+                continue;
+            }
 
-        if (crownMaterial.HasProperty("_BaseColor"))
-        {
-            crownMaterial.SetColor("_BaseColor", crownColor);
+            if (enemySpawner != null)
+            {
+                enemySpawner.DespawnEnemyImmediately(enemy);
+            }
+            else
+            {
+                Destroy(enemy.gameObject);
+            }
         }
 
-        if (crownMaterial.HasProperty("_EmissionColor"))
-        {
-            crownMaterial.EnableKeyword("_EMISSION");
-            crownMaterial.SetColor("_EmissionColor", crownColor * 2f);
-        }
-
-        crownRenderer.material = crownMaterial;
+        bossSpawnedEnemies.Clear();
     }
 
     private void DisableBossColliders()
@@ -706,6 +1405,17 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         StopCoroutine(bossRoutine);
         bossRoutine = null;
+    }
+
+    private void StopMinionRoutine()
+    {
+        if (minionRoutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(minionRoutine);
+        minionRoutine = null;
     }
 
     private void CleanupBossObject()
@@ -734,10 +1444,21 @@ public sealed class FinalBossDirector : MonoBehaviour
     private void OnValidate()
     {
         fallbackSpawnDistance = Mathf.Max(1f, fallbackSpawnDistance);
+        castleBreakDuration = Mathf.Max(0.1f, castleBreakDuration);
+        castleDebrisLifetime = Mathf.Max(0f, castleDebrisLifetime);
+        castleDebrisCount = Mathf.Max(1, castleDebrisCount);
+        bossRevealDuration = Mathf.Max(0.1f, bossRevealDuration);
         bossMaxHealth = Mathf.Max(1f, bossMaxHealth);
         bossCoreDamage = Mathf.Max(0f, bossCoreDamage);
         bossAttackInterval = Mathf.Max(0.1f, bossAttackInterval);
         firstAttackDelay = Mathf.Max(0f, firstAttackDelay);
+        minionSpawnInterval = Mathf.Max(0.5f, minionSpawnInterval);
+        firstMinionSpawnDelay = Mathf.Max(0f, firstMinionSpawnDelay);
+        maxActiveMinions = Mathf.Max(1, maxActiveMinions);
+        minionHealthMultiplier = Mathf.Max(0.1f, minionHealthMultiplier);
+        minionSpawnRadius = Mathf.Max(0.5f, minionSpawnRadius);
+        minionGroundHeight = Mathf.Max(0f, minionGroundHeight);
+        droneSpawnHeight = Mathf.Max(0f, droneSpawnHeight);
         introDuration = Mathf.Max(0f, introDuration);
         defeatDuration = Mathf.Max(0f, defeatDuration);
         defeatVisualDuration = Mathf.Max(0f, defeatVisualDuration);

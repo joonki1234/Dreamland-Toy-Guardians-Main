@@ -47,10 +47,10 @@ namespace DreamGuardians
         [Header("코어 공격")]
 
         [SerializeField, Min(0f)]
-        private float coreDamage = 5f;
+        private float coreDamage = 1f;
 
         [SerializeField, Min(0.1f)]
-        private float attackInterval = 1.25f;
+        private float attackInterval = 1f;
 
         [Tooltip("비워두면 드론 최상위 위치에서 레이저가 시작됩니다.")]
         [SerializeField]
@@ -325,8 +325,9 @@ namespace DreamGuardians
             nextAttackTime =
                 Time.time + attackInterval;
 
-            targetCore.TakeDamage(coreDamage);
+            // 레이저는 코어를 향해 표시되고, 발사 1회당 1회의 피해만 줍니다.
             ShowAttackBeam();
+            targetCore.TakeDamage(coreDamage);
         }
 
 
@@ -366,6 +367,8 @@ namespace DreamGuardians
                         ? muzzle.position
                         : transform.position;
 
+                // LineRenderer를 월드 좌표로 갱신해 드론 회전과 관계없이
+                // 레이저 끝점이 항상 코어를 정확히 향하도록 합니다.
                 Vector3 end =
                     targetCore.EnergyTarget.position;
 
@@ -497,6 +500,51 @@ namespace DreamGuardians
             {
                 health = GetComponent<EnemyHealth>();
             }
+
+            ResolveMuzzle();
+        }
+
+
+        private void ResolveMuzzle()
+        {
+            if (muzzle != null)
+            {
+                return;
+            }
+
+            Transform fallback = null;
+            Transform[] children =
+                GetComponentsInChildren<Transform>(true);
+
+            foreach (Transform child in children)
+            {
+                if (child == null || child == transform)
+                {
+                    continue;
+                }
+
+                string lowerName =
+                    child.name.ToLowerInvariant();
+
+                // Waspy 모델의 총구 본 이름은 gun.r_end / gun.l_end 계열입니다.
+                if (lowerName.Contains("muzzle") ||
+                    (lowerName.Contains("gun") &&
+                     lowerName.Contains("end")))
+                {
+                    muzzle = child;
+                    return;
+                }
+
+                if (fallback == null &&
+                    (lowerName.Contains("gun") ||
+                     lowerName.Contains("barrel") ||
+                     lowerName.Contains("laser")))
+                {
+                    fallback = child;
+                }
+            }
+
+            muzzle = fallback;
         }
 
 

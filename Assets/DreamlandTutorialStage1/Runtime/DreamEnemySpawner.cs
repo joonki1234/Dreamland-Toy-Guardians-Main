@@ -17,7 +17,7 @@ namespace DreamGuardians
         [SerializeField, Min(0f)] private float moveSpeed = 0.35f;
         [SerializeField, Min(0.5f)] private float attackRingRadius = 4.2f;
         [SerializeField, Min(0f)] private float attackSlotSpreadAngle = 12f;
-        [SerializeField, Min(0f)] private float coreDamage = 10f;
+        [SerializeField, Min(0f)] private float coreDamage = 1f;
         [SerializeField, Min(0.1f)] private float attackInterval = 1.5f;
 
         [Header("Floor Rift Spawn")]
@@ -80,7 +80,7 @@ namespace DreamGuardians
             moveSpeed = 0.35f;
             attackRingRadius = 4.2f;
             attackSlotSpreadAngle = 12f;
-            coreDamage = 10f;
+            coreDamage = 1f;
             attackInterval = 1.5f;
 
             useFloorRift = true;
@@ -277,6 +277,26 @@ namespace DreamGuardians
                 spawnPoint,
                 prefabOverride);
         }
+
+        /// <summary>
+        /// 보스처럼 포탈이 아닌 임의의 월드 위치에서 전투 적을 생성합니다.
+        /// prefabOverride가 null이면 기본 근접 적을 사용합니다.
+        /// </summary>
+        public EnemyHealth SpawnCombatEnemyAtPosition(
+            Vector3 position,
+            Quaternion rotation,
+            GameObject prefabOverride = null,
+            float healthMultiplier = 1f)
+        {
+            return SpawnEnemy(
+                position,
+                rotation,
+                false,
+                healthMultiplier,
+                null,
+                prefabOverride);
+        }
+
 
         public EnemyHealth SpawnCombatEnemy(
             float healthMultiplier = 1f)
@@ -481,9 +501,12 @@ namespace DreamGuardians
                         ? rangedEnemy.MoveSpeed
                         : moveSpeed;
 
+                // 원거리 미니건은 실제 탄환이 코어에 도착했을 때
+                // RangedMinigunEnemy가 데미지를 처리합니다.
+                // EnemyCoreMover의 즉시 데미지는 0으로 막아 중복 피해를 방지합니다.
                 float configuredCoreDamage =
                     rangedEnemy != null
-                        ? rangedEnemy.CoreDamage
+                        ? 0f
                         : coreDamage;
 
                 float configuredAttackInterval =
@@ -535,8 +558,8 @@ namespace DreamGuardians
             }
             else if (rangedEnemy != null)
             {
-                // 실제 이동과 코어 피해는 기존 EnemyCoreMover가 담당하고,
-                // 전용 컴포넌트는 Animator 상태를 동기화합니다.
+                // 이동/공격 위치 판정은 EnemyCoreMover가 담당하고,
+                // 실제 코어 피해는 원거리 전용 탄환이 담당합니다.
                 rangedEnemy.Configure(mover);
 
                 // 과거 저장본에 근접 전용 모션이 붙어 있어도 충돌하지 않게 합니다.
