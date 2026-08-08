@@ -149,6 +149,19 @@ public sealed class Stage2Director : MonoBehaviour
     /// </summary>
     public event Action Stage2Failed;
 
+    public void AbortAndResetForTest()
+    {
+        StopOwnedRoutines();
+        currentState = Stage2DirectorState.Idle;
+        allSpawnsCompleted = false;
+        completionEventRaised = false;
+        currentPhaseLabel = "Stage 2 준비";
+
+        missionUI?.ClearPersistentText();
+        missionUI?.SetObjective(string.Empty);
+        missionUI?.SetProgress(string.Empty);
+    }
+
     private void Awake()
     {
         NormalizeLegacyWaveTitles();

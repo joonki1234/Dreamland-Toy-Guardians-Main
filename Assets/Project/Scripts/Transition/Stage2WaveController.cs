@@ -745,6 +745,16 @@ public sealed class Stage2WaveController : MonoBehaviour
         allWaveSpawnsCompleted = false;
     }
 
+    public void AbortAndResetForTest()
+    {
+        StopAllCoroutines();
+        stageRoutine = null;
+        runningSpawnRoutineCount = 0;
+        allWaveSpawnsCompleted = false;
+        combatCompleted = false;
+        failed = false;
+    }
+
 
     [ContextMenu("테스트 - Stage 2 직접 시작")]
     private void TestBeginStage2()

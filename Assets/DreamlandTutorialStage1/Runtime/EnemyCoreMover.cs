@@ -363,6 +363,7 @@ namespace DreamGuardians
                 Vector3.up);
 
             ParticleSystem particles = effectObject.AddComponent<ParticleSystem>();
+            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             ParticleSystem.MainModule main = particles.main;
             main.duration = 0.22f;
             main.loop = false;

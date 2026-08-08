@@ -33,6 +33,9 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
     private Stage2Director stage2Director;
 
     [SerializeField]
+    private Stage2WaveController stage2WaveController;
+
+    [SerializeField]
     private DreamlandTransitionController transitionController;
 
     [SerializeField]
@@ -40,6 +43,12 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
 
     [SerializeField]
     private EndingDirector endingDirector;
+
+    [SerializeField]
+    private CoreState core;
+
+    [SerializeField]
+    private DreamEnemySpawner enemySpawner;
 
     [Header("현재 진행 상태")]
 
@@ -136,6 +145,13 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
                     .FindAnyObjectByType<Stage2Director>();
         }
 
+        if (stage2WaveController == null)
+        {
+            stage2WaveController =
+                UnityEngine.Object
+                    .FindAnyObjectByType<Stage2WaveController>();
+        }
+
         if (transitionController == null)
         {
             transitionController =
@@ -155,6 +171,25 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             endingDirector =
                 UnityEngine.Object
                     .FindAnyObjectByType<EndingDirector>();
+        }
+
+        if (enemySpawner == null)
+        {
+            enemySpawner =
+                UnityEngine.Object
+                    .FindAnyObjectByType<DreamEnemySpawner>();
+        }
+
+        if (core == null)
+        {
+            core =
+                UnityEngine.Object
+                    .FindAnyObjectByType<CoreState>();
+        }
+
+        if (core == null && enemySpawner != null)
+        {
+            core = enemySpawner.TargetCore;
         }
     }
 
@@ -550,24 +585,60 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             currentState);
     }
 
+    private void PrepareDirectScenarioTest(
+        bool applyRealityState,
+        bool applyFullDreamlandState)
+    {
+        ResolveFlowComponents();
+
+        stage1Director?.StopForStage2Test();
+        stage1WaveController?.StopForStage2Test();
+        stage2Director?.AbortAndResetForTest();
+        stage2WaveController?.AbortAndResetForTest();
+        finalBossDirector?.AbortAndResetForTest();
+        endingDirector?.AbortAndResetForTest();
+        enemySpawner?.DespawnAllEnemiesImmediately();
+        core?.ResetCore();
+
+        if (applyFullDreamlandState)
+        {
+            transitionController?.ApplyFullDreamlandState();
+        }
+        else if (applyRealityState)
+        {
+            transitionController?.ApplyRealityState();
+        }
+        else
+        {
+            transitionController?.ApplyStage2PortalState();
+        }
+
+        PrepareForStage1Completion();
+    }
+
+    [ContextMenu("테스트 - 튜토리얼부터 시작")]
+    private void TestStartTutorial()
+    {
+        PrepareDirectScenarioTest(
+            applyRealityState: true,
+            applyFullDreamlandState: false);
+
+        stage1Director?.Begin();
+
+        Debug.Log(
+            "[GameFlow] 튜토리얼부터 테스트를 시작했습니다.",
+            this);
+    }
+
     /// <summary>
-    /// 튜토리얼만 중단하고 Stage 1부터 테스트합니다.
-    /// Stage 1 완료 후에는 정상적으로 Stage 2로 넘어갑니다.
+    /// 튜토리얼을 건너뛰고 Stage 1부터 시작합니다.
     /// </summary>
-    [ContextMenu("테스트 - 튜토리얼 스킵 후 Stage 1 시작")]
+    [ContextMenu("테스트 - Stage 1부터 시작")]
     private void TestSkipTutorialAndStartStage1()
     {
-        if (currentState !=
-            GameFlowState.WaitingForStage1Complete)
-        {
-            Debug.LogWarning(
-                "[GameFlow] 튜토리얼 스킵은 " +
-                "Stage 1 완료 대기 상태에서만 사용할 수 있습니다. " +
-                "현재 상태: " + currentState,
-                this);
-
-            return;
-        }
+        PrepareDirectScenarioTest(
+            applyRealityState: true,
+            applyFullDreamlandState: false);
 
         if (stage1Director == null)
         {
@@ -578,40 +649,37 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             return;
         }
 
-        stage1Director
-            .SkipTutorialAndStartStage1();
+        stage1Director.SkipTutorialAndStartStage1();
 
         Debug.Log(
-            "[GameFlow] 튜토리얼을 스킵하고 " +
-            "Stage 1 테스트를 시작했습니다.",
+            "[GameFlow] 튜토리얼을 스킵하고 Stage 1 테스트를 시작했습니다.",
             this);
     }
 
     /// <summary>
-    /// 튜토리얼과 Stage 1을 모두 중단하고
-    /// Stage 2부터 테스트합니다.
+    /// 튜토리얼과 Stage 1을 모두 중단하고 Stage 2부터 테스트합니다.
     /// </summary>
-    [ContextMenu("테스트 - Stage 2 시작")]
+    [ContextMenu("테스트 - Stage 2부터 시작")]
     private void TestStartStage2()
     {
-        stage1Director?
-            .StopForStage2Test();
+        PrepareDirectScenarioTest(
+            applyRealityState: false,
+            applyFullDreamlandState: false);
 
-        stage1WaveController?
-            .StopForStage2Test();
-
-        PrepareForStage1Completion();
         StartStage2();
 
         Debug.Log(
-            "[GameFlow] 튜토리얼과 Stage 1을 중단하고 " +
-            "Stage 2 테스트를 시작했습니다.",
+            "[GameFlow] Stage 2부터 테스트를 시작했습니다.",
             this);
     }
 
     [ContextMenu("테스트 - Stage 2 이후 전환 시작")]
     private void TestStartPostStage2Transition()
     {
+        PrepareDirectScenarioTest(
+            applyRealityState: false,
+            applyFullDreamlandState: false);
+
         isRunning = true;
         absorptionCompletionHandled = false;
         fullVRCompletionHandled = false;
@@ -620,26 +688,32 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             GameFlowState.EnemyAbsorption);
     }
 
-    [ContextMenu("테스트 - 보스전 직접 시작")]
+    [ContextMenu("테스트 - 보스전부터 시작")]
     private void TestStartBossBattle()
     {
+        PrepareDirectScenarioTest(
+            applyRealityState: false,
+            applyFullDreamlandState: true);
+
         isRunning = true;
         bossCompletionHandled = false;
         bossFailureHandled = false;
 
-        if (transitionController != null)
-        {
-            transitionController
-                .ApplyFullDreamlandState();
-        }
-
         ChangeState(
             GameFlowState.BossBattle);
+
+        Debug.Log(
+            "[GameFlow] 보스전부터 테스트를 시작했습니다.",
+            this);
     }
 
     [ContextMenu("테스트 - 엔딩 직접 시작")]
     private void TestStartEnding()
     {
+        PrepareDirectScenarioTest(
+            applyRealityState: false,
+            applyFullDreamlandState: true);
+
         isRunning = true;
         endingCompletionHandled = false;
 

@@ -390,6 +390,42 @@ namespace DreamGuardians
                 this);
         }
 
+
+        public void DespawnAllEnemiesImmediately()
+        {
+            if (activeEnemies.Count == 0)
+            {
+                return;
+            }
+
+            EnemyPurification[] enemies =
+                new EnemyPurification[activeEnemies.Count];
+            activeEnemies.CopyTo(enemies);
+
+            for (int i = 0; i < enemies.Length; i++)
+            {
+                EnemyPurification purification = enemies[i];
+                if (purification == null)
+                {
+                    continue;
+                }
+
+                purification.Completed -= HandlePurificationCompleted;
+                activeEnemies.Remove(purification);
+                Destroy(purification.gameObject);
+            }
+
+            if (activeEnemies.Count == 0)
+            {
+                AllEnemiesCleared?.Invoke();
+            }
+
+            Debug.Log(
+                "[DreamEnemySpawner] 테스트 진행을 위해 " +
+                "활성 적을 모두 즉시 제거했습니다.",
+                this);
+        }
+
         private EnemyHealth SpawnEnemy(
             Vector3 position,
             Quaternion rotation,

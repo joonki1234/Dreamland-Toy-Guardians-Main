@@ -938,6 +938,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
             transform.position + Vector3.up * auraHeightOffset;
 
         auraParticles = auraObject.AddComponent<ParticleSystem>();
+        auraParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         ParticleSystem.MainModule main = auraParticles.main;
         main.duration = 5f;

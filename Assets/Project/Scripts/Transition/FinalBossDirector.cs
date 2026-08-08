@@ -61,6 +61,21 @@ public sealed class FinalBossDirector : MonoBehaviour
     [SerializeField]
     private Vector3 prototypeBossScale = new Vector3(2.5f, 2.5f, 2.5f);
 
+    [Tooltip("보스 프리팹/프로토타입 전체 크기에 곱할 배율")]
+    [SerializeField, Min(1f)]
+    private float bossScaleMultiplier = 2.6f;
+
+    [Tooltip("성 위치에서 코어 방향으로 얼마나 앞으로 당겨서 스폰할지")]
+    [SerializeField, Min(0f)]
+    private float castleSpawnForwardOffset = 12f;
+
+    [Tooltip("루트 보스 피격 판정을 더 쉽게 하기 위한 히트박스 배율")]
+    [SerializeField, Min(1f)]
+    private float easyHitboxMultiplier = 1.12f;
+
+    [SerializeField, Min(0.5f)]
+    private float minimumHitboxRadius = 1.25f;
+
     [Header("Castle Break Intro")]
     [SerializeField, Min(0.1f)]
     private float castleBreakDuration = 0.65f;
@@ -104,7 +119,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     private float minionSpawnInterval = 3.5f;
 
     [SerializeField, Min(0f)]
-    private float firstMinionSpawnDelay = 2.0f;
+    private float firstMinionSpawnDelay = 3.0f;
 
     [SerializeField, Min(1)]
     private int maxActiveMinions = 10;
@@ -113,7 +128,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     private float minionHealthMultiplier = 1.15f;
 
     [SerializeField, Min(0.5f)]
-    private float minionSpawnRadius = 2.4f;
+    private float minionSpawnRadius = 7.5f;
 
     [SerializeField, Min(0f)]
     private float minionGroundHeight = 0.8f;
@@ -496,6 +511,7 @@ public sealed class FinalBossDirector : MonoBehaviour
                 position,
                 rotation);
             instance.name = "FinalBoss";
+            ApplyBossScale(instance.transform);
             instance.SetActive(true);
             return instance;
         }
@@ -509,6 +525,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         prototype.name = "PrototypeFinalBoss";
         prototype.transform.SetPositionAndRotation(position, rotation);
         prototype.transform.localScale = prototypeBossScale;
+        ApplyBossScale(prototype.transform);
 
         ApplyPrototypeBossMaterial(prototype);
         AddPrototypeCrown(prototype);
@@ -530,7 +547,8 @@ public sealed class FinalBossDirector : MonoBehaviour
         bossAttack = GetOrAdd<FinalBossAttackController>(bossObject);
         bossAttack.enabled = true;
 
-        bossHealth.Configure(bossMaxHealth, false);
+        bossHealth.Configure(bossMaxHealth, true);
+        EnsureBossHitbox();
         SubscribeBossHealth();
     }
 
@@ -747,10 +765,21 @@ public sealed class FinalBossDirector : MonoBehaviour
             minionSpawnRadius;
 
         Vector3 spawnPosition = bossObject.transform.position + radial;
-        spawnPosition.y +=
-            typeLabel == "DRONE"
-                ? droneSpawnHeight
-                : minionGroundHeight;
+
+        Vector3 projectedGround = spawnPosition;
+        if (TryProjectToGround(spawnPosition, out Vector3 groundedPosition))
+        {
+            projectedGround = groundedPosition;
+        }
+
+        if (typeLabel == "DRONE")
+        {
+            spawnPosition = projectedGround + Vector3.up * droneSpawnHeight;
+        }
+        else
+        {
+            spawnPosition = projectedGround + Vector3.up * minionGroundHeight;
+        }
 
         Vector3 faceDirection =
             core != null
@@ -785,6 +814,29 @@ public sealed class FinalBossDirector : MonoBehaviour
             " 적 생성 / 보스 소환 순번 " +
             minionSpawnIndex,
             this);
+    }
+
+    private bool TryProjectToGround(
+        Vector3 sourcePosition,
+        out Vector3 groundedPosition)
+    {
+        Vector3 rayOrigin = sourcePosition + Vector3.up * 25f;
+
+        if (Physics.Raycast(
+                rayOrigin,
+                Vector3.down,
+                out RaycastHit hit,
+                60f,
+                Physics.DefaultRaycastLayers,
+                QueryTriggerInteraction.Ignore))
+        {
+            groundedPosition = hit.point;
+            return true;
+        }
+
+        groundedPosition = sourcePosition;
+        groundedPosition.y = Mathf.Max(0f, groundedPosition.y);
+        return false;
     }
 
     private void HandleBossDied(EnemyHealth _, DamageInfo __)
@@ -960,12 +1012,20 @@ public sealed class FinalBossDirector : MonoBehaviour
         Vector3 faceDirection =
             core != null
                 ? core.transform.position - cachedCastleSpawnPosition
-                : Vector3.forward;
+                : castleAnchor.forward;
         faceDirection.y = 0f;
 
-        cachedCastleSpawnRotation =
+        Vector3 flatDirection =
             faceDirection.sqrMagnitude > 0.0001f
-                ? Quaternion.LookRotation(faceDirection.normalized, Vector3.up)
+                ? faceDirection.normalized
+                : castleAnchor.forward;
+
+        cachedCastleSpawnPosition +=
+            flatDirection * Mathf.Max(0f, castleSpawnForwardOffset);
+
+        cachedCastleSpawnRotation =
+            flatDirection.sqrMagnitude > 0.0001f
+                ? Quaternion.LookRotation(flatDirection, Vector3.up)
                 : castleAnchor.rotation;
 
         hasCachedCastleSpawnPose = true;
@@ -994,12 +1054,20 @@ public sealed class FinalBossDirector : MonoBehaviour
             Vector3 faceDirection =
                 core != null
                     ? core.transform.position - position
-                    : Vector3.forward;
+                    : castleAnchor.forward;
             faceDirection.y = 0f;
 
-            rotation =
+            Vector3 flatDirection =
                 faceDirection.sqrMagnitude > 0.0001f
-                    ? Quaternion.LookRotation(faceDirection.normalized, Vector3.up)
+                    ? faceDirection.normalized
+                    : castleAnchor.forward;
+
+            position +=
+                flatDirection * Mathf.Max(0f, castleSpawnForwardOffset);
+
+            rotation =
+                flatDirection.sqrMagnitude > 0.0001f
+                    ? Quaternion.LookRotation(flatDirection, Vector3.up)
                     : castleAnchor.rotation;
             return;
         }
@@ -1044,6 +1112,104 @@ public sealed class FinalBossDirector : MonoBehaviour
         rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
     }
 
+    private void ApplyBossScale(Transform bossTransform)
+    {
+        if (bossTransform == null)
+        {
+            return;
+        }
+
+        float scaleMultiplier = Mathf.Max(1f, bossScaleMultiplier);
+        bossTransform.localScale *= scaleMultiplier;
+    }
+
+    private void EnsureBossHitbox()
+    {
+        if (bossObject == null)
+        {
+            return;
+        }
+
+        Collider[] existingColliders =
+            bossObject.GetComponentsInChildren<Collider>(true);
+
+        foreach (Collider otherCollider in existingColliders)
+        {
+            if (otherCollider != null)
+            {
+                otherCollider.enabled = true;
+            }
+        }
+
+        CapsuleCollider rootHitbox = bossObject.GetComponent<CapsuleCollider>();
+        if (rootHitbox == null)
+        {
+            rootHitbox = bossObject.AddComponent<CapsuleCollider>();
+        }
+
+        Bounds bounds = CalculateRendererBounds(bossObject.transform);
+        Vector3 localCenter = bossObject.transform.InverseTransformPoint(bounds.center);
+
+        // Renderer.bounds는 월드 크기입니다. 보스 자체 Scale이 큰 상태에서
+        // 이 값을 그대로 Collider 로컬 크기로 넣으면 Scale이 한 번 더 적용되어
+        // 히트박스가 하수인 영역까지 덮게 됩니다.
+        // 월드 크기를 lossyScale로 나누어 로컬 크기로 환산한 뒤 여유분만 줍니다.
+        Vector3 lossyScale = bossObject.transform.lossyScale;
+        float safeScaleX = Mathf.Max(0.001f, Mathf.Abs(lossyScale.x));
+        float safeScaleY = Mathf.Max(0.001f, Mathf.Abs(lossyScale.y));
+        float safeScaleZ = Mathf.Max(0.001f, Mathf.Abs(lossyScale.z));
+        float horizontalScale = Mathf.Max(safeScaleX, safeScaleZ);
+
+        float localWorldHeight = bounds.size.y / safeScaleY;
+        float localWorldRadius =
+            Mathf.Max(
+                bounds.extents.x / safeScaleX,
+                bounds.extents.z / safeScaleZ);
+
+        float localMinimumRadius =
+            Mathf.Max(0.25f, minimumHitboxRadius / horizontalScale);
+
+        float hitboxPadding = Mathf.Clamp(easyHitboxMultiplier, 1f, 1.25f);
+        float localHeight = Mathf.Max(
+            0.5f,
+            localWorldHeight * hitboxPadding);
+        float localRadius = Mathf.Max(
+            localMinimumRadius,
+            localWorldRadius * hitboxPadding);
+
+        rootHitbox.direction = 1;
+        rootHitbox.center = localCenter;
+        rootHitbox.height = Mathf.Max(localHeight, localRadius * 2f + 0.05f);
+        rootHitbox.radius = localRadius;
+        rootHitbox.isTrigger = false;
+        rootHitbox.enabled = true;
+    }
+
+    public void AbortAndResetForTest()
+    {
+        StopBossRoutine();
+        StopMinionRoutine();
+        UnsubscribeBossHealth();
+        CleanupBossSpawnedEnemies();
+        CleanupBossObject();
+
+        if (castleAnchor != null)
+        {
+            castleAnchor.gameObject.SetActive(true);
+        }
+
+        currentState = FinalBossState.Idle;
+        bossDefeatedEventRaised = false;
+        bossFailedEventRaised = false;
+        firstPhaseAdvanceTriggered = false;
+        secondPhaseAdvanceTriggered = false;
+        minionSpawnIndex = 0;
+
+        missionUI?.ClearPersistentText();
+        missionUI?.SetObjective(string.Empty);
+        missionUI?.SetProgress(string.Empty);
+    }
+
     private static Bounds CalculateRendererBounds(Transform root)
     {
         if (root == null)
@@ -1084,6 +1250,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         debrisObject.transform.position = bounds.center;
 
         ParticleSystem particles = debrisObject.AddComponent<ParticleSystem>();
+        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         ParticleSystem.MainModule main = particles.main;
         main.duration = 0.35f;
         main.loop = false;
@@ -1205,30 +1372,31 @@ public sealed class FinalBossDirector : MonoBehaviour
         effectObject.transform.position = position;
 
         ParticleSystem particles = effectObject.AddComponent<ParticleSystem>();
+        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         ParticleSystem.MainModule main = particles.main;
         main.duration = 0.25f;
         main.loop = false;
         main.playOnAwake = false;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.maxParticles = 36;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.85f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.8f, 2.4f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.24f);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.22f, 0.55f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.35f, 1.15f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.14f);
         main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(0.03f, 0.005f, 0.04f, 0.9f),
-            new Color(0.55f, 0.02f, 0.65f, 0.8f));
+            new Color(0.03f, 0.005f, 0.04f, 0.42f),
+            new Color(0.32f, 0.02f, 0.45f, 0.28f));
 
         ParticleSystem.EmissionModule emission = particles.emission;
         emission.rateOverTime = 0f;
         emission.SetBursts(new[]
         {
-            new ParticleSystem.Burst(0f, 28)
+            new ParticleSystem.Burst(0f, 14)
         });
 
         ParticleSystem.ShapeModule shape = particles.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = 0.35f;
+        shape.radius = 0.18f;
 
         ParticleSystemRenderer renderer =
             effectObject.GetComponent<ParticleSystemRenderer>();
@@ -1236,7 +1404,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         renderer.material = CreateSummonMaterial();
 
         particles.Play();
-        Destroy(effectObject, 1.2f);
+        Destroy(effectObject, 0.7f);
     }
 
     private static Material CreateSummonMaterial()
@@ -1444,6 +1612,13 @@ public sealed class FinalBossDirector : MonoBehaviour
     private void OnValidate()
     {
         fallbackSpawnDistance = Mathf.Max(1f, fallbackSpawnDistance);
+        prototypeBossScale.x = Mathf.Max(0.25f, prototypeBossScale.x);
+        prototypeBossScale.y = Mathf.Max(0.25f, prototypeBossScale.y);
+        prototypeBossScale.z = Mathf.Max(0.25f, prototypeBossScale.z);
+        bossScaleMultiplier = Mathf.Max(1f, bossScaleMultiplier);
+        castleSpawnForwardOffset = Mathf.Max(0f, castleSpawnForwardOffset);
+        easyHitboxMultiplier = Mathf.Max(1f, easyHitboxMultiplier);
+        minimumHitboxRadius = Mathf.Max(0.5f, minimumHitboxRadius);
         castleBreakDuration = Mathf.Max(0.1f, castleBreakDuration);
         castleDebrisLifetime = Mathf.Max(0f, castleDebrisLifetime);
         castleDebrisCount = Mathf.Max(1, castleDebrisCount);

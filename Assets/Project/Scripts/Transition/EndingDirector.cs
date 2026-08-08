@@ -77,6 +77,16 @@ public sealed class EndingDirector : MonoBehaviour
     public EndingState CurrentState => currentState;
     public event Action EndingCompleted;
 
+    public void AbortAndResetForTest()
+    {
+        StopEndingRoutine();
+        completionEventRaised = false;
+        currentState = EndingState.Idle;
+        missionUI?.ClearPersistentText();
+        missionUI?.SetObjective(string.Empty);
+        missionUI?.SetProgress(string.Empty);
+    }
+
     private void Awake()
     {
         ResolveReferences();
