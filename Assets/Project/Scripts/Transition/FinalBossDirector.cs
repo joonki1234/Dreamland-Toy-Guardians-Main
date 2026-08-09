@@ -546,14 +546,21 @@ public sealed class FinalBossDirector : MonoBehaviour
             0.1f,
             preferredDuration > 0f ? preferredDuration : bossStoryLineDuration);
 
-        missionUI?.ShowDialogue(
-            introSpeaker,
-            message,
-            duration);
-        toyFriend?.Speak(
-            message,
-            duration,
-            celebratory);
+        missionUI?.HideTransientMessages();
+        if (toyFriend != null)
+        {
+            toyFriend.Speak(
+                message,
+                duration,
+                celebratory);
+        }
+        else
+        {
+            missionUI?.ShowDialogue(
+                introSpeaker,
+                message,
+                duration);
+        }
 
         yield return new WaitForSeconds(duration);
     }
@@ -993,14 +1000,21 @@ public sealed class FinalBossDirector : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(defeatedMessage))
         {
             float storyDuration = Mathf.Max(0.1f, defeatDuration);
-            missionUI?.ShowDialogue(
-                "장난감 친구",
-                defeatedMessage,
-                storyDuration);
-            toyFriend?.Speak(
-                defeatedMessage,
-                storyDuration,
-                true);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(
+                    defeatedMessage,
+                    storyDuration,
+                    true);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    "장난감 친구",
+                    defeatedMessage,
+                    storyDuration);
+            }
         }
 
         if (bossObject != null && defeatVisualDuration > 0f)
@@ -1123,7 +1137,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         }
 
         missionUI.SetBossHealth(
-            "CORRUPTED TOY BOX",
+            "오염된 선물 상자",
             current,
             maximum);
     }

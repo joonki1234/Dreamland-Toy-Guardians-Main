@@ -57,6 +57,67 @@ namespace DreamGuardians
         public static Sprite StrategicLightning =>
             LoadSprite("strategic_lightning_icon", Vector4.zero);
 
+        // Kenney UI Pack - Sci-Fi (Blue theme)
+        // Editor importer copies only the selected source PNGs into Resources/KenneySciFiUI.
+        public static Sprite KenneyMissionPanel =>
+            LoadRelativeSprite("KenneySciFiUI/mission_panel", 0.16f) ?? SciFiWindow;
+
+        public static Sprite KenneyCounterPanel =>
+            LoadRelativeSprite("KenneySciFiUI/counter_panel", 0.16f) ?? SciFiWindow;
+
+        public static Sprite KenneyBossPanel =>
+            LoadRelativeSprite("KenneySciFiUI/boss_panel", 0.16f) ?? SciFiWindow;
+
+        public static Sprite KenneyCoreBarBlue =>
+            LoadRelativeSprite("KenneySciFiUI/core_bar_blue", 0.30f) ?? SciFiBarBackground;
+
+        public static Sprite KenneyCoreBarGreen =>
+            LoadRelativeSprite("KenneySciFiUI/core_bar_green", 0.30f) ?? SciFiBarGreen;
+
+        public static Sprite KenneyCoreBarRed =>
+            LoadRelativeSprite("KenneySciFiUI/core_bar_red", 0.30f) ?? SciFiBarRed;
+
+        public static Sprite KenneyBossBarBlue =>
+            LoadRelativeSprite("KenneySciFiUI/boss_bar_blue", 0.30f) ?? SciFiBarBackground;
+
+        public static Sprite KenneyBossBarRed =>
+            LoadRelativeSprite("KenneySciFiUI/boss_bar_red", 0.30f) ?? SciFiBarRed;
+
+
+        private static Sprite LoadRelativeSprite(string resourcePath, float borderRatio)
+        {
+            string key = resourcePath + ":relative:" + borderRatio;
+            if (spriteCache.TryGetValue(key, out Sprite cached) && cached != null)
+            {
+                return cached;
+            }
+
+            Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null)
+            {
+                return null;
+            }
+
+            float maxBorder = Mathf.Max(0f, Mathf.Min(texture.width, texture.height) * 0.45f);
+            float border = Mathf.Clamp(
+                Mathf.Min(texture.width, texture.height) * Mathf.Clamp01(borderRatio),
+                0f,
+                maxBorder);
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect,
+                new Vector4(border, border, border, border));
+
+            sprite.name = texture.name + "_RuntimeSprite";
+            spriteCache[key] = sprite;
+            return sprite;
+        }
+
         private static Sprite LoadSprite(string resourceName, Vector4 border)
         {
             string key = resourceName + ":" + border;

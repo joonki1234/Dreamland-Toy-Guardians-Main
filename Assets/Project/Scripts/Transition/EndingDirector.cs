@@ -209,11 +209,18 @@ public sealed class EndingDirector : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(firstMessage))
         {
             float duration = Mathf.Max(0.1f, firstDialogueDuration);
-            missionUI?.ShowDialogue(
-                speaker,
-                firstMessage,
-                duration);
-            toyFriend?.Speak(firstMessage, duration, true);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(firstMessage, duration, true);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    speaker,
+                    firstMessage,
+                    duration);
+            }
 
             if (firstDialogueDuration > 0f)
             {
@@ -224,11 +231,18 @@ public sealed class EndingDirector : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(secondMessage))
         {
             float duration = Mathf.Max(0.1f, secondDialogueDuration);
-            missionUI?.ShowDialogue(
-                speaker,
-                secondMessage,
-                duration);
-            toyFriend?.Speak(secondMessage, duration, false);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(secondMessage, duration, false);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    speaker,
+                    secondMessage,
+                    duration);
+            }
 
             if (secondDialogueDuration > 0f)
             {
@@ -239,11 +253,18 @@ public sealed class EndingDirector : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(thirdMessage))
         {
             float duration = Mathf.Max(0.1f, thirdDialogueDuration);
-            missionUI?.ShowDialogue(
-                speaker,
-                thirdMessage,
-                duration);
-            toyFriend?.Speak(thirdMessage, duration, false);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(thirdMessage, duration, false);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    speaker,
+                    thirdMessage,
+                    duration);
+            }
 
             if (thirdDialogueDuration > 0f)
             {
@@ -254,11 +275,18 @@ public sealed class EndingDirector : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(fourthMessage))
         {
             float duration = Mathf.Max(0.1f, fourthDialogueDuration);
-            missionUI?.ShowDialogue(
-                speaker,
-                fourthMessage,
-                duration);
-            toyFriend?.Speak(fourthMessage, duration, true);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(fourthMessage, duration, true);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    speaker,
+                    fourthMessage,
+                    duration);
+            }
 
             if (fourthDialogueDuration > 0f)
             {

@@ -536,14 +536,21 @@ public sealed class DreamlandTransitionController : MonoBehaviour
                 0.1f,
                 enemyAbsorptionDuration);
 
-            missionUI?.ShowDialogue(
-                "장난감 친구",
-                absorptionMessage,
-                storyDuration);
-            toyFriend?.Speak(
-                absorptionMessage,
-                storyDuration,
-                false);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(
+                    absorptionMessage,
+                    storyDuration,
+                    false);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    "장난감 친구",
+                    absorptionMessage,
+                    storyDuration);
+            }
         }
 
         float duration =
@@ -589,14 +596,21 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             float suspenseDuration =
                 Mathf.Max(0.1f, bossSuspenseDuration);
 
-            missionUI?.ShowDialogue(
-                "장난감 친구",
-                bossSuspenseMessage,
-                suspenseDuration);
-            toyFriend?.Speak(
-                bossSuspenseMessage,
-                suspenseDuration,
-                false);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(
+                    bossSuspenseMessage,
+                    suspenseDuration,
+                    false);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    "장난감 친구",
+                    bossSuspenseMessage,
+                    suspenseDuration);
+            }
 
             yield return new WaitForSeconds(suspenseDuration);
         }

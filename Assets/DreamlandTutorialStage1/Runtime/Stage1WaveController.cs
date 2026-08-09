@@ -944,16 +944,22 @@ namespace DreamGuardians
                             ? Mathf.Max(line.Duration, line.VoiceClip.length)
                             : line.Duration;
 
-                    missionUI?.ShowDialogue(
-                        line.Speaker,
-                        line.Message,
-                        playbackDuration);
-
-                    toyFriend?.Speak(
-                        line.Message,
-                        playbackDuration,
-                        i == 0,
-                        line.VoiceClip);
+                    missionUI?.HideTransientMessages();
+                    if (toyFriend != null)
+                    {
+                        toyFriend.Speak(
+                            line.Message,
+                            playbackDuration,
+                            i == 0,
+                            line.VoiceClip);
+                    }
+                    else
+                    {
+                        missionUI?.ShowDialogue(
+                            line.Speaker,
+                            line.Message,
+                            playbackDuration);
+                    }
 
                     yield return new WaitForSeconds(playbackDuration);
                 }
@@ -963,14 +969,21 @@ namespace DreamGuardians
                 const string fallbackMessage =
                     "코어에 꿈빛이 충분히 모였어! 이제 동료의 직업 능력을 이어 시너지를 발동해 봐!";
 
-                missionUI?.ShowDialogue(
-                    "장난감 친구",
-                    fallbackMessage,
-                    4.5f);
-                toyFriend?.Speak(
-                    fallbackMessage,
-                    4.5f,
-                    true);
+                missionUI?.HideTransientMessages();
+                if (toyFriend != null)
+                {
+                    toyFriend.Speak(
+                        fallbackMessage,
+                        4.5f,
+                        true);
+                }
+                else
+                {
+                    missionUI?.ShowDialogue(
+                        "장난감 친구",
+                        fallbackMessage,
+                        4.5f);
+                }
 
                 yield return new WaitForSeconds(4.5f);
             }

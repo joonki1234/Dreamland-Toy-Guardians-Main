@@ -106,15 +106,18 @@ namespace DreamGuardians
             {
                 healthFillImage.enabled = ratio > 0f;
                 healthFillImage.sprite = ratio <= 0.30f
-                    ? DreamlandUiSkin.SciFiBarRed
-                    : DreamlandUiSkin.SciFiBarGreen;
+                    ? DreamlandUiSkin.KenneyCoreBarRed
+                    : DreamlandUiSkin.KenneyCoreBarGreen;
+                healthFillImage.color = ratio <= 0.30f
+                    ? new Color(1f, 0.54f, 0.53f, 0.98f)
+                    : new Color(0.62f, 0.95f, 0.86f, 0.96f);
             }
 
             if (labelText != null)
             {
                 labelText.color = ratio <= 0.30f
-                    ? new Color(1f, 0.42f, 0.34f, 1f)
-                    : new Color(0.54f, 1f, 0.94f, 1f);
+                    ? new Color(1f, 0.72f, 0.72f, 1f)
+                    : new Color(0.76f, 0.98f, 0.97f, 1f);
             }
         }
 
@@ -140,61 +143,70 @@ namespace DreamGuardians
 
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.referenceResolution = new Vector2(1600f, 1000f);
+            scaler.matchWidthOrHeight = 0.58f;
 
             RectTransform root = canvasObject.GetComponent<RectTransform>();
 
             panel = CreatePanel(
                 "CoreStatusPanel",
                 root,
-                DreamlandUiSkin.StrategicCoreStrip,
+                DreamlandUiSkin.KenneyCoreBarBlue,
                 new Vector2(0.5f, 1f),
-                new Vector2(500f, 92f),
-                new Vector2(0f, -18f),
+                new Vector2(560f, 118f),
+                new Vector2(0f, -10f),
                 new Vector2(0.5f, 1f));
+
+            // The shell is only a layout root. The visible Kenney bar is built below.
+            Image panelImage = panel.GetComponent<Image>();
+            panelImage.color = new Color(1f, 1f, 1f, 0f);
 
             RectTransform panelRect = panel.GetComponent<RectTransform>();
 
             labelText = CreateText(
                 "CoreLabel",
                 panelRect,
-                "CORE STATUS",
-                new Vector2(0f, 0.70f),
-                new Vector2(215f, 28f),
-                18,
+                "코어 상태",
+                new Vector2(0f, 0.72f),
+                new Vector2(250f, 34f),
+                22,
                 TextAnchor.MiddleLeft,
-                new Vector2(92f, 0f),
+                new Vector2(46f, 0f),
                 new Vector2(0f, 0.5f));
             labelText.fontStyle = FontStyle.Bold;
-            labelText.color = new Color(0.54f, 1f, 0.94f, 1f);
+            labelText.color = new Color(0.76f, 0.98f, 0.97f, 1f);
 
             healthText = CreateText(
                 "CoreHP",
                 panelRect,
                 "100 / 100",
-                new Vector2(1f, 0.70f),
-                new Vector2(145f, 30f),
-                21,
+                new Vector2(1f, 0.72f),
+                new Vector2(172f, 36f),
+                26,
                 TextAnchor.MiddleRight,
-                new Vector2(-22f, 0f),
+                new Vector2(-34f, 0f),
                 new Vector2(1f, 0.5f));
             healthText.fontStyle = FontStyle.Bold;
+            healthText.color = new Color(1f, 0.99f, 1f, 1f);
 
             GameObject barBg = CreatePanel(
                 "CoreBarBackground",
                 panelRect,
-                DreamlandUiSkin.SciFiBarBackground,
-                new Vector2(0.57f, 0.30f),
-                new Vector2(355f, 24f),
-                Vector2.zero,
+                DreamlandUiSkin.KenneyCoreBarBlue,
+                new Vector2(0.5f, 0.28f),
+                new Vector2(430f, 24f),
+                new Vector2(0f, 0f),
                 new Vector2(0.5f, 0.5f));
+
+            Image bgImage = barBg.GetComponent<Image>();
+            bgImage.type = Image.Type.Sliced;
+            bgImage.color = new Color(0.70f, 0.82f, 0.96f, 0.84f);
 
             RectTransform bgRect = barBg.GetComponent<RectTransform>();
             GameObject fill = CreatePanel(
                 "CoreBarFill",
                 bgRect,
-                DreamlandUiSkin.SciFiBarGreen,
+                DreamlandUiSkin.KenneyCoreBarGreen,
                 new Vector2(0f, 0f),
                 Vector2.zero,
                 Vector2.zero,
@@ -207,6 +219,8 @@ namespace DreamGuardians
             healthFillRect.offsetMin = new Vector2(5f, 5f);
             healthFillRect.offsetMax = new Vector2(-5f, -5f);
             healthFillImage = fill.GetComponent<Image>();
+            healthFillImage.type = Image.Type.Sliced;
+            healthFillImage.color = new Color(0.62f, 0.95f, 0.86f, 0.96f);
         }
 
         private void ApplyCamera()
@@ -294,12 +308,15 @@ namespace DreamGuardians
             text.font = GetRuntimeFont();
             text.fontSize = fontSize;
             text.alignment = alignment;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = Mathf.Max(15, fontSize - 7);
+            text.resizeTextMaxSize = fontSize;
             text.color = Color.white;
             text.raycastTarget = false;
 
             Outline outline = textObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0f, 0f, 0f, 0.8f);
-            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            outline.effectColor = new Color(0f, 0f, 0f, 0.90f);
+            outline.effectDistance = new Vector2(2f, -2f);
             return text;
         }
 

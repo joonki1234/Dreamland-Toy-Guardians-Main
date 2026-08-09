@@ -109,6 +109,9 @@ namespace DreamGuardians
         private Renderer[] cachedRenderers;
         private GameObject speechBubbleRoot;
         private Text speechBubbleText;
+        private Text speechBubbleSpeakerText;
+        private MissionBannerUI missionUI;
+        private bool storyFocusRequested;
         private Vector3 visualBaseLocalPosition;
         private Quaternion visualBaseLocalRotation;
         private Vector3 characterBaseLocalScale;
@@ -287,6 +290,14 @@ namespace DreamGuardians
             StopSpeaking();
             EnsureSpeechBubble();
 
+            missionUI ??= Object.FindAnyObjectByType<MissionBannerUI>();
+            if (missionUI != null)
+            {
+                missionUI.HideTransientMessages();
+                missionUI.BeginToyFriendStoryFocus();
+                storyFocusRequested = true;
+            }
+
             speakingRoutine = StartCoroutine(
                 SpeakingRoutine(
                     message,
@@ -313,6 +324,12 @@ namespace DreamGuardians
             if (speechBubbleRoot != null)
             {
                 speechBubbleRoot.SetActive(false);
+            }
+
+            if (storyFocusRequested)
+            {
+                missionUI?.EndToyFriendStoryFocus();
+                storyFocusRequested = false;
             }
         }
 
@@ -581,6 +598,12 @@ namespace DreamGuardians
                 voiceSource.Stop();
             }
 
+            if (storyFocusRequested)
+            {
+                missionUI?.EndToyFriendStoryFocus();
+                storyFocusRequested = false;
+            }
+
             onSpeechFinished?.Invoke();
             speakingRoutine = null;
         }
@@ -629,7 +652,7 @@ namespace DreamGuardians
             canvas.sortingOrder = 200;
 
             RectTransform canvasRect = speechBubbleRoot.GetComponent<RectTransform>();
-            canvasRect.sizeDelta = new Vector2(640f, 190f);
+            canvasRect.sizeDelta = new Vector2(700f, 224f);
             canvasRect.localScale = Vector3.one * bubbleWorldScale;
 
             GameObject panelObject = new GameObject(
@@ -646,8 +669,69 @@ namespace DreamGuardians
             panelRect.offsetMax = Vector2.zero;
 
             Image panel = panelObject.GetComponent<Image>();
-            panel.color = new Color(0.96f, 1f, 0.98f, 0.96f);
+            panel.sprite = DreamlandUiSkin.KenneyMissionPanel;
+            panel.type = panel.sprite != null && panel.sprite.border.sqrMagnitude > 0f
+                ? Image.Type.Sliced
+                : Image.Type.Simple;
+            panel.color = new Color(1f, 1f, 1f, 0.62f);
             panel.raycastTarget = false;
+
+            GameObject innerObject = new GameObject(
+                "BubbleInner",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            innerObject.transform.SetParent(speechBubbleRoot.transform, false);
+            RectTransform innerRect = innerObject.GetComponent<RectTransform>();
+            innerRect.anchorMin = Vector2.zero;
+            innerRect.anchorMax = Vector2.one;
+            innerRect.offsetMin = new Vector2(18f, 18f);
+            innerRect.offsetMax = new Vector2(-18f, -18f);
+            Image inner = innerObject.GetComponent<Image>();
+            inner.color = new Color(0.91f, 0.97f, 1f, 0.94f);
+            inner.raycastTarget = false;
+
+            GameObject accentObject = new GameObject(
+                "BubbleAccent",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            accentObject.transform.SetParent(speechBubbleRoot.transform, false);
+            RectTransform accentRect = accentObject.GetComponent<RectTransform>();
+            accentRect.anchorMin = new Vector2(0.5f, 1f);
+            accentRect.anchorMax = new Vector2(0.5f, 1f);
+            accentRect.pivot = new Vector2(0.5f, 1f);
+            accentRect.anchoredPosition = new Vector2(0f, -19f);
+            accentRect.sizeDelta = new Vector2(470f, 8f);
+            Image accent = accentObject.GetComponent<Image>();
+            accent.sprite = DreamlandUiSkin.KenneyCoreBarBlue;
+            accent.type = accent.sprite != null && accent.sprite.border.sqrMagnitude > 0f
+                ? Image.Type.Sliced
+                : Image.Type.Simple;
+            accent.color = new Color(0.54f, 0.90f, 0.90f, 0.95f);
+            accent.raycastTarget = false;
+
+            GameObject speakerObject = new GameObject(
+                "Speaker",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Text));
+            speakerObject.transform.SetParent(speechBubbleRoot.transform, false);
+            RectTransform speakerRect = speakerObject.GetComponent<RectTransform>();
+            speakerRect.anchorMin = new Vector2(0f, 1f);
+            speakerRect.anchorMax = new Vector2(0f, 1f);
+            speakerRect.pivot = new Vector2(0f, 1f);
+            speakerRect.anchoredPosition = new Vector2(48f, -34f);
+            speakerRect.sizeDelta = new Vector2(250f, 32f);
+
+            speechBubbleSpeakerText = speakerObject.GetComponent<Text>();
+            speechBubbleSpeakerText.font = GetRuntimeFont();
+            speechBubbleSpeakerText.fontSize = 24;
+            speechBubbleSpeakerText.fontStyle = FontStyle.Bold;
+            speechBubbleSpeakerText.alignment = TextAnchor.MiddleLeft;
+            speechBubbleSpeakerText.text = "장난감 친구";
+            speechBubbleSpeakerText.color = new Color(0.23f, 0.58f, 0.67f, 1f);
+            speechBubbleSpeakerText.raycastTarget = false;
 
             GameObject tailObject = new GameObject(
                 "BubbleTail",
@@ -657,16 +741,19 @@ namespace DreamGuardians
             tailObject.transform.SetParent(speechBubbleRoot.transform, false);
 
             RectTransform tailRect = tailObject.GetComponent<RectTransform>();
-            tailRect.anchorMin = new Vector2(0.28f, 0f);
-            tailRect.anchorMax = new Vector2(0.28f, 0f);
+            tailRect.anchorMin = new Vector2(0.30f, 0f);
+            tailRect.anchorMax = new Vector2(0.30f, 0f);
             tailRect.pivot = new Vector2(0.5f, 0.5f);
-            tailRect.anchoredPosition = new Vector2(0f, -22f);
-            tailRect.sizeDelta = new Vector2(54f, 54f);
+            tailRect.anchoredPosition = new Vector2(0f, -20f);
+            tailRect.sizeDelta = new Vector2(48f, 48f);
             tailRect.localRotation = Quaternion.Euler(0f, 0f, 45f);
 
             Image tail = tailObject.GetComponent<Image>();
-            tail.color = panel.color;
+            tail.color = new Color(0.74f, 0.90f, 1f, 0.98f);
             tail.raycastTarget = false;
+            Outline tailOutline = tailObject.AddComponent<Outline>();
+            tailOutline.effectColor = new Color(0.38f, 0.72f, 0.80f, 0.80f);
+            tailOutline.effectDistance = new Vector2(2f, -2f);
 
             GameObject textObject = new GameObject(
                 "Message",
@@ -678,17 +765,20 @@ namespace DreamGuardians
             RectTransform textRect = textObject.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(38f, 24f);
-            textRect.offsetMax = new Vector2(-38f, -24f);
+            textRect.offsetMin = new Vector2(48f, 30f);
+            textRect.offsetMax = new Vector2(-48f, -70f);
 
             speechBubbleText = textObject.GetComponent<Text>();
             speechBubbleText.font = GetRuntimeFont();
-            speechBubbleText.fontSize = 34;
+            speechBubbleText.fontSize = 32;
             speechBubbleText.fontStyle = FontStyle.Bold;
             speechBubbleText.alignment = TextAnchor.MiddleCenter;
             speechBubbleText.horizontalOverflow = HorizontalWrapMode.Wrap;
             speechBubbleText.verticalOverflow = VerticalWrapMode.Overflow;
-            speechBubbleText.color = new Color(0.05f, 0.12f, 0.11f, 1f);
+            speechBubbleText.resizeTextForBestFit = true;
+            speechBubbleText.resizeTextMinSize = 24;
+            speechBubbleText.resizeTextMaxSize = 32;
+            speechBubbleText.color = new Color(0.10f, 0.18f, 0.27f, 1f);
             speechBubbleText.raycastTarget = false;
 
             speechBubbleRoot.SetActive(false);

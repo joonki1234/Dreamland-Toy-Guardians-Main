@@ -410,14 +410,21 @@ public sealed class Stage2Director : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(clearMessage))
         {
-            missionUI?.ShowDialogue(
-                clearSpeaker,
-                clearMessage,
-                clearDialogueDuration);
-            toyFriend?.Speak(
-                clearMessage,
-                clearDialogueDuration,
-                true);
+            missionUI?.HideTransientMessages();
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(
+                    clearMessage,
+                    clearDialogueDuration,
+                    true);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    clearSpeaker,
+                    clearMessage,
+                    clearDialogueDuration);
+            }
         }
 
         float completionDuration = Mathf.Max(

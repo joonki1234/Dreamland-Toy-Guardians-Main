@@ -510,16 +510,23 @@ namespace DreamGuardians
                     ? Mathf.Max(line.Duration, line.VoiceClip.length)
                     : line.Duration;
 
-            missionUI?.ShowDialogue(
-                line.Speaker,
-                line.Message,
-                playbackDuration);
+            missionUI?.HideTransientMessages();
 
-            toyFriend?.Speak(
-                line.Message,
-                playbackDuration,
-                false,
-                line.VoiceClip);
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(
+                    line.Message,
+                    playbackDuration,
+                    false,
+                    line.VoiceClip);
+            }
+            else
+            {
+                missionUI?.ShowDialogue(
+                    line.Speaker,
+                    line.Message,
+                    playbackDuration);
+            }
 
             yield return
                 new WaitForSeconds(
@@ -666,11 +673,15 @@ namespace DreamGuardians
             }
 
 
+            // 싱글 플레이 튜토리얼에서는 무기/네트워크 계층이 어떤 playerId를
+            // 보내더라도 하나의 LOCAL 카운터로 합칩니다. 이렇게 해야 화면의
+            // 0/3 표시와 실제 완료 판정이 항상 같은 값을 사용합니다.
             string playerId =
-                string.IsNullOrWhiteSpace(
-                    info.playerId)
+                expectedPlayerCount <= 1
                     ? "LOCAL"
-                    : info.playerId;
+                    : (string.IsNullOrWhiteSpace(info.playerId)
+                        ? "LOCAL"
+                        : info.playerId);
 
 
             hitCountsByPlayer.TryGetValue(
@@ -751,6 +762,7 @@ namespace DreamGuardians
         {
             missionUI?.SetObjective(string.Empty);
             missionUI?.SetProgress(string.Empty);
+            missionUI?.HideTransientMessages();
 
             if (toyFriend != null)
             {
@@ -762,30 +774,11 @@ namespace DreamGuardians
                     ? dialogueData.PurificationInstructionLine
                     : null;
 
-            string speaker =
-                line != null && !string.IsNullOrWhiteSpace(line.Speaker)
-                    ? line.Speaker
-                    : "장난감 친구";
-            string message =
-                line != null && !string.IsNullOrWhiteSpace(line.Message)
-                    ? line.Message
-                    : "좋아! 공격이 제대로 들어갔어. 이제 끝까지 공격해서 완전히 정화해!";
-            float duration =
-                line != null
-                    ? Mathf.Max(0.2f,
-                        line.VoiceClip != null
-                            ? Mathf.Max(line.Duration, line.VoiceClip.length)
-                            : line.Duration)
-                    : 3f;
-
-            missionUI?.ShowDialogue(speaker, message, duration);
-            toyFriend?.Speak(
-                message,
-                duration,
-                true,
-                line != null ? line.VoiceClip : null);
-
-            yield return new WaitForSeconds(duration);
+            yield return PlayToyFriendOnlyLine(
+                line,
+                "좋아! 공격이 제대로 들어갔어. 이제 끝까지 공격해서 완전히 정화해!",
+                3f,
+                true);
 
             if (toyFriend != null)
             {
@@ -793,7 +786,9 @@ namespace DreamGuardians
             }
 
             postShootingStoryRoutine = null;
-            EnablePurificationPhase();
+            // 위에서 이미 3D 친구가 정화 방법을 설명했으므로 같은 대사를
+            // 오른쪽 2D 가이드 패널에 다시 띄우지 않습니다.
+            EnablePurificationPhase(false);
         }
 
 
@@ -839,7 +834,7 @@ namespace DreamGuardians
         }
 
 
-        private void EnablePurificationPhase()
+        private void EnablePurificationPhase(bool showInstructionGuide = true)
         {
             if (tutorialEnemy == null ||
                 tutorialEnemy.IsDead)
@@ -871,19 +866,22 @@ namespace DreamGuardians
                     : "몬스터 HP를 0으로 만드세요");
 
 
-            if (dialogueData != null)
+            if (showInstructionGuide)
             {
-                ShowGuideLine(
-                    dialogueData
-                        .PurificationInstructionLine);
-            }
-            else
-            {
-                missionUI?.ShowQuickGuide(
-                    "장난감 친구",
-                    "좋아! 이제 악몽을 " +
-                    "완전히 정화해보자!",
-                    3f);
+                if (dialogueData != null)
+                {
+                    ShowGuideLine(
+                        dialogueData
+                            .PurificationInstructionLine);
+                }
+                else
+                {
+                    missionUI?.ShowQuickGuide(
+                        "장난감 친구",
+                        "좋아! 이제 악몽을 " +
+                        "완전히 정화해보자!",
+                        3f);
+                }
             }
         }
 
@@ -923,110 +921,125 @@ namespace DreamGuardians
 
         private IEnumerator TransitionToWaveRoutine()
         {
-            missionUI?.SetObjective(
-                string.Empty);
+            missionUI?.SetObjective(string.Empty);
+            missionUI?.SetProgress(string.Empty);
+            missionUI?.HideTransientMessages();
 
-            missionUI?.SetProgress(
-                string.Empty);
-
+            float clearBannerDuration =
+                dialogueData != null
+                    ? dialogueData.TutorialClearDuration
+                    : 2f;
 
             missionUI?.ShowBanner(
                 dialogueData != null
-                    ? dialogueData
-                        .TutorialClearTitle
+                    ? dialogueData.TutorialClearTitle
                     : "TUTORIAL CLEAR",
 
                 dialogueData != null
-                    ? dialogueData
-                        .TutorialClearSubtitle
+                    ? dialogueData.TutorialClearSubtitle
                     : "꿈빛 에너지가 코어로 돌아왔습니다",
 
+                clearBannerDuration);
+
+            if (clearBannerDuration > 0f)
+            {
+                yield return new WaitForSeconds(clearBannerDuration);
+            }
+
+            // 적 정화 직후의 두 대사는 2D 가이드 패널이 아니라
+            // 3D 장난감 친구가 다시 등장해 직접 말합니다.
+            if (toyFriend != null)
+            {
+                yield return toyFriend.ShowForStory();
+            }
+
+            TutorialDialogueLine clearLine =
                 dialogueData != null
-                    ? dialogueData
-                        .TutorialClearDuration
-                    : 2f);
+                    ? dialogueData.TutorialClearLine
+                    : null;
 
+            yield return PlayToyFriendOnlyLine(
+                clearLine,
+                "잘했어! 이런 식으로 오염된 장난감을 정화하면서 코어를 지키면 돼.",
+                3f,
+                true);
 
-            float transitionDelay =
-                waveStartDelay;
+            TutorialDialogueLine stage1Line =
+                dialogueData != null
+                    ? dialogueData.Stage1StartLine
+                    : null;
 
+            yield return PlayToyFriendOnlyLine(
+                stage1Line,
+                "준비됐지? 이제 진짜 공격이 시작될 거야. 코어를 끝까지 지켜줘!",
+                3.2f,
+                false);
 
-            if (dialogueData != null)
-            {
-                ShowGuideLine(
-                    dialogueData
-                        .TutorialClearLine);
-
-                if (dialogueData
-                        .TutorialClearLine != null)
-                {
-                    transitionDelay =
-                        Mathf.Max(
-                            transitionDelay,
-                            dialogueData
-                                .TutorialClearLine
-                                .Duration);
-                }
-            }
-            else
-            {
-                missionUI?.ShowQuickGuide(
-                    "장난감 친구",
-                    "완벽해! 이제 꿈빛 코어를 지켜줘!",
-                    3f);
-
-                transitionDelay =
-                    Mathf.Max(
-                        transitionDelay,
-                        3f);
-            }
-
-
-            yield return
-                new WaitForSeconds(
-                    transitionDelay);
-
-            if (dialogueData != null &&
-                dialogueData.Stage1StartLine != null)
-            {
-                TutorialDialogueLine stage1Line = dialogueData.Stage1StartLine;
-                ShowGuideLine(stage1Line);
-                yield return new WaitForSeconds(stage1Line.Duration);
-            }
-            else
-            {
-                missionUI?.ShowQuickGuide(
-                    "장난감 친구",
-                    "준비됐지? 이제 진짜 공격이 시작될 거야. 코어를 끝까지 지켜줘!",
-                    3.2f);
-                yield return new WaitForSeconds(3.2f);
-            }
-
-
-            /*
-             * Stage 1 전투가 시작되면 3D 장난감 친구는 잠시 퇴장합니다.
-             * 이후 전투 중 안내는 MissionBannerUI의 2D Quick Guide가 담당하고,
-             * 2차 공격 종료 후 시너지 설명 때 다시 등장합니다.
-             */
             if (toyFriend != null)
             {
                 yield return toyFriend.HideForCombat();
             }
 
+            if (waveStartDelay > 0f)
+            {
+                yield return new WaitForSeconds(waveStartDelay);
+            }
 
             transitionToWaveRoutine = null;
+            State = TutorialStage1State.Wave1;
 
-            State =
-                TutorialStage1State.Wave1;
-
-
-            /*
-             * Stage1WaveController의 Started 이벤트가
-             * 발생하면서 포탈 A와 Road_1이 등장합니다.
-             */
+            // Stage1WaveController의 Started 이벤트가 발생하면서
+            // 포탈 A와 Road_1이 등장합니다.
             stage1.StartStage1();
         }
 
+
+        private IEnumerator PlayToyFriendOnlyLine(
+            TutorialDialogueLine line,
+            string fallbackMessage,
+            float fallbackDuration,
+            bool celebratory)
+        {
+            string speaker =
+                line != null && !string.IsNullOrWhiteSpace(line.Speaker)
+                    ? line.Speaker
+                    : "장난감 친구";
+
+            string message =
+                line != null && !string.IsNullOrWhiteSpace(line.Message)
+                    ? line.Message
+                    : fallbackMessage;
+
+            float duration =
+                line != null
+                    ? Mathf.Max(
+                        0.2f,
+                        line.VoiceClip != null
+                            ? Mathf.Max(line.Duration, line.VoiceClip.length)
+                            : line.Duration)
+                    : Mathf.Max(0.2f, fallbackDuration);
+
+            missionUI?.HideTransientMessages();
+
+            if (toyFriend != null)
+            {
+                toyFriend.Speak(
+                    message,
+                    duration,
+                    celebratory,
+                    line != null ? line.VoiceClip : null);
+            }
+            else
+            {
+                // 3D 친구가 씬에서 누락된 경우에만 2D 대화창으로 폴백합니다.
+                missionUI?.ShowDialogue(
+                    speaker,
+                    message,
+                    duration);
+            }
+
+            yield return new WaitForSeconds(duration);
+        }
 
         private void HandleStage1Completed()
         {
@@ -1275,12 +1288,21 @@ namespace DreamGuardians
                 GetCompletedPlayerCount();
 
 
-            int localHits =
-                hitCountsByPlayer.TryGetValue(
+            int localHits = 0;
+
+            if (hitCountsByPlayer.TryGetValue(
                     "LOCAL",
-                    out int count)
-                    ? count
-                    : 0;
+                    out int count))
+            {
+                localHits = count;
+            }
+            else if (expectedPlayerCount <= 1)
+            {
+                foreach (int value in hitCountsByPlayer.Values)
+                {
+                    localHits = Mathf.Max(localHits, value);
+                }
+            }
 
 
             missionUI?.SetProgress(
