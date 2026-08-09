@@ -26,43 +26,31 @@ MonoBehaviour:
     message: "\uC6B0\uB9AC \uAFC8\uB098\uB77C\uAC00 \uC545\uBABD \uBC14\uC774\uB7EC\uC2A4\uC5D0 \uC624\uC5FC\uB418\uACE0 \uC788\uC5B4."
     duration: 3
   - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uB4E4\uC774 \uAFC8\uBE5B \uCF54\uC5B4\uB97C \uBE7C\uC557\uC544 \uD3EC\uD0C8\uC744 \uB2EB\uC73C\uB824 \uD574."
+    message: "오염된 장난감들이 꿈빛 코어를 파괴해 포탈을 닫으려 해"
     duration: 3.5
   - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uD3EC\uD0C8\uC774 \uB2EB\uD788\uBA74 \uAFC8\uB098\uB77C\uB294 \uD604\uC2E4\uACFC \uC601\uC6D0\uD788 \uB2E8\uC808\uB3FC."
+    message: "코어가 파괴되면 꿈나라는 현실과 영원히 단절돼"
     duration: 3.2
   - speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
     message: "\uB098\uC640 \uD568\uAED8 \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uC904\uB798?"
     duration: 2.6
-  roleIntroductionLines:
-  - speaker: "장난감 친구"
-    message: "너희 여덟 명은 두 명씩 한 팀이 되어 네 가지 직업을 맡게 될 거야."
-    duration: 4
-  - speaker: "장난감 친구"
-    message: "경찰은 위험을 빠르게 찾아 막고, 소방관은 위급한 순간에 모두를 지켜줘."
-    duration: 4.5
-  - speaker: "장난감 친구"
-    message: "요리사는 동료가 계속 싸울 수 있게 돕고, 건축가는 안전한 길과 방어를 만들어."
-    duration: 4.5
-  - speaker: "장난감 친구"
-    message: "지금은 각 직업이 무엇을 잘하는지만 기억해 둬. 힘을 연결하는 방법은 전투 중에 알려줄게!"
-    duration: 4.5
+  roleIntroductionLines: []
   roleSelectionPromptLine:
-    speaker: "장난감 친구"
-    message: "이제 원하는 직업을 골라 줘. 한 직업에는 정확히 두 명씩 들어가야 해!"
-    duration: 3.8
+    speaker: ""
+    message: ""
+    duration: 0.2
   roleSelectionCompleteLine:
-    speaker: "장난감 친구"
-    message: "좋아, 여덟 명 모두 준비됐어! 각자의 역할을 기억하고 서로 가까이 움직여 줘."
-    duration: 3.8
+    speaker: ""
+    message: ""
+    duration: 0.2
   enemyAppearsLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uACE0\uB9C8\uC6CC. \uBA3C\uC800 \uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uC744 \uC815\uD654\uD558\uB294 \uBC29\uBC95\uC744 \uC54C\uB824\uC904\uAC8C."
-    duration: 3
+    message: "좋아, 그럼 바로 시작하자. 먼저 오염된 장난감을 정화하는 방법부터 익혀보자."
+    duration: 3.5
   shootingObjective: "\uD29C\uD1A0\uB9AC\uC5BC \uBAAC\uC2A4\uD130\uB97C \uBA85\uC911"
   shootingInstructionLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC55E\uC5D0 \uB098\uD0C0\uB09C \uC7A5\uB09C\uAC10\uC744 \uC870\uC900\uD574\uC11C \uC138 \uBC88 \uACF5\uACA9\uD574 \uBD10!"
+    message: "앞에 오염된 장난감이 나타났어. 조준해서 세 번 공격해 봐!"
     duration: 2.5
   synergyObjective: "\uB450 \uAC00\uC9C0 \uC9C1\uC5C5 \uC2DC\uB108\uC9C0\uB97C \uBC1C\uB3D9"
   synergyInstructionLine:
@@ -73,8 +61,7 @@ MonoBehaviour:
   purificationProgress: "\uBAAC\uC2A4\uD130 HP\uB97C 0\uC73C\uB85C \uB9CC\uB4DC\uC138\uC694"
   purificationInstructionLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC88B\uC544! \uC774\uC81C \uBAA8\uB450 \uD568\uAED8 \uC545\uBABD\uC744
-      \uC644\uC804\uD788 \uC815\uD654\uD574\uBCF4\uC790!"
+    message: "좋아! 공격이 제대로 들어갔어. 이제 끝까지 공격해서 완전히 정화해!"
     duration: 3
   tutorialClearTitle: TUTORIAL CLEAR
   tutorialClearSubtitle: "\uAFC8\uBE5B \uC5D0\uB108\uC9C0\uAC00 \uCF54\uC5B4\uB85C
@@ -82,8 +69,12 @@ MonoBehaviour:
   tutorialClearDuration: 2
   tutorialClearLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uC88B\uC558\uC5B4! \uC774\uC81C \uC624\uC5FC\uB41C \uC7A5\uB09C\uAC10\uC744 \uC815\uD654\uD558\uBA74\uC11C \uAFC8\uBE5B \uCF54\uC5B4\uB97C \uB05D\uAE4C\uC9C0 \uC9C0\uCF1C\uC918!"
+    message: "잘했어! 이런 식으로 오염된 장난감을 정화하면서 코어를 지키면 돼."
     duration: 3.5
+  stage1StartLine:
+    speaker: "장난감 친구"
+    message: "준비됐지? 이제 진짜 공격이 시작될 거야. 코어를 끝까지 지켜줘!"
+    duration: 3.2
   waveStartTitle: STAGE 1 START
   waveStartSubtitle: "\uAFC8\uBE5B \uCF54\uC5B4\uB97C \uC9C0\uCF1C\uB77C"
   waveObjective: "Stage 1 \xB7 \uCF54\uC5B4 \uBC29\uC5B4"
@@ -93,7 +84,7 @@ MonoBehaviour:
     duration: 3.5
   beforeFinalGroupLine:
     speaker: "\uC7A5\uB09C\uAC10 \uCE5C\uAD6C"
-    message: "\uADE0\uC5F4\uC774 \uB354 \uCEE4\uC84C\uC5B4. \uC545\uBABD\uC774 \uBE60\uB974\uAC8C \uD37C\uC9C0\uACE0 \uC788\uC5B4. \uC870\uAE08\uB9CC \uB354 \uBC84\uD168!"
+    message: "더 강한 적들이 나오기 시작했어. 멀리서 공격하는 녀석들도 보여. 조금만 더 버텨!"
     duration: 3.5
   synergyUnlockTitle: SYNERGY UNLOCK
   synergyUnlockSubtitle: "직업의 힘이 서로 연결됩니다"

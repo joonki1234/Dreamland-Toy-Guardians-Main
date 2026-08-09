@@ -30,6 +30,13 @@ public sealed class Stage2Director : MonoBehaviour
     [SerializeField]
     private MissionBannerUI missionUI;
 
+    [Tooltip("Stage 2 클리어 이후 보스 전조 스토리를 직접 말할 3D 장난감 친구")]
+    [SerializeField]
+    private ToyFriendController toyFriend;
+
+    [SerializeField, Min(0f)]
+    private float toyFriendStoryTransitionDuration = 0.35f;
+
     [Header("Stage 2 시작 UI")]
     [SerializeField]
     private string stageStartTitle = "STAGE 2 START";
@@ -86,12 +93,12 @@ public sealed class Stage2Director : MonoBehaviour
     [TextArea(2, 4)]
     [SerializeField]
     private string secondWaveGuideMessage =
-        "균열이 더 커지고 있어. 사방에서 오는 장난감들을 조심해!";
+        "이번엔 위쪽도 조심해! 날아다니는 장난감들이 코어를 노리고 있어!";
 
     [TextArea(2, 4)]
     [SerializeField]
     private string finalWaveGuideMessage =
-        "꿈나라가 현실을 덮고 있어. 마지막 공격이야. 조금만 더 버텨!";
+        "모든 종류의 오염된 장난감들이 한꺼번에 몰려오고 있어. 마지막 공격이야, 조금만 더 버텨!";
 
     [Header("Stage 2 완료 UI")]
     [SerializeField]
@@ -106,7 +113,7 @@ public sealed class Stage2Director : MonoBehaviour
     [TextArea(2, 4)]
     [SerializeField]
     private string clearMessage =
-        "해냈어! 남은 꿈빛이 하나로 모이며 새로운 길을 열고 있어!";
+        "해냈어! 오염된 장난감들을 전부 정화했어!";
 
     [Min(0.1f)]
     [SerializeField]
@@ -164,6 +171,7 @@ public sealed class Stage2Director : MonoBehaviour
 
     private void Awake()
     {
+        ApplyStoryDialogueRevision();
         NormalizeLegacyWaveTitles();
         ResolveReferences();
     }
@@ -192,6 +200,12 @@ public sealed class Stage2Director : MonoBehaviour
         {
             missionUI =
                 UnityEngine.Object.FindAnyObjectByType<MissionBannerUI>();
+        }
+
+        if (toyFriend == null)
+        {
+            toyFriend =
+                UnityEngine.Object.FindAnyObjectByType<ToyFriendController>();
         }
     }
 
@@ -379,6 +393,16 @@ public sealed class Stage2Director : MonoBehaviour
         }
 
         missionUI?.ClearPersistentText();
+
+        // 23번 대사부터 보스 전조 스토리가 이어지므로 전투 중 숨었던
+        // 장난감 친구를 다시 불러 직접 말하게 합니다. 이후 전환/보스 Director가
+        // 같은 친구를 이어서 사용하도록 여기서는 다시 숨기지 않습니다.
+        if (toyFriend != null)
+        {
+            yield return toyFriend.ShowForStory(
+                toyFriendStoryTransitionDuration);
+        }
+
         missionUI?.ShowBanner(
             clearTitle,
             clearSubtitle,
@@ -386,10 +410,14 @@ public sealed class Stage2Director : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(clearMessage))
         {
-            missionUI?.ShowQuickGuide(
+            missionUI?.ShowDialogue(
                 clearSpeaker,
                 clearMessage,
                 clearDialogueDuration);
+            toyFriend?.Speak(
+                clearMessage,
+                clearDialogueDuration,
+                true);
         }
 
         float completionDuration = Mathf.Max(
@@ -496,6 +524,20 @@ public sealed class Stage2Director : MonoBehaviour
         }
     }
 
+    private void ApplyStoryDialogueRevision()
+    {
+        stageStartGuideMessage =
+            "악몽 바이러스가 더 강해졌어. 코어를 계속 지켜줘!";
+        firstWaveGuideMessage =
+            "검은 균열이 다시 열리고 있어. 코어에 닿기 전에 모두 정화해!";
+        secondWaveGuideMessage =
+            "이번엔 위쪽도 조심해! 날아다니는 장난감들이 코어를 노리고 있어!";
+        finalWaveGuideMessage =
+            "모든 종류의 오염된 장난감들이 한꺼번에 몰려오고 있어. 마지막 공격이야, 조금만 더 버텨!";
+        clearMessage =
+            "해냈어! 오염된 장난감들을 전부 정화했어!";
+    }
+
     private void OnValidate()
     {
         NormalizeLegacyWaveTitles();
@@ -504,6 +546,8 @@ public sealed class Stage2Director : MonoBehaviour
         waveBannerDuration = Mathf.Max(0.1f, waveBannerDuration);
         progressRefreshInterval = Mathf.Max(0.05f, progressRefreshInterval);
         quickGuideDuration = Mathf.Max(0.1f, quickGuideDuration);
+        toyFriendStoryTransitionDuration =
+            Mathf.Max(0f, toyFriendStoryTransitionDuration);
         clearBannerDuration = Mathf.Max(0.1f, clearBannerDuration);
         clearDialogueDuration = Mathf.Max(0.1f, clearDialogueDuration);
         failedBannerDuration = Mathf.Max(0.1f, failedBannerDuration);

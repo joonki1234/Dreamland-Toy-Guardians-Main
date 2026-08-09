@@ -24,6 +24,13 @@ public sealed class EndingDirector : MonoBehaviour
     [SerializeField]
     private MissionBannerUI missionUI;
 
+    [Tooltip("보스 정화 이후 32~35번 엔딩 대사를 직접 말할 3D 장난감 친구")]
+    [SerializeField]
+    private ToyFriendController toyFriend;
+
+    [SerializeField, Min(0f)]
+    private float toyFriendStoryTransitionDuration = 0.35f;
+
     [Header("Ending UI")]
     [SerializeField]
     private string endingTitle = "DREAM RESTORED";
@@ -37,12 +44,22 @@ public sealed class EndingDirector : MonoBehaviour
     [TextArea(2, 4)]
     [SerializeField]
     private string firstMessage =
-        "모두의 용기 덕분에 악몽이 사라졌어. 정말 고마워!";
+        "너희 덕분에 장난감들도 다시 원래 모습으로 돌아갈 수 있을 거야. 정말 고마워!";
 
     [TextArea(2, 4)]
     [SerializeField]
     private string secondMessage =
-        "현실로 돌아가더라도 오늘의 꿈과 힘을 잊지 말아 줘.";
+        "이제 너희도 현실로 돌아갈 시간이야.";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string thirdMessage =
+        "현실로 돌아가더라도, 각자의 꿈을 지키기 위해 계속 노력해 줘.";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string fourthMessage =
+        "꿈을 포기하지 않는다면, 언젠가 그 꿈에 꼭 닿을 수 있을 거야!";
 
     [SerializeField]
     private string finalTitle = "THE END";
@@ -61,7 +78,15 @@ public sealed class EndingDirector : MonoBehaviour
 
     [Min(0f)]
     [SerializeField]
-    private float secondDialogueDuration = 3f;
+    private float secondDialogueDuration = 2.8f;
+
+    [Min(0f)]
+    [SerializeField]
+    private float thirdDialogueDuration = 3.8f;
+
+    [Min(0f)]
+    [SerializeField]
+    private float fourthDialogueDuration = 3.8f;
 
     [Min(0f)]
     [SerializeField]
@@ -89,6 +114,7 @@ public sealed class EndingDirector : MonoBehaviour
 
     private void Awake()
     {
+        ApplyStoryDialogueRevision();
         ResolveReferences();
     }
 
@@ -126,6 +152,12 @@ public sealed class EndingDirector : MonoBehaviour
             missionUI =
                 UnityEngine.Object.FindAnyObjectByType<MissionBannerUI>();
         }
+
+        if (toyFriend == null)
+        {
+            toyFriend =
+                UnityEngine.Object.FindAnyObjectByType<ToyFriendController>();
+        }
     }
 
     private void HandleStateChanged(
@@ -158,6 +190,12 @@ public sealed class EndingDirector : MonoBehaviour
         currentState = EndingState.Running;
         missionUI?.ClearPersistentText();
 
+        if (toyFriend != null)
+        {
+            yield return toyFriend.ShowForStory(
+                toyFriendStoryTransitionDuration);
+        }
+
         missionUI?.ShowBanner(
             endingTitle,
             endingSubtitle,
@@ -170,10 +208,12 @@ public sealed class EndingDirector : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(firstMessage))
         {
+            float duration = Mathf.Max(0.1f, firstDialogueDuration);
             missionUI?.ShowDialogue(
                 speaker,
                 firstMessage,
-                Mathf.Max(0.1f, firstDialogueDuration));
+                duration);
+            toyFriend?.Speak(firstMessage, duration, true);
 
             if (firstDialogueDuration > 0f)
             {
@@ -183,14 +223,46 @@ public sealed class EndingDirector : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(secondMessage))
         {
+            float duration = Mathf.Max(0.1f, secondDialogueDuration);
             missionUI?.ShowDialogue(
                 speaker,
                 secondMessage,
-                Mathf.Max(0.1f, secondDialogueDuration));
+                duration);
+            toyFriend?.Speak(secondMessage, duration, false);
 
             if (secondDialogueDuration > 0f)
             {
                 yield return new WaitForSeconds(secondDialogueDuration);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(thirdMessage))
+        {
+            float duration = Mathf.Max(0.1f, thirdDialogueDuration);
+            missionUI?.ShowDialogue(
+                speaker,
+                thirdMessage,
+                duration);
+            toyFriend?.Speak(thirdMessage, duration, false);
+
+            if (thirdDialogueDuration > 0f)
+            {
+                yield return new WaitForSeconds(thirdDialogueDuration);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(fourthMessage))
+        {
+            float duration = Mathf.Max(0.1f, fourthDialogueDuration);
+            missionUI?.ShowDialogue(
+                speaker,
+                fourthMessage,
+                duration);
+            toyFriend?.Speak(fourthMessage, duration, true);
+
+            if (fourthDialogueDuration > 0f)
+            {
+                yield return new WaitForSeconds(fourthDialogueDuration);
             }
         }
 
@@ -232,11 +304,26 @@ public sealed class EndingDirector : MonoBehaviour
         endingRoutine = null;
     }
 
+    private void ApplyStoryDialogueRevision()
+    {
+        firstMessage =
+            "너희 덕분에 장난감들도 다시 원래 모습으로 돌아갈 수 있을 거야. 정말 고마워!";
+        secondMessage = "이제 너희도 현실로 돌아갈 시간이야.";
+        thirdMessage =
+            "현실로 돌아가더라도, 각자의 꿈을 지키기 위해 계속 노력해 줘.";
+        fourthMessage =
+            "꿈을 포기하지 않는다면, 언젠가 그 꿈에 꼭 닿을 수 있을 거야!";
+    }
+
     private void OnValidate()
     {
         openingBannerDuration = Mathf.Max(0f, openingBannerDuration);
+        toyFriendStoryTransitionDuration =
+            Mathf.Max(0f, toyFriendStoryTransitionDuration);
         firstDialogueDuration = Mathf.Max(0f, firstDialogueDuration);
         secondDialogueDuration = Mathf.Max(0f, secondDialogueDuration);
+        thirdDialogueDuration = Mathf.Max(0f, thirdDialogueDuration);
+        fourthDialogueDuration = Mathf.Max(0f, fourthDialogueDuration);
         finalBannerDuration = Mathf.Max(0f, finalBannerDuration);
     }
 }

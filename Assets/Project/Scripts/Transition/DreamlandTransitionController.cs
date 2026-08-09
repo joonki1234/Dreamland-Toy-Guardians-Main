@@ -42,6 +42,13 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     [SerializeField]
     private MissionBannerUI missionUI;
 
+    [Tooltip("보스 등장 전 24~25번 대사를 직접 말할 3D 장난감 친구")]
+    [SerializeField]
+    private ToyFriendController toyFriend;
+
+    [SerializeField, Min(0f)]
+    private float toyFriendStoryTransitionDuration = 0.35f;
+
     [Tooltip("하늘 전환을 담당하는 컨트롤러")]
     [SerializeField]
     private DreamSkyTransitionController skyTransitionController;
@@ -111,8 +118,16 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     [TextArea(2, 4)]
     [SerializeField]
     private string absorptionMessage =
-        "검은 기운이 균열로 빨려 들어가고 있어. " +
-        "곧 완전한 꿈나라가 열릴 거야!";
+        "잠깐... 이상해. 장난감들은 사라졌는데 오염된 기운이 더 강해지고 있어...";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string bossSuspenseMessage =
+        "이 기운은...? 설마...!";
+
+    [Min(0.1f)]
+    [SerializeField]
+    private float bossSuspenseDuration = 2.2f;
 
 
     [Header("완전 꿈나라 전환")]
@@ -265,6 +280,7 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
     private void Awake()
     {
+        ApplyStoryDialogueRevision();
         ResolveReferences();
         CapturePortalBaseScale();
         CaptureRevealObjectStates();
@@ -339,6 +355,13 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             missionUI =
                 UnityEngine.Object.FindAnyObjectByType
                     <MissionBannerUI>();
+        }
+
+        if (toyFriend == null)
+        {
+            toyFriend =
+                UnityEngine.Object.FindAnyObjectByType
+                    <ToyFriendController>();
         }
 
         if (skyTransitionController == null)
@@ -493,6 +516,12 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
         missionUI?.ClearPersistentText();
 
+        if (toyFriend != null)
+        {
+            yield return toyFriend.ShowForStory(
+                toyFriendStoryTransitionDuration);
+        }
+
         missionUI?.ShowBanner(
             absorptionTitle,
             absorptionSubtitle,
@@ -503,12 +532,18 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(
                 absorptionMessage))
         {
+            float storyDuration = Mathf.Max(
+                0.1f,
+                enemyAbsorptionDuration);
+
             missionUI?.ShowDialogue(
                 "장난감 친구",
                 absorptionMessage,
-                Mathf.Max(
-                    0.1f,
-                    enemyAbsorptionDuration));
+                storyDuration);
+            toyFriend?.Speak(
+                absorptionMessage,
+                storyDuration,
+                false);
         }
 
         float duration =
@@ -548,6 +583,23 @@ public sealed class DreamlandTransitionController : MonoBehaviour
         }
 
         RestorePortalScale();
+
+        if (!string.IsNullOrWhiteSpace(bossSuspenseMessage))
+        {
+            float suspenseDuration =
+                Mathf.Max(0.1f, bossSuspenseDuration);
+
+            missionUI?.ShowDialogue(
+                "장난감 친구",
+                bossSuspenseMessage,
+                suspenseDuration);
+            toyFriend?.Speak(
+                bossSuspenseMessage,
+                suspenseDuration,
+                false);
+
+            yield return new WaitForSeconds(suspenseDuration);
+        }
 
         transitionRoutine = null;
 
@@ -1289,12 +1341,23 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     }
 
 
+    private void ApplyStoryDialogueRevision()
+    {
+        absorptionMessage =
+            "잠깐... 이상해. 장난감들은 사라졌는데 오염된 기운이 더 강해지고 있어...";
+        bossSuspenseMessage = "이 기운은...? 설마...!";
+    }
+
     private void OnValidate()
     {
         enemyAbsorptionDuration =
             Mathf.Max(
                 0f,
                 enemyAbsorptionDuration);
+
+        bossSuspenseDuration = Mathf.Max(0.1f, bossSuspenseDuration);
+        toyFriendStoryTransitionDuration =
+            Mathf.Max(0f, toyFriendStoryTransitionDuration);
 
         portalPulseAmount =
             Mathf.Max(

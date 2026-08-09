@@ -12,7 +12,7 @@ using UnityEngine;
 /// 오염된 장난감을 계속 만들어내는 선물상자가 성을 부수고 등장합니다.
 /// 보스는 근접/원거리/비행 적을 계속 생성하며 저항하고,
 /// HP가 2/3, 1/3 남는 지점마다 코어 쪽으로 날뛰며 접근합니다.
-/// 상자를 파괴하면 보스가 생성한 적들도 함께 사라집니다.
+/// 상자를 정화하면 보스가 생성한 적들도 함께 사라집니다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class FinalBossDirector : MonoBehaviour
@@ -33,6 +33,13 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     [SerializeField]
     private MissionBannerUI missionUI;
+
+    [Tooltip("보스 등장 설명과 정화 완료 대사를 직접 말할 3D 장난감 친구")]
+    [SerializeField]
+    private ToyFriendController toyFriend;
+
+    [SerializeField, Min(0f)]
+    private float toyFriendStoryTransitionDuration = 0.35f;
 
     [SerializeField]
     private CoreState core;
@@ -163,21 +170,44 @@ public sealed class FinalBossDirector : MonoBehaviour
     private string introTitle = "FINAL BOSS";
 
     [SerializeField]
-    private string introSubtitle = "오염된 장난감 상자를 파괴하라";
+    private string introSubtitle = "오염된 선물 상자를 정화하라";
 
     [SerializeField]
-    private string objectiveText = "오염된 상자를 파괴하고 코어를 지켜라";
+    private string objectiveText = "오염된 선물 상자를 정화하고 코어를 지켜라";
 
     [SerializeField]
     private string introSpeaker = "장난감 친구";
 
     [TextArea(2, 4)]
     [SerializeField]
-    private string introMessage =
-        "저 상자가 오염된 장난감을 계속 만들어내고 있어! 상자를 부수면 바이러스도 사라질 거야!";
+    private string bossIdentityMessage =
+        "저건... 꿈나라의 장난감들이 태어나는 선물 상자야!";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string bossInfectionMessage =
+        "선물 상자까지 악몽 바이러스에 감염됐어... 그래서 태어나는 장난감들까지 모두 오염되고 있었던 거야!";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string bossSourceMessage =
+        "꿈나라가 계속 오염됐던 것도 저 상자에서 오염된 장난감들이 계속 태어나고 있었기 때문이야.";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string bossPurifyGoalMessage =
+        "저 선물 상자를 정화하면 오염의 근원도 사라질 거야. 그러면 꿈나라도 다시 원래대로 돌아올 수 있어!";
+
+    [TextArea(2, 4)]
+    [SerializeField]
+    private string bossBattleStartMessage =
+        "조심해! 상자가 또 오염된 장난감들을 만들어내고 있어! 저 상자를 정화하자!";
+
+    [SerializeField, Min(0.1f)]
+    private float bossStoryLineDuration = 3.8f;
 
     [SerializeField]
-    private string defeatedTitle = "BOSS DEFEATED";
+    private string defeatedTitle = "BOSS PURIFIED";
 
     [SerializeField]
     private string defeatedSubtitle = "오염의 근원이 정화되었습니다";
@@ -185,7 +215,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     [TextArea(2, 4)]
     [SerializeField]
     private string defeatedMessage =
-        "상자가 부서졌어! 오염된 기운도 사라지고 있어!";
+        "해냈어! 선물 상자의 오염이 사라지고 있어... 꿈나라도 다시 빛을 되찾고 있어!";
 
     [SerializeField]
     private string failedTitle = "MISSION FAILED";
@@ -245,6 +275,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private void Awake()
     {
+        ApplyStoryDialogueRevision();
         ResolveReferences();
     }
 
@@ -277,6 +308,12 @@ public sealed class FinalBossDirector : MonoBehaviour
         {
             missionUI =
                 UnityEngine.Object.FindAnyObjectByType<MissionBannerUI>();
+        }
+
+        if (toyFriend == null)
+        {
+            toyFriend =
+                UnityEngine.Object.FindAnyObjectByType<ToyFriendController>();
         }
 
         if (core == null)
@@ -412,29 +449,13 @@ public sealed class FinalBossDirector : MonoBehaviour
         currentState = FinalBossState.Intro;
 
         missionUI?.ClearPersistentText();
-        missionUI?.ShowBanner(
-            introTitle,
-            introSubtitle,
-            Mathf.Max(0.1f, introDuration));
-
-        if (!string.IsNullOrWhiteSpace(introMessage))
-        {
-            missionUI?.ShowDialogue(
-                introSpeaker,
-                introMessage,
-                Mathf.Max(0.1f, introDuration));
-        }
-
-        float introElapsed = 0f;
         CacheCastleBossPose();
         ApplyBossArenaFocus();
 
         if (castleAnchor != null &&
             castleAnchor.gameObject.activeInHierarchy)
         {
-            float start = Time.time;
             yield return CastleBreakRoutine();
-            introElapsed += Time.time - start;
         }
 
         bossObject = SpawnBossObject();
@@ -449,15 +470,32 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         ConfigureBossComponents();
         StartBossSpawnCameraShake();
-
-        float revealStart = Time.time;
         yield return BossRevealRoutine();
-        introElapsed += Time.time - revealStart;
 
-        float remainingIntro = Mathf.Max(0f, introDuration - introElapsed);
-        if (remainingIntro > 0f)
+        // 26~30번은 보스 앞에서 3D 장난감 친구가 직접 설명합니다.
+        if (toyFriend != null)
         {
-            yield return new WaitForSeconds(remainingIntro);
+            yield return toyFriend.ShowForStory(
+                toyFriendStoryTransitionDuration);
+        }
+
+        // 보스가 완전히 모습을 드러낸 뒤 정체와 오염 원인을 순서대로 설명합니다.
+        yield return PlayBossStoryLine(bossIdentityMessage, 2.8f);
+        yield return PlayBossStoryLine(bossInfectionMessage, 4.6f);
+        yield return PlayBossStoryLine(bossSourceMessage, 4.3f);
+        yield return PlayBossStoryLine(bossPurifyGoalMessage, 4.6f);
+
+        missionUI?.ShowBanner(
+            introTitle,
+            introSubtitle,
+            Mathf.Max(0.1f, introDuration));
+        yield return PlayBossStoryLine(bossBattleStartMessage, 3.8f, true);
+
+        // 실제 보스 전투가 시작되면 장난감 친구는 다시 전투 화면에서 빠집니다.
+        if (toyFriend != null)
+        {
+            yield return toyFriend.HideForCombat(
+                toyFriendStoryTransitionDuration);
         }
 
         if (currentState != FinalBossState.Intro ||
@@ -492,6 +530,32 @@ public sealed class FinalBossDirector : MonoBehaviour
             this);
 
         bossRoutine = null;
+    }
+
+    private IEnumerator PlayBossStoryLine(
+        string message,
+        float preferredDuration,
+        bool celebratory = false)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            yield break;
+        }
+
+        float duration = Mathf.Max(
+            0.1f,
+            preferredDuration > 0f ? preferredDuration : bossStoryLineDuration);
+
+        missionUI?.ShowDialogue(
+            introSpeaker,
+            message,
+            duration);
+        toyFriend?.Speak(
+            message,
+            duration,
+            celebratory);
+
+        yield return new WaitForSeconds(duration);
     }
 
     private IEnumerator CastleBreakRoutine()
@@ -599,8 +663,10 @@ public sealed class FinalBossDirector : MonoBehaviour
         bossAttack = GetOrAdd<FinalBossAttackController>(bossObject);
         bossAttack.enabled = true;
 
-        bossHealth.Configure(bossMaxHealth, true);
+        // 등장/스토리 연출 중에는 피격되지 않도록 막습니다.
+        bossHealth.Configure(bossMaxHealth, false);
         EnsureBossHitbox();
+        bossAttack.PrepareCorruptedVisuals(core);
         SubscribeBossHealth();
     }
 
@@ -728,7 +794,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         missionUI?.SetObjective(
             phaseIndex == 1
                 ? "보스가 코어 쪽으로 접근한다! 오염된 장난감을 막아라"
-                : "보스가 광폭화했다! 상자를 파괴하라");
+                : "보스가 광폭화했다! 선물 상자를 정화하라");
     }
 
     private void StartMinionRoutine()
@@ -911,6 +977,14 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         DisableBossColliders();
         missionUI?.ClearPersistentText();
+
+        // 31번 정화 완료 대사도 3D 장난감 친구가 직접 등장해 말합니다.
+        if (toyFriend != null)
+        {
+            yield return toyFriend.ShowForStory(
+                toyFriendStoryTransitionDuration);
+        }
+
         missionUI?.ShowBanner(
             defeatedTitle,
             defeatedSubtitle,
@@ -918,10 +992,15 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(defeatedMessage))
         {
+            float storyDuration = Mathf.Max(0.1f, defeatDuration);
             missionUI?.ShowDialogue(
                 "장난감 친구",
                 defeatedMessage,
-                Mathf.Max(0.1f, defeatDuration));
+                storyDuration);
+            toyFriend?.Speak(
+                defeatedMessage,
+                storyDuration,
+                true);
         }
 
         if (bossObject != null && defeatVisualDuration > 0f)
@@ -972,7 +1051,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         RestoreBossArenaFocus();
 
         Debug.Log(
-            "[FinalBoss] 오염 상자 파괴 완료. " +
+            "[FinalBoss] 오염된 선물 상자 정화 완료. " +
             "BossDefeated 이벤트를 발생시킵니다.",
             this);
 
@@ -1829,6 +1908,25 @@ public sealed class FinalBossDirector : MonoBehaviour
             : target.AddComponent<T>();
     }
 
+    private void ApplyStoryDialogueRevision()
+    {
+        introSubtitle = "오염된 선물 상자를 정화하라";
+        objectiveText = "오염된 선물 상자를 정화하고 코어를 지켜라";
+        bossIdentityMessage = "저건... 꿈나라의 장난감들이 태어나는 선물 상자야!";
+        bossInfectionMessage =
+            "선물 상자까지 악몽 바이러스에 감염됐어... 그래서 태어나는 장난감들까지 모두 오염되고 있었던 거야!";
+        bossSourceMessage =
+            "꿈나라가 계속 오염됐던 것도 저 상자에서 오염된 장난감들이 계속 태어나고 있었기 때문이야.";
+        bossPurifyGoalMessage =
+            "저 선물 상자를 정화하면 오염의 근원도 사라질 거야. 그러면 꿈나라도 다시 원래대로 돌아올 수 있어!";
+        bossBattleStartMessage =
+            "조심해! 상자가 또 오염된 장난감들을 만들어내고 있어! 저 상자를 정화하자!";
+        defeatedTitle = "BOSS PURIFIED";
+        defeatedSubtitle = "오염의 근원이 정화되었습니다";
+        defeatedMessage =
+            "해냈어! 선물 상자의 오염이 사라지고 있어... 꿈나라도 다시 빛을 되찾고 있어!";
+    }
+
     private void OnValidate()
     {
         fallbackSpawnDistance = Mathf.Max(1f, fallbackSpawnDistance);
@@ -1858,6 +1956,9 @@ public sealed class FinalBossDirector : MonoBehaviour
         minionGroundHeight = Mathf.Max(0f, minionGroundHeight);
         droneSpawnHeight = Mathf.Max(0f, droneSpawnHeight);
         introDuration = Mathf.Max(0f, introDuration);
+        bossStoryLineDuration = Mathf.Max(0.1f, bossStoryLineDuration);
+        toyFriendStoryTransitionDuration =
+            Mathf.Max(0f, toyFriendStoryTransitionDuration);
         defeatDuration = Mathf.Max(0f, defeatDuration);
         defeatVisualDuration = Mathf.Max(0f, defeatVisualDuration);
     }

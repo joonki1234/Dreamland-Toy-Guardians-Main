@@ -47,9 +47,9 @@ namespace DreamGuardians
         [SerializeField] private List<TutorialDialogueLine> roleIntroductionLines =
             new List<TutorialDialogueLine>();
         [SerializeField] private TutorialDialogueLine roleSelectionPromptLine =
-            new TutorialDialogueLine();
+            new TutorialDialogueLine("", "", 0.2f);
         [SerializeField] private TutorialDialogueLine roleSelectionCompleteLine =
-            new TutorialDialogueLine();
+            new TutorialDialogueLine("", "", 0.2f);
 
         [Header("튜토리얼 적 등장 직전")]
         [SerializeField] private TutorialDialogueLine enemyAppearsLine = new TutorialDialogueLine();
@@ -72,6 +72,7 @@ namespace DreamGuardians
         [SerializeField] private string tutorialClearSubtitle = "꿈빛 에너지가 코어로 돌아왔습니다";
         [SerializeField, Min(0.2f)] private float tutorialClearDuration = 2f;
         [SerializeField] private TutorialDialogueLine tutorialClearLine = new TutorialDialogueLine();
+        [SerializeField] private TutorialDialogueLine stage1StartLine = new TutorialDialogueLine();
 
         [Header("Wave 1 시작")]
         [SerializeField] private string waveStartTitle = "WAVE 1 START";
@@ -123,6 +124,7 @@ namespace DreamGuardians
         public string TutorialClearSubtitle => tutorialClearSubtitle;
         public float TutorialClearDuration => Mathf.Max(0.2f, tutorialClearDuration);
         public TutorialDialogueLine TutorialClearLine => tutorialClearLine;
+        public TutorialDialogueLine Stage1StartLine => stage1StartLine;
         public string WaveStartTitle => waveStartTitle;
         public string WaveStartSubtitle => waveStartSubtitle;
         public string WaveObjective => waveObjective;
@@ -162,11 +164,11 @@ namespace DreamGuardians
                     3f),
                 new TutorialDialogueLine(
                     "장난감 친구",
-                    "오염된 장난감들이 꿈빛 코어를 빼앗아 포탈을 닫으려 해.",
+                    "오염된 장난감들이 꿈빛 코어를 파괴해 포탈을 닫으려 해",
                     3.5f),
                 new TutorialDialogueLine(
                     "장난감 친구",
-                    "포탈이 닫히면 꿈나라는 현실과 영원히 단절돼.",
+                    "코어가 파괴되면 꿈나라는 현실과 영원히 단절돼",
                     3.2f),
                 new TutorialDialogueLine(
                     "장난감 친구",
@@ -174,45 +176,23 @@ namespace DreamGuardians
                     2.6f)
             };
 
-            roleIntroductionLines = new List<TutorialDialogueLine>
-            {
-                new TutorialDialogueLine(
-                    "장난감 친구",
-                    "너희 여덟 명은 두 명씩 한 팀이 되어 네 가지 직업을 맡게 될 거야.",
-                    4f),
-                new TutorialDialogueLine(
-                    "장난감 친구",
-                    "경찰은 위험을 빠르게 찾아 막고, 소방관은 위급한 순간에 모두를 지켜줘.",
-                    4.5f),
-                new TutorialDialogueLine(
-                    "장난감 친구",
-                    "요리사는 동료가 계속 싸울 수 있게 돕고, 건축가는 안전한 길과 방어를 만들어.",
-                    4.5f),
-                new TutorialDialogueLine(
-                    "장난감 친구",
-                    "지금은 각 직업이 무엇을 잘하는지만 기억해 둬. 힘을 연결하는 방법은 전투 중에 알려줄게!",
-                    4.5f)
-            };
+            roleIntroductionLines = new List<TutorialDialogueLine>();
 
-            roleSelectionPromptLine = new TutorialDialogueLine(
-                "장난감 친구",
-                "이제 원하는 직업을 골라 줘. 한 직업에는 정확히 두 명씩 들어가야 해!",
-                3.8f);
+            roleSelectionPromptLine =
+                new TutorialDialogueLine("", "", 0.2f);
 
-            roleSelectionCompleteLine = new TutorialDialogueLine(
-                "장난감 친구",
-                "좋아, 여덟 명 모두 준비됐어! 각자의 역할을 기억하고 서로 가까이 움직여 줘.",
-                3.8f);
+            roleSelectionCompleteLine =
+                new TutorialDialogueLine("", "", 0.2f);
 
             enemyAppearsLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "고마워. 먼저 오염된 장난감을 정화하는 방법을 알려줄게.",
-                3f);
+                "좋아, 그럼 바로 시작하자. 먼저 오염된 장난감을 정화하는 방법부터 익혀보자.",
+                3.5f);
 
             shootingObjective = "튜토리얼 몬스터를 명중";
             shootingInstructionLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "앞에 나타난 장난감을 조준해서 세 번 공격해 봐!",
+                "앞에 오염된 장난감이 나타났어. 조준해서 세 번 공격해 봐!",
                 2.5f);
 
             synergyObjective = "두 가지 직업 시너지를 발동";
@@ -225,7 +205,7 @@ namespace DreamGuardians
             purificationProgress = "몬스터 HP를 0으로 만드세요";
             purificationInstructionLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "좋아! 이제 모두 함께 악몽을 완전히 정화해보자!",
+                "좋아! 공격이 제대로 들어갔어. 이제 끝까지 공격해서 완전히 정화해!",
                 3f);
 
             tutorialClearTitle = "TUTORIAL CLEAR";
@@ -233,8 +213,13 @@ namespace DreamGuardians
             tutorialClearDuration = 2f;
             tutorialClearLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "좋았어! 이제 오염된 장난감을 정화하면서 꿈빛 코어를 끝까지 지켜줘!",
+                "잘했어! 이런 식으로 오염된 장난감을 정화하면서 코어를 지키면 돼.",
                 3.5f);
+
+            stage1StartLine = new TutorialDialogueLine(
+                "장난감 친구",
+                "준비됐지? 이제 진짜 공격이 시작될 거야. 코어를 끝까지 지켜줘!",
+                3.2f);
 
             waveStartTitle = "WAVE 1 START";
             waveStartSubtitle = "꿈빛 코어를 지켜라";
@@ -246,7 +231,7 @@ namespace DreamGuardians
                 3.5f);
             beforeFinalGroupLine = new TutorialDialogueLine(
                 "장난감 친구",
-                "균열이 더 커졌어. 악몽이 빠르게 퍼지고 있어. 조금만 더 버텨!",
+                "더 강한 적들이 나오기 시작했어. 멀리서 공격하는 녀석들도 보여. 조금만 더 버텨!",
                 3.5f);
 
             synergyUnlockTitle = "SYNERGY UNLOCK";

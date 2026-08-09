@@ -14,42 +14,25 @@ namespace DreamGuardians
             Vector3 position,
             Vector3 incomingDirection)
         {
-            Vector3 direction = incomingDirection.sqrMagnitude > 0.0001f
-                ? incomingDirection.normalized
-                : Vector3.up;
-
+            // 드론 레이저의 파란 코어 충격과 같은 짧고 둥근 피드백을
+            // 근접 박치기에는 붉은 계열로 사용합니다. 바깥으로 길게 튀는
+            // 기존 콘/링 효과는 제거해 코어에서 폭발하는 느낌을 줄였습니다.
             SpawnBurst(
                 "Core_HeadbuttImpact",
                 position,
-                direction,
-                new Color(1f, 0.12f, 0.03f, 1f),
-                new Color(1f, 0.82f, 0.18f, 0.9f),
-                46,
-                0.07f,
-                0.22f,
-                1.7f,
-                4.2f,
-                0.18f,
-                0.46f,
-                0.28f,
-                1.1f);
-
-            SpawnBurst(
-                "Core_HeadbuttShockRing",
-                position,
                 Vector3.up,
-                new Color(1f, 0.30f, 0.05f, 0.8f),
-                new Color(1f, 0.04f, 0.02f, 0.15f),
-                28,
-                0.10f,
-                0.26f,
-                2.0f,
-                3.8f,
-                0.18f,
-                0.38f,
-                0.45f,
-                1.0f,
-                ParticleSystemShapeType.Circle);
+                new Color(1f, 0.08f, 0.035f, 1f),
+                new Color(1f, 0.62f, 0.50f, 0.92f),
+                34,
+                0.045f,
+                0.15f,
+                0.7f,
+                2.2f,
+                0.12f,
+                0.34f,
+                0.22f,
+                0.95f,
+                ParticleSystemShapeType.Sphere);
         }
 
         public static void SpawnMuzzleFlash(

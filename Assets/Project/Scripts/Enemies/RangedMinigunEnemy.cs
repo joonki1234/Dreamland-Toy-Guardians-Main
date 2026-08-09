@@ -283,7 +283,7 @@ namespace DreamGuardians
 
             ResolveMuzzle();
 
-            Vector3 targetPosition = core.EnergyTarget.position;
+            Vector3 targetPosition = core.AttackTargetPosition;
             Vector3 origin = muzzle != null
                 ? muzzle.position
                 : transform.position + Vector3.up * 0.8f;

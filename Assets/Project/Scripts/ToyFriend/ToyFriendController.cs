@@ -118,6 +118,7 @@ namespace DreamGuardians
         public Transform TalkPoint => talkPoint;
         public bool IsMoving { get; private set; }
         public bool IsSpeaking => speakingRoutine != null;
+        public bool IsVisible { get; private set; } = true;
 
         private void Awake()
         {
@@ -161,6 +162,10 @@ namespace DreamGuardians
             if (hideBeforeEntrance)
             {
                 SetVisible(false);
+            }
+            else
+            {
+                IsVisible = true;
             }
         }
 
@@ -313,6 +318,8 @@ namespace DreamGuardians
 
         public void SetVisible(bool visible)
         {
+            IsVisible = visible;
+
             if (cachedRenderers == null)
             {
                 cachedRenderers =
@@ -357,6 +364,16 @@ namespace DreamGuardians
                 : storyPresenceTransitionDuration;
 
             Vector3 targetScale = characterBaseLocalScale;
+
+            // Stage 2 클리어 → 전조 → 보스 설명 → 엔딩처럼 스토리가
+            // 연속될 때 이미 보이는 친구를 매 대사 구간마다 다시 축소/등장시키지 않습니다.
+            if (IsVisible)
+            {
+                transform.localScale = targetScale;
+                FacePlayerImmediately();
+                yield break;
+            }
+
             Vector3 startScale = targetScale * 0.05f;
 
             transform.localScale = startScale;

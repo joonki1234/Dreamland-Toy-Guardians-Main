@@ -84,10 +84,7 @@ namespace DreamGuardians
 
             targetTransform = targetCore.EnergyTarget;
 
-            Vector3 targetPosition =
-                targetTransform != null
-                    ? targetTransform.position
-                    : targetCore.transform.position;
+            Vector3 targetPosition = targetCore.AttackTargetPosition;
 
             Vector3 toTarget =
                 targetPosition - transform.position;
@@ -120,11 +117,7 @@ namespace DreamGuardians
                 return transform.forward;
             }
 
-            Transform target = targetCore.EnergyTarget;
-            Vector3 targetPosition =
-                target != null
-                    ? target.position
-                    : targetCore.transform.position;
+            Vector3 targetPosition = targetCore.AttackTargetPosition;
 
             Vector3 direction =
                 targetPosition - transform.position;
@@ -140,10 +133,7 @@ namespace DreamGuardians
             if (targetCore != null &&
                 !targetCore.IsDestroyed)
             {
-                Vector3 impactPosition =
-                    targetCore.EnergyTarget != null
-                        ? targetCore.EnergyTarget.position
-                        : targetCore.transform.position;
+                Vector3 impactPosition = targetCore.AttackTargetPosition;
 
                 targetCore.TakeDamage(damage);
                 DreamlandCombatFx.SpawnCoreProjectileImpact(

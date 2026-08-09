@@ -175,7 +175,7 @@ namespace DreamGuardians
                     moveSpeed * Time.deltaTime);
 
             RotateTowards(
-                targetCore.transform.position -
+                targetCore.AttackTargetPosition -
                 transform.position);
 
             TryAttackCore();
@@ -332,7 +332,7 @@ namespace DreamGuardians
                 muzzle != null
                     ? muzzle.position
                     : transform.position;
-            Vector3 targetPosition = targetCore.EnergyTarget.position;
+            Vector3 targetPosition = targetCore.AttackTargetPosition;
             Vector3 beamDirection = targetPosition - muzzlePosition;
 
             DreamlandCombatFx.SpawnMuzzleFlash(
@@ -386,7 +386,7 @@ namespace DreamGuardians
                 // LineRenderer를 월드 좌표로 갱신해 드론 회전과 관계없이
                 // 레이저 끝점이 항상 코어를 정확히 향하도록 합니다.
                 Vector3 end =
-                    targetCore.EnergyTarget.position;
+                    targetCore.AttackTargetPosition;
 
                 attackBeam.SetPosition(0, start);
                 attackBeam.SetPosition(1, end);

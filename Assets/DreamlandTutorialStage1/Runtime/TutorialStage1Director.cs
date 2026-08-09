@@ -80,6 +80,7 @@ namespace DreamGuardians
         private Coroutine flowRoutine;
         private Coroutine transitionToWaveRoutine;
         private Coroutine stage1CompletionRoutine;
+        private Coroutine postShootingStoryRoutine;
 
         private bool emergencySuppressionCompleted;
         private bool starlightBlueprintCompleted;
@@ -183,17 +184,6 @@ namespace DreamGuardians
             {
                 toyFriend = UnityEngine.Object.FindAnyObjectByType
                     <ToyFriendController>();
-            }
-
-            if (roleSelection == null)
-            {
-                roleSelection = GetComponent<RoleSelectionController>();
-            }
-
-            if (roleSelection == null)
-            {
-                // 씬을 직접 수정하지 않아도 기존 프로젝트에서 바로 시험할 수 있습니다.
-                roleSelection = gameObject.AddComponent<RoleSelectionController>();
             }
 
             // 코어보다 먼저 등장하지 않도록 튜토리얼 진행이 시작 시점을 관리합니다.
@@ -401,24 +391,10 @@ namespace DreamGuardians
 
             /*
              * 4단계:
-             * 직업 선택 UI는 사용하지 않습니다.
-             * 각 직업의 역할 설명만 보여 준 뒤 바로 튜토리얼 전투로 넘어갑니다.
-             * 실제 직업은 로비/현재 플레이어 설정을 그대로 사용합니다.
+             * 직업 설명/직업 선택은 튜토리얼 이전에 별도로 진행합니다.
+             * 여기서는 관련 UI와 대사를 모두 건너뛰고 곧바로 전투 학습으로 넘어갑니다.
              */
             State = TutorialStage1State.RoleSelection;
-
-            if (dialogueData != null &&
-                dialogueData.RoleIntroductionLines != null)
-            {
-                foreach (TutorialDialogueLine line in
-                         dialogueData.RoleIntroductionLines)
-                {
-                    yield return PlayDialogueLine(line);
-                }
-            }
-
-            // RoleSelectionController.ShowAndWait()를 호출하지 않으므로
-            // 직업 선택창은 생성/표시되지 않습니다.
             roleSelection?.Hide();
 
             if (dialogueData != null)
@@ -759,8 +735,65 @@ namespace DreamGuardians
             }
             else
             {
-                EnablePurificationPhase();
+                if (postShootingStoryRoutine == null)
+                {
+                    // 3회 명중 직후의 핵심 튜토리얼 대사는 2D 안내만 띄우지 않고
+                    // 3D 장난감 친구가 다시 나타나 직접 설명합니다.
+                    State = TutorialStage1State.PurifyTutorialEnemy;
+                    postShootingStoryRoutine =
+                        StartCoroutine(PlayPostShootingStoryRoutine());
+                }
             }
+        }
+
+
+        private IEnumerator PlayPostShootingStoryRoutine()
+        {
+            missionUI?.SetObjective(string.Empty);
+            missionUI?.SetProgress(string.Empty);
+
+            if (toyFriend != null)
+            {
+                yield return toyFriend.ShowForStory();
+            }
+
+            TutorialDialogueLine line =
+                dialogueData != null
+                    ? dialogueData.PurificationInstructionLine
+                    : null;
+
+            string speaker =
+                line != null && !string.IsNullOrWhiteSpace(line.Speaker)
+                    ? line.Speaker
+                    : "장난감 친구";
+            string message =
+                line != null && !string.IsNullOrWhiteSpace(line.Message)
+                    ? line.Message
+                    : "좋아! 공격이 제대로 들어갔어. 이제 끝까지 공격해서 완전히 정화해!";
+            float duration =
+                line != null
+                    ? Mathf.Max(0.2f,
+                        line.VoiceClip != null
+                            ? Mathf.Max(line.Duration, line.VoiceClip.length)
+                            : line.Duration)
+                    : 3f;
+
+            missionUI?.ShowDialogue(speaker, message, duration);
+            toyFriend?.Speak(
+                message,
+                duration,
+                true,
+                line != null ? line.VoiceClip : null);
+
+            yield return new WaitForSeconds(duration);
+
+            if (toyFriend != null)
+            {
+                yield return toyFriend.HideForCombat();
+            }
+
+            postShootingStoryRoutine = null;
+            EnablePurificationPhase();
         }
 
 
@@ -952,6 +985,22 @@ namespace DreamGuardians
             yield return
                 new WaitForSeconds(
                     transitionDelay);
+
+            if (dialogueData != null &&
+                dialogueData.Stage1StartLine != null)
+            {
+                TutorialDialogueLine stage1Line = dialogueData.Stage1StartLine;
+                ShowGuideLine(stage1Line);
+                yield return new WaitForSeconds(stage1Line.Duration);
+            }
+            else
+            {
+                missionUI?.ShowQuickGuide(
+                    "장난감 친구",
+                    "준비됐지? 이제 진짜 공격이 시작될 거야. 코어를 끝까지 지켜줘!",
+                    3.2f);
+                yield return new WaitForSeconds(3.2f);
+            }
 
 
             /*
@@ -1192,6 +1241,7 @@ namespace DreamGuardians
             flowRoutine = null;
             transitionToWaveRoutine = null;
             stage1CompletionRoutine = null;
+            postShootingStoryRoutine = null;
         }
 
 

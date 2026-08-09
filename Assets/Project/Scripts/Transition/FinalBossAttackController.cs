@@ -88,7 +88,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     [SerializeField]
     private Color corruptedRibbonColor =
-        new Color(0.62f, 0.035f, 0.11f, 1f);
+        new Color(0.035f, 0.48f, 0.68f, 1f);
 
     [SerializeField]
     private Color corruptedAccentColor =
@@ -117,7 +117,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private Color eyeColor = new Color(1f, 0.015f, 0.02f, 1f);
 
     [SerializeField, Min(0.05f)]
-    private float eyeSize = 0.34f;
+    private float eyeSize = 0.48f;
 
     [SerializeField, Range(0.1f, 0.45f)]
     private float eyeSpacingRatio = 0.22f;
@@ -163,6 +163,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private Material auraMaterial;
 
     private GameObject eyeRoot;
+    private Transform leftEye;
+    private Transform rightEye;
     private Material eyeMaterial;
     private Light eyeLight;
 
@@ -210,6 +212,11 @@ public sealed class FinalBossAttackController : MonoBehaviour
             auraObject.SetActive(true);
         }
 
+        if (eyeRoot != null && !isDead)
+        {
+            eyeRoot.SetActive(true);
+        }
+
         if (configured)
         {
             nextAttackTime =
@@ -227,6 +234,11 @@ public sealed class FinalBossAttackController : MonoBehaviour
         {
             auraObject.SetActive(false);
         }
+
+        if (eyeRoot != null)
+        {
+            eyeRoot.SetActive(false);
+        }
     }
 
     private void OnDestroy()
@@ -241,6 +253,11 @@ public sealed class FinalBossAttackController : MonoBehaviour
             Destroy(auraMaterial);
         }
 
+        if (eyeRoot != null)
+        {
+            Destroy(eyeRoot);
+        }
+
         if (eyeMaterial != null)
         {
             Destroy(eyeMaterial);
@@ -250,6 +267,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private void Update()
     {
         UpdateAuraPosition();
+        UpdateEyePresentation();
         UpdateEyePulse();
 
         if (!configured ||
@@ -283,6 +301,22 @@ public sealed class FinalBossAttackController : MonoBehaviour
         if (Time.time >= nextAttackTime)
         {
             StartNextAttack();
+        }
+    }
+
+    /// <summary>
+    /// 보스가 실제 전투를 시작하기 전, 등장 연출 단계에서 붉은 눈을 먼저 준비합니다.
+    /// </summary>
+    public void PrepareCorruptedVisuals(CoreState core)
+    {
+        targetCore = core;
+        CacheReferences();
+        ApplyCorruptedPalette();
+        CreateCorruptedEyes();
+
+        if (eyeRoot != null)
+        {
+            eyeRoot.SetActive(true);
         }
     }
 
@@ -784,6 +818,11 @@ public sealed class FinalBossAttackController : MonoBehaviour
             emission.enabled = false;
             auraParticles.Emit(40);
         }
+
+        if (eyeRoot != null)
+        {
+            eyeRoot.SetActive(false);
+        }
     }
 
     private IEnumerator HitFlashRoutine()
@@ -955,62 +994,37 @@ public sealed class FinalBossAttackController : MonoBehaviour
     {
         if (eyeRoot != null)
         {
+            UpdateEyePresentation();
             return;
         }
 
-        Bounds bounds = CalculateBossVisualBounds();
-        Vector3 forward =
-            targetCore != null
-                ? targetCore.transform.position - bounds.center
-                : (Camera.main != null
-                    ? Camera.main.transform.position - bounds.center
-                    : Vector3.forward);
-        forward.y = 0f;
-
-        if (forward.sqrMagnitude <= 0.0001f)
-        {
-            forward = Vector3.forward;
-        }
-        forward.Normalize();
-
-        Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
-        float faceDepth = Mathf.Max(bounds.extents.x, bounds.extents.z) * 0.82f;
-        float spacing = Mathf.Max(
-            eyeSize * 0.9f,
-            Mathf.Max(bounds.size.x, bounds.size.z) * eyeSpacingRatio);
-        float eyeY = bounds.center.y + bounds.extents.y * eyeVerticalRatio;
-        Vector3 eyeCenter =
-            new Vector3(bounds.center.x, eyeY, bounds.center.z) +
-            forward * faceDepth;
-
+        // Keep the eye rig in world space. The gift-box model is imported with
+        // a very large scale, so parenting the eyes directly to the boss can
+        // make their size or position effectively disappear.
         eyeRoot = new GameObject("FinalBoss_RedEyes");
-        eyeRoot.transform.SetParent(transform, false);
-        eyeRoot.transform.localPosition = Vector3.zero;
-        eyeRoot.transform.localRotation = Quaternion.identity;
-        eyeRoot.transform.localScale = Vector3.one;
         eyeRoot.layer = gameObject.layer;
 
-        CreateEye("LeftEye", eyeCenter - right * spacing * 0.5f);
-        CreateEye("RightEye", eyeCenter + right * spacing * 0.5f);
+        leftEye = CreateEye("LeftEye");
+        rightEye = CreateEye("RightEye");
 
         GameObject lightObject = new GameObject("EyeGlowLight");
+        lightObject.layer = gameObject.layer;
         lightObject.transform.SetParent(eyeRoot.transform, false);
-        lightObject.transform.position = eyeCenter + forward * 0.08f;
         eyeLight = lightObject.AddComponent<Light>();
         eyeLight.type = LightType.Point;
         eyeLight.color = eyeColor;
-        eyeLight.range = Mathf.Max(2.0f, eyeSize * 8f);
-        eyeLight.intensity = 1.7f;
+        eyeLight.intensity = 2.6f;
         eyeLight.shadows = LightShadows.None;
+
+        UpdateEyePresentation();
     }
 
-    private void CreateEye(string eyeName, Vector3 worldPosition)
+    private Transform CreateEye(string eyeName)
     {
         GameObject eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         eye.name = eyeName;
         eye.layer = gameObject.layer;
-        eye.transform.SetParent(eyeRoot.transform, true);
-        eye.transform.position = worldPosition;
+        eye.transform.SetParent(eyeRoot.transform, false);
 
         Collider eyeCollider = eye.GetComponent<Collider>();
         if (eyeCollider != null)
@@ -1018,22 +1032,95 @@ public sealed class FinalBossAttackController : MonoBehaviour
             Destroy(eyeCollider);
         }
 
-        Vector3 lossy = eyeRoot.transform.lossyScale;
-        float scaleX = Mathf.Max(0.001f, Mathf.Abs(lossy.x));
-        float scaleY = Mathf.Max(0.001f, Mathf.Abs(lossy.y));
-        float scaleZ = Mathf.Max(0.001f, Mathf.Abs(lossy.z));
-        float diameter = Mathf.Max(0.08f, eyeSize);
-        eye.transform.localScale = new Vector3(
-            diameter / scaleX,
-            diameter * 0.55f / scaleY,
-            diameter * 0.38f / scaleZ);
-
         Renderer eyeRenderer = eye.GetComponent<Renderer>();
         if (eyeRenderer != null)
         {
-            eyeRenderer.material = GetEyeMaterial();
+            eyeRenderer.sharedMaterial = GetEyeMaterial();
             eyeRenderer.shadowCastingMode =
                 UnityEngine.Rendering.ShadowCastingMode.Off;
+            eyeRenderer.receiveShadows = false;
+        }
+
+        return eye.transform;
+    }
+
+    private void UpdateEyePresentation()
+    {
+        if (eyeRoot == null || leftEye == null || rightEye == null)
+        {
+            return;
+        }
+
+        Bounds bounds = CalculateBossVisualBounds();
+
+        // Prefer the player's view direction so the red eyes are always placed
+        // on the visible face of the box. Fall back to the core direction.
+        Vector3 forward = Vector3.zero;
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            forward = mainCamera.transform.position - bounds.center;
+        }
+        else if (targetCore != null)
+        {
+            forward = targetCore.AttackTargetPosition - bounds.center;
+        }
+
+        forward.y = 0f;
+        if (forward.sqrMagnitude <= 0.0001f)
+        {
+            forward = transform.forward;
+            forward.y = 0f;
+        }
+        if (forward.sqrMagnitude <= 0.0001f)
+        {
+            forward = Vector3.forward;
+        }
+        forward.Normalize();
+
+        Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
+
+        float faceDepth =
+            Mathf.Abs(forward.x) * bounds.extents.x +
+            Mathf.Abs(forward.z) * bounds.extents.z;
+        float horizontalHalfSpan =
+            Mathf.Abs(right.x) * bounds.extents.x +
+            Mathf.Abs(right.z) * bounds.extents.z;
+
+        float referenceSize = Mathf.Max(
+            0.1f,
+            Mathf.Min(
+                bounds.size.y,
+                Mathf.Max(bounds.size.x, bounds.size.z)));
+        float resolvedEyeSize = Mathf.Max(eyeSize, referenceSize * 0.10f);
+        float spacing = Mathf.Max(
+            resolvedEyeSize * 1.8f,
+            horizontalHalfSpan * Mathf.Clamp01(eyeSpacingRatio * 2.2f));
+
+        float eyeY =
+            bounds.center.y + bounds.extents.y * eyeVerticalRatio;
+        Vector3 eyeCenter =
+            new Vector3(bounds.center.x, eyeY, bounds.center.z) +
+            forward * (faceDepth + resolvedEyeSize * 0.55f + 0.04f);
+
+        eyeRoot.transform.position = eyeCenter;
+        eyeRoot.transform.rotation = Quaternion.LookRotation(forward, Vector3.up);
+
+        leftEye.localPosition = Vector3.left * spacing * 0.5f;
+        rightEye.localPosition = Vector3.right * spacing * 0.5f;
+
+        Vector3 eyeScale = new Vector3(
+            resolvedEyeSize,
+            resolvedEyeSize * 0.58f,
+            resolvedEyeSize * 0.34f);
+        leftEye.localScale = eyeScale;
+        rightEye.localScale = eyeScale;
+
+        if (eyeLight != null)
+        {
+            eyeLight.transform.localPosition =
+                Vector3.forward * resolvedEyeSize * 0.2f;
+            eyeLight.range = Mathf.Max(3f, resolvedEyeSize * 8f);
         }
     }
 
@@ -1044,9 +1131,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
             return eyeMaterial;
         }
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-        shader ??= Shader.Find("Standard");
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
         shader ??= Shader.Find("Unlit/Color");
+        shader ??= Shader.Find("Universal Render Pipeline/Lit");
+        shader ??= Shader.Find("Standard");
 
         if (shader == null)
         {
@@ -1088,7 +1176,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         if (eyeLight != null)
         {
-            eyeLight.intensity = 1.5f + Mathf.Sin(Time.time * 8f) * 0.35f;
+            eyeLight.intensity = 2.3f + Mathf.Sin(Time.time * 8f) * 0.45f;
         }
     }
 

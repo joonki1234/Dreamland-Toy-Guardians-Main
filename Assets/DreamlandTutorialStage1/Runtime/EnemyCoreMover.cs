@@ -75,7 +75,6 @@ namespace DreamGuardians
         private float modelYawOffset;
 
 
-        private static Material meleeImpactMaterial;
 
         private EnemyHealth health;
         private float nextAttackTime;
@@ -371,9 +370,7 @@ namespace DreamGuardians
             IsAttackingCore = true;
 
             Vector3 restPosition = transform.position;
-            Vector3 corePosition = targetCore.EnergyTarget != null
-                ? targetCore.EnergyTarget.position
-                : targetCore.transform.position;
+            Vector3 corePosition = targetCore.AttackTargetPosition;
 
             Vector3 toCore = corePosition - restPosition;
             toCore.y = 0f;
@@ -425,7 +422,12 @@ namespace DreamGuardians
             if (!IsUnavailableForAttack())
             {
                 targetCore.TakeDamage(coreDamage);
-                PlayCoreMeleeImpact();
+
+                // 드론의 파란 코어 충격과 같은 짧은 구형 효과를
+                // 근접 공격에는 붉은색으로 표시합니다.
+                DreamlandCombatFx.SpawnHeadbuttImpact(
+                    targetCore.AttackTargetPosition,
+                    direction);
             }
 
             elapsed = 0f;
@@ -459,116 +461,6 @@ namespace DreamGuardians
             return targetCore == null ||
                    targetCore.IsDestroyed ||
                    (health != null && health.IsDead);
-        }
-
-
-        /// <summary>
-        /// 근접 적이 코어를 때렸다는 느낌이 바로 들도록
-        /// 코어 표면에서 짧은 충격 스파크를 생성합니다.
-        /// 외부 이펙트 프리팹 없이 런타임 ParticleSystem으로 동작합니다.
-        /// </summary>
-        private void PlayCoreMeleeImpact()
-        {
-            if (targetCore == null)
-            {
-                return;
-            }
-
-            Transform target = targetCore.EnergyTarget;
-            Vector3 impactPosition =
-                target != null
-                    ? target.position
-                    : targetCore.transform.position;
-
-            Vector3 awayFromEnemy = impactPosition - transform.position;
-            if (awayFromEnemy.sqrMagnitude <= 0.0001f)
-            {
-                awayFromEnemy = Vector3.up;
-            }
-
-            DreamlandCombatFx.SpawnHeadbuttImpact(
-                impactPosition,
-                awayFromEnemy);
-
-            GameObject effectObject = new GameObject("Core_MeleeHit_Impact");
-            effectObject.transform.position = impactPosition;
-            effectObject.transform.rotation = Quaternion.LookRotation(
-                awayFromEnemy.normalized,
-                Vector3.up);
-
-            ParticleSystem particles = effectObject.AddComponent<ParticleSystem>();
-            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            ParticleSystem.MainModule main = particles.main;
-            main.duration = 0.22f;
-            main.loop = false;
-            main.playOnAwake = false;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.maxParticles = 28;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.18f, 0.38f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(1.4f, 3.2f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.16f);
-            main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(1f, 0.22f, 0.08f, 1f),
-                new Color(1f, 0.78f, 0.20f, 1f));
-
-            ParticleSystem.EmissionModule emission = particles.emission;
-            emission.rateOverTime = 0f;
-            emission.SetBursts(new[]
-            {
-                new ParticleSystem.Burst(0f, 20)
-            });
-
-            ParticleSystem.ShapeModule shape = particles.shape;
-            shape.enabled = true;
-            shape.shapeType = ParticleSystemShapeType.Hemisphere;
-            shape.radius = 0.18f;
-
-            ParticleSystemRenderer particleRenderer =
-                effectObject.GetComponent<ParticleSystemRenderer>();
-            particleRenderer.renderMode = ParticleSystemRenderMode.Billboard;
-            particleRenderer.material = GetMeleeImpactMaterial();
-
-            particles.Play();
-            Destroy(effectObject, 1f);
-        }
-
-
-        private static Material GetMeleeImpactMaterial()
-        {
-            if (meleeImpactMaterial != null)
-            {
-                return meleeImpactMaterial;
-            }
-
-            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-            shader ??= Shader.Find("Particles/Standard Unlit");
-            shader ??= Shader.Find("Unlit/Color");
-
-            if (shader == null)
-            {
-                return null;
-            }
-
-            meleeImpactMaterial = new Material(shader)
-            {
-                name = "CoreMeleeImpact_Runtime",
-                hideFlags = HideFlags.DontSave
-            };
-
-            if (meleeImpactMaterial.HasProperty("_BaseColor"))
-            {
-                meleeImpactMaterial.SetColor(
-                    "_BaseColor",
-                    new Color(1f, 0.35f, 0.08f, 1f));
-            }
-            else if (meleeImpactMaterial.HasProperty("_Color"))
-            {
-                meleeImpactMaterial.SetColor(
-                    "_Color",
-                    new Color(1f, 0.35f, 0.08f, 1f));
-            }
-
-            return meleeImpactMaterial;
         }
 
 
