@@ -4,9 +4,8 @@ using UnityEngine.UI;
 namespace DreamGuardians
 {
     /// <summary>
-    /// 코어 체력을 화면 상단 중앙에 고정해서 표시합니다.
-    /// XR 카메라의 위치/회전에 영향을 받지 않도록 루트 Screen Space Camera Canvas를 사용하고,
-    /// 체력바는 Image.fillAmount 대신 RectTransform 폭을 직접 줄여 확실하게 갱신합니다.
+    /// 코어 체력을 화면 상단 중앙에 고정 표시하는 Sci-Fi HUD입니다.
+    /// Strategic Warfare의 상태 패널 + Sci-Fi GUI Skin 게이지를 사용합니다.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(CoreState))]
@@ -17,9 +16,11 @@ namespace DreamGuardians
         private CoreState core;
         private Canvas canvas;
         private GameObject canvasObject;
+        private GameObject panel;
         private Text healthText;
-        private Image healthFill;
+        private Text labelText;
         private RectTransform healthFillRect;
+        private Image healthFillImage;
 
         private void Awake()
         {
@@ -38,12 +39,10 @@ namespace DreamGuardians
             }
 
             EnsureUI();
-
             if (canvasObject != null)
             {
                 canvasObject.SetActive(true);
             }
-
             Refresh();
         }
 
@@ -80,38 +79,42 @@ namespace DreamGuardians
 
         private void Refresh()
         {
-            if (core == null)
+            if (core != null)
             {
-                return;
+                UpdateDisplay(core.CurrentHealth, core.MaxHealth);
             }
-
-            UpdateDisplay(core.CurrentHealth, core.MaxHealth);
         }
 
         private void UpdateDisplay(float current, float maximum)
         {
             EnsureUI();
 
-            float safeMaximum = Mathf.Max(1f, maximum);
-            float normalized = Mathf.Clamp01(current / safeMaximum);
+            float safeMax = Mathf.Max(1f, maximum);
+            float ratio = Mathf.Clamp01(current / safeMax);
 
-            if (healthText != null)
-            {
-                healthText.text =
-                    $"CORE HP  {Mathf.CeilToInt(current)} / {Mathf.CeilToInt(safeMaximum)}";
-            }
+            healthText.text =
+                Mathf.CeilToInt(current) + " / " + Mathf.CeilToInt(safeMax);
 
-            // Filled Image는 Sprite/Shader 조합에 따라 fillAmount가 시각적으로
-            // 반영되지 않는 경우가 있어 RectTransform의 우측 앵커를 직접 줄입니다.
             if (healthFillRect != null)
             {
-                healthFillRect.anchorMax =
-                    new Vector2(Mathf.Max(0.0001f, normalized), 1f);
+                healthFillRect.anchorMax = new Vector2(
+                    Mathf.Max(0.0001f, ratio),
+                    1f);
             }
 
-            if (healthFill != null)
+            if (healthFillImage != null)
             {
-                healthFill.enabled = normalized > 0.0001f;
+                healthFillImage.enabled = ratio > 0f;
+                healthFillImage.sprite = ratio <= 0.30f
+                    ? DreamlandUiSkin.SciFiBarRed
+                    : DreamlandUiSkin.SciFiBarGreen;
+            }
+
+            if (labelText != null)
+            {
+                labelText.color = ratio <= 0.30f
+                    ? new Color(1f, 0.42f, 0.34f, 1f)
+                    : new Color(0.54f, 1f, 0.94f, 1f);
             }
         }
 
@@ -123,19 +126,16 @@ namespace DreamGuardians
             }
 
             canvasObject = new GameObject(
-                "CoreHealthHUD",
+                "CoreSciFiHUD",
                 typeof(RectTransform),
                 typeof(Canvas),
                 typeof(CanvasScaler));
-
-            // 월드 오브젝트인 코어의 자식으로 두지 않습니다.
-            // 이렇게 해야 XR 카메라를 위/아래로 움직여도 HUD 위치가 변하지 않습니다.
             canvasObject.transform.SetParent(null, false);
 
             canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.sortingOrder = 1500;
-            canvas.planeDistance = 0.6f;
+            canvas.planeDistance = 0.65f;
             ApplyCamera();
 
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
@@ -143,56 +143,70 @@ namespace DreamGuardians
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+            RectTransform root = canvasObject.GetComponent<RectTransform>();
 
-            GameObject panel = CreateImageObject(
-                "CoreHealthPanel",
-                canvasRect,
-                new Color(0.02f, 0.035f, 0.07f, 0.84f));
+            panel = CreatePanel(
+                "CoreStatusPanel",
+                root,
+                DreamlandUiSkin.StrategicCoreStrip,
+                new Vector2(0.5f, 1f),
+                new Vector2(500f, 92f),
+                new Vector2(0f, -18f),
+                new Vector2(0.5f, 1f));
 
             RectTransform panelRect = panel.GetComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.5f, 1f);
-            panelRect.anchorMax = new Vector2(0.5f, 1f);
-            panelRect.pivot = new Vector2(0.5f, 1f);
-            panelRect.anchoredPosition = new Vector2(0f, -28f);
-            panelRect.sizeDelta = new Vector2(460f, 76f);
+
+            labelText = CreateText(
+                "CoreLabel",
+                panelRect,
+                "CORE STATUS",
+                new Vector2(0f, 0.70f),
+                new Vector2(215f, 28f),
+                18,
+                TextAnchor.MiddleLeft,
+                new Vector2(92f, 0f),
+                new Vector2(0f, 0.5f));
+            labelText.fontStyle = FontStyle.Bold;
+            labelText.color = new Color(0.54f, 1f, 0.94f, 1f);
 
             healthText = CreateText(
-                "CoreHealthText",
+                "CoreHP",
                 panelRect,
-                new Vector2(0.5f, 0.68f),
-                new Vector2(420f, 38f),
-                27);
+                "100 / 100",
+                new Vector2(1f, 0.70f),
+                new Vector2(145f, 30f),
+                21,
+                TextAnchor.MiddleRight,
+                new Vector2(-22f, 0f),
+                new Vector2(1f, 0.5f));
+            healthText.fontStyle = FontStyle.Bold;
 
-            GameObject barBackground = CreateImageObject(
-                "HealthBarBackground",
+            GameObject barBg = CreatePanel(
+                "CoreBarBackground",
                 panelRect,
-                new Color(0.10f, 0.10f, 0.13f, 0.95f));
+                DreamlandUiSkin.SciFiBarBackground,
+                new Vector2(0.57f, 0.30f),
+                new Vector2(355f, 24f),
+                Vector2.zero,
+                new Vector2(0.5f, 0.5f));
 
-            RectTransform barBackgroundRect =
-                barBackground.GetComponent<RectTransform>();
+            RectTransform bgRect = barBg.GetComponent<RectTransform>();
+            GameObject fill = CreatePanel(
+                "CoreBarFill",
+                bgRect,
+                DreamlandUiSkin.SciFiBarGreen,
+                new Vector2(0f, 0f),
+                Vector2.zero,
+                Vector2.zero,
+                new Vector2(0f, 0.5f));
 
-            barBackgroundRect.anchorMin = new Vector2(0.5f, 0.28f);
-            barBackgroundRect.anchorMax = new Vector2(0.5f, 0.28f);
-            barBackgroundRect.pivot = new Vector2(0.5f, 0.5f);
-            barBackgroundRect.anchoredPosition = Vector2.zero;
-            barBackgroundRect.sizeDelta = new Vector2(402f, 14f);
-
-            GameObject fillObject = CreateImageObject(
-                "HealthBarFill",
-                barBackgroundRect,
-                new Color(0.20f, 0.95f, 0.58f, 1f));
-
-            healthFillRect = fillObject.GetComponent<RectTransform>();
+            healthFillRect = fill.GetComponent<RectTransform>();
             healthFillRect.anchorMin = Vector2.zero;
             healthFillRect.anchorMax = Vector2.one;
             healthFillRect.pivot = new Vector2(0f, 0.5f);
-            healthFillRect.offsetMin = new Vector2(2f, 2f);
-            healthFillRect.offsetMax = new Vector2(-2f, -2f);
-
-            healthFill = fillObject.GetComponent<Image>();
-            healthFill.type = Image.Type.Simple;
-            healthFill.preserveAspect = false;
+            healthFillRect.offsetMin = new Vector2(5f, 5f);
+            healthFillRect.offsetMax = new Vector2(-5f, -5f);
+            healthFillImage = fill.GetComponent<Image>();
         }
 
         private void ApplyCamera()
@@ -202,73 +216,90 @@ namespace DreamGuardians
                 return;
             }
 
-            Camera targetCamera = Camera.main;
-            if (targetCamera == null)
+            Camera target = Camera.main;
+            if (target == null)
             {
-                targetCamera = UnityEngine.Object.FindAnyObjectByType<Camera>();
+                target = Object.FindAnyObjectByType<Camera>();
             }
 
-            if (targetCamera != null && canvas.worldCamera != targetCamera)
+            if (target != null)
             {
                 canvas.renderMode = RenderMode.ScreenSpaceCamera;
-                canvas.worldCamera = targetCamera;
-                canvas.planeDistance = 0.6f;
+                canvas.worldCamera = target;
+                canvas.planeDistance = 0.65f;
             }
         }
 
-
-        private static GameObject CreateImageObject(
+        private static GameObject CreatePanel(
             string objectName,
             Transform parent,
-            Color color)
+            Sprite sprite,
+            Vector2 anchor,
+            Vector2 size,
+            Vector2 anchoredPosition,
+            Vector2 pivot)
         {
-            GameObject imageObject = new GameObject(
+            GameObject panelObject = new GameObject(
                 objectName,
                 typeof(RectTransform),
                 typeof(CanvasRenderer),
                 typeof(Image));
+            panelObject.transform.SetParent(parent, false);
 
-            imageObject.transform.SetParent(parent, false);
+            RectTransform rect = panelObject.GetComponent<RectTransform>();
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = pivot;
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
 
-            Image image = imageObject.GetComponent<Image>();
-            image.color = color;
+            Image image = panelObject.GetComponent<Image>();
+            image.sprite = sprite;
+            image.type = sprite != null && sprite.border.sqrMagnitude > 0f
+                ? Image.Type.Sliced
+                : Image.Type.Simple;
+            image.color = Color.white;
             image.raycastTarget = false;
 
-            return imageObject;
+            return panelObject;
         }
 
         private static Text CreateText(
             string objectName,
             Transform parent,
+            string value,
             Vector2 anchor,
             Vector2 size,
-            int fontSize)
+            int fontSize,
+            TextAnchor alignment,
+            Vector2 anchoredPosition,
+            Vector2 pivot)
         {
             GameObject textObject = new GameObject(
                 objectName,
                 typeof(RectTransform),
                 typeof(CanvasRenderer),
                 typeof(Text));
-
             textObject.transform.SetParent(parent, false);
 
             RectTransform rect = textObject.GetComponent<RectTransform>();
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = Vector2.zero;
+            rect.pivot = pivot;
+            rect.anchoredPosition = anchoredPosition;
             rect.sizeDelta = size;
 
             Text text = textObject.GetComponent<Text>();
+            text.text = value;
             text.font = GetRuntimeFont();
             text.fontSize = fontSize;
-            text.fontStyle = FontStyle.Bold;
-            text.alignment = TextAnchor.MiddleCenter;
+            text.alignment = alignment;
             text.color = Color.white;
             text.raycastTarget = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
 
+            Outline outline = textObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.8f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
             return text;
         }
 
@@ -279,13 +310,25 @@ namespace DreamGuardians
                 return runtimeFont;
             }
 
-            runtimeFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
-            if (runtimeFont == null)
+            string[] preferredFonts =
             {
-                runtimeFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                "Malgun Gothic",
+                "Noto Sans CJK KR",
+                "Noto Sans KR",
+                "Apple SD Gothic Neo",
+                "Arial"
+            };
+
+            try
+            {
+                runtimeFont = Font.CreateDynamicFontFromOSFont(preferredFonts, 28);
+            }
+            catch
+            {
+                runtimeFont = null;
             }
 
+            runtimeFont ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             return runtimeFont;
         }
     }

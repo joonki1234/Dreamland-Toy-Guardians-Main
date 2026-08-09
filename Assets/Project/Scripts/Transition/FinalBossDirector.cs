@@ -40,6 +40,9 @@ public sealed class FinalBossDirector : MonoBehaviour
     [SerializeField]
     private DreamEnemySpawner enemySpawner;
 
+    [SerializeField]
+    private EnemyPortalStageController enemyPortalStageController;
+
     [Header("Boss Spawn / Castle")]
     [SerializeField]
     private GameObject bossPrefab;
@@ -50,6 +53,10 @@ public sealed class FinalBossDirector : MonoBehaviour
     [Tooltip("맵의 Castle 오브젝트. 연결되어 있으면 기존 BossSpawnPoint보다 우선합니다.")]
     [SerializeField]
     private Transform castleAnchor;
+
+    [Tooltip("보스전에서 성 주변 시야를 정리할 나무 루트. 비어 있으면 Tree_Border를 자동 탐색합니다.")]
+    [SerializeField]
+    private Transform treeBorder;
 
     [SerializeField]
     private bool createPrototypeBossWhenPrefabMissing = true;
@@ -88,6 +95,21 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     [SerializeField, Min(0.1f)]
     private float bossRevealDuration = 0.8f;
+
+    [Header("Boss Arena Focus")]
+    [SerializeField]
+    private bool hideTreesNearBoss = true;
+
+    [Tooltip("성/보스 근처에서 숨길 나무 반경")]
+    [SerializeField, Min(1f)]
+    private float bossFocusTreeHideRadius = 20f;
+
+    [Header("Boss Spawn Camera Shake")]
+    [SerializeField, Min(0f)]
+    private float bossSpawnShakeDuration = 0.58f;
+
+    [SerializeField, Min(0f)]
+    private float bossSpawnShakeStrength = 0.085f;
 
     [Header("Boss Stats")]
     [Min(1f)]
@@ -201,6 +223,13 @@ public sealed class FinalBossDirector : MonoBehaviour
     private bool hasCachedCastleSpawnPose;
     private Vector3 cachedCastleSpawnPosition;
     private Quaternion cachedCastleSpawnRotation;
+    private Coroutine cameraShakeRoutine;
+    private Transform shakenCameraTransform;
+    private Vector3 shakenCameraOriginalLocalPosition;
+    private bool hasCameraShakeOrigin;
+
+    private readonly List<GameObject> hiddenBossArenaObjects =
+        new List<GameObject>();
 
     private readonly List<EnemyHealth> bossSpawnedEnemies =
         new List<EnemyHealth>();
@@ -230,6 +259,8 @@ public sealed class FinalBossDirector : MonoBehaviour
         UnsubscribeEvents();
         StopBossRoutine();
         StopMinionRoutine();
+        StopCameraShake();
+        RestoreBossArenaFocus();
         UnsubscribeBossHealth();
         CleanupBossObject();
     }
@@ -259,12 +290,27 @@ public sealed class FinalBossDirector : MonoBehaviour
                 UnityEngine.Object.FindAnyObjectByType<DreamEnemySpawner>();
         }
 
+        if (enemyPortalStageController == null)
+        {
+            enemyPortalStageController =
+                UnityEngine.Object.FindAnyObjectByType<EnemyPortalStageController>();
+        }
+
         if (castleAnchor == null)
         {
             GameObject castle = GameObject.Find("Castle");
             if (castle != null)
             {
                 castleAnchor = castle.transform;
+            }
+        }
+
+        if (treeBorder == null)
+        {
+            GameObject treeRoot = GameObject.Find("Tree_Border");
+            if (treeRoot != null)
+            {
+                treeBorder = treeRoot.transform;
             }
         }
     }
@@ -340,6 +386,8 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         StopBossRoutine();
         StopMinionRoutine();
+        StopCameraShake();
+        RestoreBossArenaFocus();
         CleanupBossSpawnedEnemies();
         UnsubscribeBossHealth();
         CleanupBossObject();
@@ -379,6 +427,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         float introElapsed = 0f;
         CacheCastleBossPose();
+        ApplyBossArenaFocus();
 
         if (castleAnchor != null &&
             castleAnchor.gameObject.activeInHierarchy)
@@ -399,6 +448,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         }
 
         ConfigureBossComponents();
+        StartBossSpawnCameraShake();
 
         float revealStart = Time.time;
         yield return BossRevealRoutine();
@@ -537,11 +587,13 @@ public sealed class FinalBossDirector : MonoBehaviour
     {
         bossHealth = GetOrAdd<EnemyHealth>(bossObject);
         GetOrAdd<RoleSynergyTracker>(bossObject);
-        GetOrAdd<EnemyWorldHealthBar>(bossObject);
 
-        if (bossObject.GetComponentInChildren<Collider>(true) == null)
+        EnemyWorldHealthBar oldWorldBar =
+            bossObject.GetComponent<EnemyWorldHealthBar>();
+        if (oldWorldBar != null)
         {
-            bossObject.AddComponent<CapsuleCollider>();
+            oldWorldBar.Hide();
+            oldWorldBar.enabled = false;
         }
 
         bossAttack = GetOrAdd<FinalBossAttackController>(bossObject);
@@ -917,6 +969,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         bossDefeatedEventRaised = true;
         currentState = FinalBossState.Completed;
+        RestoreBossArenaFocus();
 
         Debug.Log(
             "[FinalBoss] 오염 상자 파괴 완료. " +
@@ -955,6 +1008,8 @@ public sealed class FinalBossDirector : MonoBehaviour
         }
 
         missionUI?.ClearPersistentText();
+        missionUI?.HideBossHealth();
+        RestoreBossArenaFocus();
         missionUI?.ShowBanner(
             failedTitle,
             failedSubtitle,
@@ -988,10 +1043,10 @@ public sealed class FinalBossDirector : MonoBehaviour
             return;
         }
 
-        missionUI.SetProgress(
-            "FINAL BOSS HP  " +
-            Mathf.CeilToInt(current) + " / " +
-            Mathf.CeilToInt(maximum));
+        missionUI.SetBossHealth(
+            "CORRUPTED TOY BOX",
+            current,
+            maximum);
     }
 
     private void CacheCastleBossPose()
@@ -1130,65 +1185,99 @@ public sealed class FinalBossDirector : MonoBehaviour
             return;
         }
 
-        Collider[] existingColliders =
-            bossObject.GetComponentsInChildren<Collider>(true);
-
-        foreach (Collider otherCollider in existingColliders)
+        // 루트 Collider는 모델 전체를 한 덩어리로 덮어 주변 하수인 사격을
+        // 가로챌 수 있으므로 비활성화하고, 실제 렌더러 단위 히트박스를 사용합니다.
+        Collider[] rootColliders = bossObject.GetComponents<Collider>();
+        foreach (Collider rootCollider in rootColliders)
         {
-            if (otherCollider != null)
+            if (rootCollider != null)
             {
-                otherCollider.enabled = true;
+                rootCollider.enabled = false;
             }
         }
 
-        CapsuleCollider rootHitbox = bossObject.GetComponent<CapsuleCollider>();
-        if (rootHitbox == null)
+        bool hasUsableCollider = false;
+        Renderer[] renderers = bossObject.GetComponentsInChildren<Renderer>(true);
+
+        foreach (Renderer modelRenderer in renderers)
         {
-            rootHitbox = bossObject.AddComponent<CapsuleCollider>();
+            if (modelRenderer == null ||
+                modelRenderer is ParticleSystemRenderer ||
+                modelRenderer is LineRenderer ||
+                modelRenderer.name.Contains("Aura") ||
+                modelRenderer.name.Contains("Eye"))
+            {
+                continue;
+            }
+
+            Collider existing = modelRenderer.GetComponent<Collider>();
+            if (existing != null && modelRenderer.gameObject != bossObject)
+            {
+                existing.enabled = true;
+                hasUsableCollider = true;
+                continue;
+            }
+
+            Bounds localBounds;
+            bool hasLocalBounds = false;
+
+            SkinnedMeshRenderer skinned = modelRenderer as SkinnedMeshRenderer;
+            if (skinned != null)
+            {
+                localBounds = skinned.localBounds;
+                hasLocalBounds = true;
+            }
+            else
+            {
+                MeshFilter meshFilter = modelRenderer.GetComponent<MeshFilter>();
+                if (meshFilter != null && meshFilter.sharedMesh != null)
+                {
+                    localBounds = meshFilter.sharedMesh.bounds;
+                    hasLocalBounds = true;
+                }
+                else
+                {
+                    localBounds = default;
+                }
+            }
+
+            if (!hasLocalBounds)
+            {
+                continue;
+            }
+
+            BoxCollider hitbox = modelRenderer.gameObject.AddComponent<BoxCollider>();
+            hitbox.center = localBounds.center;
+            hitbox.size = localBounds.size * Mathf.Clamp(easyHitboxMultiplier, 1f, 1.10f);
+            hitbox.isTrigger = false;
+            hitbox.enabled = true;
+            hasUsableCollider = true;
         }
 
+        if (hasUsableCollider)
+        {
+            return;
+        }
+
+        // 메시 Collider를 만들 수 없는 예외 프리팹에서만 작은 BoxCollider를 사용합니다.
         Bounds bounds = CalculateRendererBounds(bossObject.transform);
-        Vector3 localCenter = bossObject.transform.InverseTransformPoint(bounds.center);
+        BoxCollider fallback = bossObject.AddComponent<BoxCollider>();
+        fallback.center = bossObject.transform.InverseTransformPoint(bounds.center);
 
-        // Renderer.bounds는 월드 크기입니다. 보스 자체 Scale이 큰 상태에서
-        // 이 값을 그대로 Collider 로컬 크기로 넣으면 Scale이 한 번 더 적용되어
-        // 히트박스가 하수인 영역까지 덮게 됩니다.
-        // 월드 크기를 lossyScale로 나누어 로컬 크기로 환산한 뒤 여유분만 줍니다.
         Vector3 lossyScale = bossObject.transform.lossyScale;
-        float safeScaleX = Mathf.Max(0.001f, Mathf.Abs(lossyScale.x));
-        float safeScaleY = Mathf.Max(0.001f, Mathf.Abs(lossyScale.y));
-        float safeScaleZ = Mathf.Max(0.001f, Mathf.Abs(lossyScale.z));
-        float horizontalScale = Mathf.Max(safeScaleX, safeScaleZ);
-
-        float localWorldHeight = bounds.size.y / safeScaleY;
-        float localWorldRadius =
-            Mathf.Max(
-                bounds.extents.x / safeScaleX,
-                bounds.extents.z / safeScaleZ);
-
-        float localMinimumRadius =
-            Mathf.Max(0.25f, minimumHitboxRadius / horizontalScale);
-
-        float hitboxPadding = Mathf.Clamp(easyHitboxMultiplier, 1f, 1.25f);
-        float localHeight = Mathf.Max(
-            0.5f,
-            localWorldHeight * hitboxPadding);
-        float localRadius = Mathf.Max(
-            localMinimumRadius,
-            localWorldRadius * hitboxPadding);
-
-        rootHitbox.direction = 1;
-        rootHitbox.center = localCenter;
-        rootHitbox.height = Mathf.Max(localHeight, localRadius * 2f + 0.05f);
-        rootHitbox.radius = localRadius;
-        rootHitbox.isTrigger = false;
-        rootHitbox.enabled = true;
+        fallback.size = new Vector3(
+            bounds.size.x / Mathf.Max(0.001f, Mathf.Abs(lossyScale.x)),
+            bounds.size.y / Mathf.Max(0.001f, Mathf.Abs(lossyScale.y)),
+            bounds.size.z / Mathf.Max(0.001f, Mathf.Abs(lossyScale.z))) * 1.04f;
+        fallback.isTrigger = false;
     }
 
     public void AbortAndResetForTest()
     {
         StopBossRoutine();
         StopMinionRoutine();
+        StopCameraShake();
+        RestoreBossArenaFocus();
         UnsubscribeBossHealth();
         CleanupBossSpawnedEnemies();
         CleanupBossObject();
@@ -1208,6 +1297,137 @@ public sealed class FinalBossDirector : MonoBehaviour
         missionUI?.ClearPersistentText();
         missionUI?.SetObjective(string.Empty);
         missionUI?.SetProgress(string.Empty);
+    }
+
+    private void ApplyBossArenaFocus()
+    {
+        RestoreBossArenaFocus();
+        enemyPortalStageController?.HideAllPortalsForBoss();
+
+        if (!hideTreesNearBoss || treeBorder == null)
+        {
+            return;
+        }
+
+        Vector3 focusPosition = hasCachedCastleSpawnPose
+            ? cachedCastleSpawnPosition
+            : (castleAnchor != null ? castleAnchor.position : transform.position);
+        float radius = Mathf.Max(1f, bossFocusTreeHideRadius);
+
+        for (int groupIndex = 0; groupIndex < treeBorder.childCount; groupIndex++)
+        {
+            Transform group = treeBorder.GetChild(groupIndex);
+            if (group == null)
+            {
+                continue;
+            }
+
+            for (int childIndex = 0; childIndex < group.childCount; childIndex++)
+            {
+                Transform candidate = group.GetChild(childIndex);
+                if (candidate == null || !candidate.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                Vector3 delta = candidate.position - focusPosition;
+                delta.y = 0f;
+
+                if (delta.sqrMagnitude <= radius * radius)
+                {
+                    hiddenBossArenaObjects.Add(candidate.gameObject);
+                    candidate.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        Debug.Log(
+            "[FinalBoss] 보스 집중 연출을 위해 성 주변 나무 " +
+            hiddenBossArenaObjects.Count + "개를 숨겼습니다.",
+            this);
+    }
+
+    private void RestoreBossArenaFocus()
+    {
+        for (int i = 0; i < hiddenBossArenaObjects.Count; i++)
+        {
+            GameObject hidden = hiddenBossArenaObjects[i];
+            if (hidden != null)
+            {
+                hidden.SetActive(true);
+            }
+        }
+
+        hiddenBossArenaObjects.Clear();
+    }
+
+    private void StartBossSpawnCameraShake()
+    {
+        StopCameraShake();
+
+        if (bossSpawnShakeDuration <= 0f || bossSpawnShakeStrength <= 0f)
+        {
+            return;
+        }
+
+        cameraShakeRoutine = StartCoroutine(BossSpawnCameraShakeRoutine());
+    }
+
+    private IEnumerator BossSpawnCameraShakeRoutine()
+    {
+        Camera targetCamera = Camera.main;
+        if (targetCamera == null)
+        {
+            cameraShakeRoutine = null;
+            yield break;
+        }
+
+        Transform cameraTransform = targetCamera.transform;
+        Vector3 originalLocalPosition = cameraTransform.localPosition;
+        shakenCameraTransform = cameraTransform;
+        shakenCameraOriginalLocalPosition = originalLocalPosition;
+        hasCameraShakeOrigin = true;
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.05f, bossSpawnShakeDuration);
+
+        while (elapsed < duration && cameraTransform != null)
+        {
+            elapsed += Time.deltaTime;
+            float normalized = Mathf.Clamp01(elapsed / duration);
+            float strength = bossSpawnShakeStrength * (1f - normalized);
+            Vector2 random = UnityEngine.Random.insideUnitCircle * strength;
+
+            cameraTransform.localPosition =
+                originalLocalPosition + new Vector3(random.x, random.y, 0f);
+
+            yield return null;
+        }
+
+        if (cameraTransform != null)
+        {
+            cameraTransform.localPosition = originalLocalPosition;
+        }
+
+        hasCameraShakeOrigin = false;
+        shakenCameraTransform = null;
+        cameraShakeRoutine = null;
+    }
+
+    private void StopCameraShake()
+    {
+        if (cameraShakeRoutine != null)
+        {
+            StopCoroutine(cameraShakeRoutine);
+            cameraShakeRoutine = null;
+        }
+
+        if (hasCameraShakeOrigin && shakenCameraTransform != null)
+        {
+            shakenCameraTransform.localPosition = shakenCameraOriginalLocalPosition;
+        }
+
+        hasCameraShakeOrigin = false;
+        shakenCameraTransform = null;
     }
 
     private static Bounds CalculateRendererBounds(Transform root)
@@ -1623,6 +1843,9 @@ public sealed class FinalBossDirector : MonoBehaviour
         castleDebrisLifetime = Mathf.Max(0f, castleDebrisLifetime);
         castleDebrisCount = Mathf.Max(1, castleDebrisCount);
         bossRevealDuration = Mathf.Max(0.1f, bossRevealDuration);
+        bossFocusTreeHideRadius = Mathf.Max(1f, bossFocusTreeHideRadius);
+        bossSpawnShakeDuration = Mathf.Max(0f, bossSpawnShakeDuration);
+        bossSpawnShakeStrength = Mathf.Max(0f, bossSpawnShakeStrength);
         bossMaxHealth = Mathf.Max(1f, bossMaxHealth);
         bossCoreDamage = Mathf.Max(0f, bossCoreDamage);
         bossAttackInterval = Mathf.Max(0.1f, bossAttackInterval);

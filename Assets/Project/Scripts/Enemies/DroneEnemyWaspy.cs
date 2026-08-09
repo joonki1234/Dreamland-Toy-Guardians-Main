@@ -61,10 +61,10 @@ namespace DreamGuardians
             new Color(0.2f, 0.95f, 1f, 1f);
 
         [SerializeField, Min(0.005f)]
-        private float beamWidth = 0.04f;
+        private float beamWidth = 0.075f;
 
         [SerializeField, Min(0.02f)]
-        private float beamDuration = 0.12f;
+        private float beamDuration = 0.26f;
 
         [Header("애니메이션")]
 
@@ -327,6 +327,22 @@ namespace DreamGuardians
 
             // 레이저는 코어를 향해 표시되고, 발사 1회당 1회의 피해만 줍니다.
             ShowAttackBeam();
+
+            Vector3 muzzlePosition =
+                muzzle != null
+                    ? muzzle.position
+                    : transform.position;
+            Vector3 targetPosition = targetCore.EnergyTarget.position;
+            Vector3 beamDirection = targetPosition - muzzlePosition;
+
+            DreamlandCombatFx.SpawnMuzzleFlash(
+                muzzlePosition,
+                beamDirection,
+                beamColor);
+            DreamlandCombatFx.SpawnDroneLaserImpact(
+                targetPosition,
+                beamColor);
+
             targetCore.TakeDamage(coreDamage);
         }
 
@@ -384,6 +400,10 @@ namespace DreamGuardians
 
                 attackBeam.startColor = fadedColor;
                 attackBeam.endColor = fadedColor;
+
+                float pulse = 0.82f + Mathf.Sin(elapsed * 65f) * 0.18f;
+                attackBeam.startWidth = beamWidth * pulse;
+                attackBeam.endWidth = beamWidth * 0.48f * pulse;
 
                 yield return null;
             }

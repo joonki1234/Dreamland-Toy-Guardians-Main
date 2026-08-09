@@ -693,6 +693,27 @@ public sealed class EnemyPortalStageController : MonoBehaviour
     // Portal
     // =========================================================
 
+    /// <summary>
+    /// 최종 보스 등장 시 시야를 가리는 Stage 1/2 적 포탈을 모두 숨깁니다.
+    /// 이후 Stage 1/2 테스트를 다시 시작하면 각 웨이브 이벤트가 필요한 포탈을
+    /// 정상적으로 다시 활성화합니다.
+    /// </summary>
+    public void HideAllPortalsForBoss()
+    {
+        SetPortalActive(portalA, false);
+        SetPortalActive(portalB, false);
+        SetPortalActive(portalC, false);
+        SetPortalActive(portalD, false);
+        SetPortalActive(portalE, false);
+        SetPortalActive(portalF, false);
+        SetPortalActive(portalG, false);
+        SetPortalActive(portalH, false);
+
+        Debug.Log(
+            "[PortalStage] 최종 보스 시야 확보를 위해 적 포탈을 모두 숨겼습니다.",
+            this);
+    }
+
     private void SetActivePortalCount(
         int count)
     {

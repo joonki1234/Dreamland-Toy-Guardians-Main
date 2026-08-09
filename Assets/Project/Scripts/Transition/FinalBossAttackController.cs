@@ -112,6 +112,19 @@ public sealed class FinalBossAttackController : MonoBehaviour
     [SerializeField, Min(0.02f)]
     private float hitFlashDuration = 0.12f;
 
+    [Header("붉은 눈")]
+    [SerializeField]
+    private Color eyeColor = new Color(1f, 0.015f, 0.02f, 1f);
+
+    [SerializeField, Min(0.05f)]
+    private float eyeSize = 0.34f;
+
+    [SerializeField, Range(0.1f, 0.45f)]
+    private float eyeSpacingRatio = 0.22f;
+
+    [SerializeField, Range(-0.25f, 0.35f)]
+    private float eyeVerticalRatio = 0.08f;
+
     [Header("Director에서 전달되는 전투 수치")]
     [SerializeField]
     private CoreState targetCore;
@@ -148,6 +161,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private GameObject auraObject;
     private ParticleSystem auraParticles;
     private Material auraMaterial;
+
+    private GameObject eyeRoot;
+    private Material eyeMaterial;
+    private Light eyeLight;
 
     public bool IsPhaseMoving => phaseMoving;
 
@@ -223,11 +240,17 @@ public sealed class FinalBossAttackController : MonoBehaviour
         {
             Destroy(auraMaterial);
         }
+
+        if (eyeMaterial != null)
+        {
+            Destroy(eyeMaterial);
+        }
     }
 
     private void Update()
     {
         UpdateAuraPosition();
+        UpdateEyePulse();
 
         if (!configured ||
             isDead ||
@@ -290,6 +313,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
         enabled = true;
 
         nextAttackTime = Time.time + firstAttackDelay;
+
+        CreateCorruptedEyes();
 
         if (targetCore == null)
         {
@@ -926,6 +951,182 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
     }
 
+    private void CreateCorruptedEyes()
+    {
+        if (eyeRoot != null)
+        {
+            return;
+        }
+
+        Bounds bounds = CalculateBossVisualBounds();
+        Vector3 forward =
+            targetCore != null
+                ? targetCore.transform.position - bounds.center
+                : (Camera.main != null
+                    ? Camera.main.transform.position - bounds.center
+                    : Vector3.forward);
+        forward.y = 0f;
+
+        if (forward.sqrMagnitude <= 0.0001f)
+        {
+            forward = Vector3.forward;
+        }
+        forward.Normalize();
+
+        Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
+        float faceDepth = Mathf.Max(bounds.extents.x, bounds.extents.z) * 0.82f;
+        float spacing = Mathf.Max(
+            eyeSize * 0.9f,
+            Mathf.Max(bounds.size.x, bounds.size.z) * eyeSpacingRatio);
+        float eyeY = bounds.center.y + bounds.extents.y * eyeVerticalRatio;
+        Vector3 eyeCenter =
+            new Vector3(bounds.center.x, eyeY, bounds.center.z) +
+            forward * faceDepth;
+
+        eyeRoot = new GameObject("FinalBoss_RedEyes");
+        eyeRoot.transform.SetParent(transform, false);
+        eyeRoot.transform.localPosition = Vector3.zero;
+        eyeRoot.transform.localRotation = Quaternion.identity;
+        eyeRoot.transform.localScale = Vector3.one;
+        eyeRoot.layer = gameObject.layer;
+
+        CreateEye("LeftEye", eyeCenter - right * spacing * 0.5f);
+        CreateEye("RightEye", eyeCenter + right * spacing * 0.5f);
+
+        GameObject lightObject = new GameObject("EyeGlowLight");
+        lightObject.transform.SetParent(eyeRoot.transform, false);
+        lightObject.transform.position = eyeCenter + forward * 0.08f;
+        eyeLight = lightObject.AddComponent<Light>();
+        eyeLight.type = LightType.Point;
+        eyeLight.color = eyeColor;
+        eyeLight.range = Mathf.Max(2.0f, eyeSize * 8f);
+        eyeLight.intensity = 1.7f;
+        eyeLight.shadows = LightShadows.None;
+    }
+
+    private void CreateEye(string eyeName, Vector3 worldPosition)
+    {
+        GameObject eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        eye.name = eyeName;
+        eye.layer = gameObject.layer;
+        eye.transform.SetParent(eyeRoot.transform, true);
+        eye.transform.position = worldPosition;
+
+        Collider eyeCollider = eye.GetComponent<Collider>();
+        if (eyeCollider != null)
+        {
+            Destroy(eyeCollider);
+        }
+
+        Vector3 lossy = eyeRoot.transform.lossyScale;
+        float scaleX = Mathf.Max(0.001f, Mathf.Abs(lossy.x));
+        float scaleY = Mathf.Max(0.001f, Mathf.Abs(lossy.y));
+        float scaleZ = Mathf.Max(0.001f, Mathf.Abs(lossy.z));
+        float diameter = Mathf.Max(0.08f, eyeSize);
+        eye.transform.localScale = new Vector3(
+            diameter / scaleX,
+            diameter * 0.55f / scaleY,
+            diameter * 0.38f / scaleZ);
+
+        Renderer eyeRenderer = eye.GetComponent<Renderer>();
+        if (eyeRenderer != null)
+        {
+            eyeRenderer.material = GetEyeMaterial();
+            eyeRenderer.shadowCastingMode =
+                UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+    }
+
+    private Material GetEyeMaterial()
+    {
+        if (eyeMaterial != null)
+        {
+            return eyeMaterial;
+        }
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        shader ??= Shader.Find("Standard");
+        shader ??= Shader.Find("Unlit/Color");
+
+        if (shader == null)
+        {
+            return null;
+        }
+
+        eyeMaterial = new Material(shader)
+        {
+            name = "FinalBoss_RedEyes_Runtime",
+            color = eyeColor
+        };
+
+        if (eyeMaterial.HasProperty("_BaseColor"))
+        {
+            eyeMaterial.SetColor("_BaseColor", eyeColor);
+        }
+        if (eyeMaterial.HasProperty("_Color"))
+        {
+            eyeMaterial.SetColor("_Color", eyeColor);
+        }
+        if (eyeMaterial.HasProperty("_EmissionColor"))
+        {
+            eyeMaterial.EnableKeyword("_EMISSION");
+            eyeMaterial.SetColor("_EmissionColor", eyeColor * 7.5f);
+        }
+
+        return eyeMaterial;
+    }
+
+    private void UpdateEyePulse()
+    {
+        if (eyeRoot == null)
+        {
+            return;
+        }
+
+        float pulse = 0.94f + Mathf.Sin(Time.time * 7.5f) * 0.06f;
+        eyeRoot.transform.localScale = Vector3.one * pulse;
+
+        if (eyeLight != null)
+        {
+            eyeLight.intensity = 1.5f + Mathf.Sin(Time.time * 8f) * 0.35f;
+        }
+    }
+
+    private Bounds CalculateBossVisualBounds()
+    {
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        bool hasBounds = false;
+        Bounds bounds = new Bounds(transform.position, Vector3.one * 2f);
+
+        foreach (Renderer modelRenderer in renderers)
+        {
+            bool isEyeRenderer =
+                eyeRoot != null &&
+                modelRenderer != null &&
+                modelRenderer.transform.IsChildOf(eyeRoot.transform);
+
+            if (modelRenderer == null ||
+                modelRenderer is ParticleSystemRenderer ||
+                modelRenderer is LineRenderer ||
+                isEyeRenderer)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = modelRenderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(modelRenderer.bounds);
+            }
+        }
+
+        return bounds;
+    }
+
     private void CreateCorruptionAura()
     {
         if (auraObject != null)
@@ -1145,6 +1346,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         auraRadius = Mathf.Max(0f, auraRadius);
         auraEmissionRate = Mathf.Max(1f, auraEmissionRate);
         hitFlashDuration = Mathf.Max(0.02f, hitFlashDuration);
+        eyeSize = Mathf.Max(0.05f, eyeSize);
         coreDamage = Mathf.Max(0f, coreDamage);
         attackInterval = Mathf.Max(0.1f, attackInterval);
         firstAttackDelay = Mathf.Max(0f, firstAttackDelay);

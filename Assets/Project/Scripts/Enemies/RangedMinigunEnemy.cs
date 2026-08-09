@@ -292,7 +292,13 @@ namespace DreamGuardians
 
             if (shotDirection.sqrMagnitude > 0.0001f)
             {
-                origin += shotDirection.normalized * muzzleForwardOffset;
+                Vector3 normalizedShotDirection = shotDirection.normalized;
+                origin += normalizedShotDirection * muzzleForwardOffset;
+
+                DreamlandCombatFx.SpawnMuzzleFlash(
+                    origin,
+                    normalizedShotDirection,
+                    bulletColor);
             }
 
             CoreEnemyProjectile.Spawn(

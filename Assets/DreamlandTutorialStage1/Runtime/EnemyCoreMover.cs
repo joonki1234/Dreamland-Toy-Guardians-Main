@@ -47,6 +47,22 @@ namespace DreamGuardians
         [SerializeField, Min(0.1f)]
         private float attackInterval = 1.5f;
 
+        [Header("박치기 공격 연출")]
+        [SerializeField, Min(0.05f)]
+        private float headbuttWindupDuration = 0.16f;
+
+        [SerializeField, Min(0.05f)]
+        private float headbuttLungeDuration = 0.18f;
+
+        [SerializeField, Min(0.05f)]
+        private float headbuttRecoverDuration = 0.24f;
+
+        [SerializeField, Min(0.1f)]
+        private float headbuttDistance = 1.65f;
+
+        [SerializeField, Min(0f)]
+        private float headbuttWindbackDistance = 0.22f;
+
 
         [Header("회전 설정")]
 
@@ -68,6 +84,8 @@ namespace DreamGuardians
 
         private bool isBeingKnockedBack;
         private Coroutine knockbackRoutine;
+        private Coroutine headbuttRoutine;
+        private bool isHeadbutting;
 
 
         // 현재 미끼에 유인되고 있는지 여부
@@ -117,6 +135,13 @@ namespace DreamGuardians
         {
             IsAttackingCore = false;
 
+            if (headbuttRoutine != null)
+            {
+                StopCoroutine(headbuttRoutine);
+                headbuttRoutine = null;
+            }
+            isHeadbutting = false;
+
             if (health != null)
             {
                 health.Died -= HandleDied;
@@ -139,6 +164,12 @@ namespace DreamGuardians
             if (isBeingKnockedBack)
             {
                 IsAttackingCore = false;
+                return;
+            }
+
+            if (isHeadbutting)
+            {
+                IsAttackingCore = true;
                 return;
             }
 
@@ -311,24 +342,123 @@ namespace DreamGuardians
                 toCore.normalized
             );
 
-            if (Time.time <
-                nextAttackTime)
+            // 원거리 적은 EnemyCoreMover의 데미지가 0이고,
+            // IsAttackingCore 신호만 사용해 전용 사격 스크립트를 실행합니다.
+            if (coreDamage <= 0f)
             {
                 return;
             }
 
-            nextAttackTime =
-                Time.time +
-                attackInterval;
-
-            targetCore.TakeDamage(
-                coreDamage
-            );
-
-            if (coreDamage > 0f)
+            if (Time.time < nextAttackTime ||
+                headbuttRoutine != null)
             {
+                return;
+            }
+
+            nextAttackTime = Time.time + attackInterval;
+            headbuttRoutine = StartCoroutine(HeadbuttAttackRoutine());
+        }
+
+        private IEnumerator HeadbuttAttackRoutine()
+        {
+            if (targetCore == null || targetCore.IsDestroyed)
+            {
+                headbuttRoutine = null;
+                yield break;
+            }
+
+            isHeadbutting = true;
+            IsAttackingCore = true;
+
+            Vector3 restPosition = transform.position;
+            Vector3 corePosition = targetCore.EnergyTarget != null
+                ? targetCore.EnergyTarget.position
+                : targetCore.transform.position;
+
+            Vector3 toCore = corePosition - restPosition;
+            toCore.y = 0f;
+
+            Vector3 direction = toCore.sqrMagnitude > 0.0001f
+                ? toCore.normalized
+                : transform.forward;
+            direction.y = 0f;
+
+            RotateTowards(direction);
+
+            float safeDistance = Mathf.Max(0.25f, toCore.magnitude - 0.65f);
+            float lungeDistance = Mathf.Min(headbuttDistance, safeDistance);
+
+            Vector3 windbackPosition =
+                restPosition - direction * headbuttWindbackDistance;
+            Vector3 impactPosition =
+                restPosition + direction * lungeDistance;
+
+            DreamlandCombatFx.SpawnChargeDust(restPosition);
+
+            float elapsed = 0f;
+            float windup = Mathf.Max(0.05f, headbuttWindupDuration);
+            while (elapsed < windup && !IsUnavailableForAttack())
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / windup);
+                transform.position = Vector3.Lerp(
+                    restPosition,
+                    windbackPosition,
+                    t * t);
+                yield return null;
+            }
+
+            elapsed = 0f;
+            float lunge = Mathf.Max(0.05f, headbuttLungeDuration);
+            while (elapsed < lunge && !IsUnavailableForAttack())
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / lunge);
+                float fastT = 1f - Mathf.Pow(1f - t, 3f);
+                transform.position = Vector3.Lerp(
+                    windbackPosition,
+                    impactPosition,
+                    fastT);
+                yield return null;
+            }
+
+            if (!IsUnavailableForAttack())
+            {
+                targetCore.TakeDamage(coreDamage);
                 PlayCoreMeleeImpact();
             }
+
+            elapsed = 0f;
+            float recover = Mathf.Max(0.05f, headbuttRecoverDuration);
+            Vector3 recoverStart = transform.position;
+            while (elapsed < recover &&
+                   health != null &&
+                   !health.IsDead)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / recover);
+                float smooth = t * t * (3f - 2f * t);
+                transform.position = Vector3.Lerp(
+                    recoverStart,
+                    restPosition,
+                    smooth);
+                yield return null;
+            }
+
+            if (health == null || !health.IsDead)
+            {
+                transform.position = restPosition;
+            }
+
+            isHeadbutting = false;
+            headbuttRoutine = null;
+        }
+
+        private bool IsUnavailableForAttack()
+        {
+            return targetCore == null ||
+                   targetCore.IsDestroyed ||
+                   (health != null && health.IsDead);
         }
 
 
@@ -355,6 +485,10 @@ namespace DreamGuardians
             {
                 awayFromEnemy = Vector3.up;
             }
+
+            DreamlandCombatFx.SpawnHeadbuttImpact(
+                impactPosition,
+                awayFromEnemy);
 
             GameObject effectObject = new GameObject("Core_MeleeHit_Impact");
             effectObject.transform.position = impactPosition;
@@ -722,6 +856,12 @@ namespace DreamGuardians
                     0.1f,
                     attackInterval
                 );
+
+            headbuttWindupDuration = Mathf.Max(0.05f, headbuttWindupDuration);
+            headbuttLungeDuration = Mathf.Max(0.05f, headbuttLungeDuration);
+            headbuttRecoverDuration = Mathf.Max(0.05f, headbuttRecoverDuration);
+            headbuttDistance = Mathf.Max(0.1f, headbuttDistance);
+            headbuttWindbackDistance = Mathf.Max(0f, headbuttWindbackDistance);
 
             turnSpeed =
                 Mathf.Max(

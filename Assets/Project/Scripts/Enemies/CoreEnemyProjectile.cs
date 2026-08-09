@@ -17,7 +17,7 @@ namespace DreamGuardians
         private float spawnedAt;
         private float maxLifetime = 3f;
         private float hitDistance = 0.12f;
-        private float visualLength = 0.18f;
+        private float visualLength = 0.38f;
 
         private LineRenderer lineRenderer;
         private Material runtimeMaterial;
@@ -140,7 +140,15 @@ namespace DreamGuardians
             if (targetCore != null &&
                 !targetCore.IsDestroyed)
             {
+                Vector3 impactPosition =
+                    targetCore.EnergyTarget != null
+                        ? targetCore.EnergyTarget.position
+                        : targetCore.transform.position;
+
                 targetCore.TakeDamage(damage);
+                DreamlandCombatFx.SpawnCoreProjectileImpact(
+                    impactPosition,
+                    projectileColor);
             }
 
             Destroy(gameObject);
@@ -152,8 +160,8 @@ namespace DreamGuardians
             lineRenderer = gameObject.AddComponent<LineRenderer>();
             lineRenderer.useWorldSpace = true;
             lineRenderer.positionCount = 2;
-            lineRenderer.startWidth = 0.045f;
-            lineRenderer.endWidth = 0.012f;
+            lineRenderer.startWidth = 0.075f;
+            lineRenderer.endWidth = 0.025f;
             lineRenderer.numCapVertices = 3;
             lineRenderer.shadowCastingMode =
                 UnityEngine.Rendering.ShadowCastingMode.Off;

@@ -401,8 +401,9 @@ namespace DreamGuardians
 
             /*
              * 4단계:
-             * 직업의 역할만 먼저 설명한 뒤 8명이 두 명씩 직업을 선택합니다.
-             * 시너지 설명과 실제 해금은 Stage 1의 2차 공격 종료 뒤에 진행합니다.
+             * 직업 선택 UI는 사용하지 않습니다.
+             * 각 직업의 역할 설명만 보여 준 뒤 바로 튜토리얼 전투로 넘어갑니다.
+             * 실제 직업은 로비/현재 플레이어 설정을 그대로 사용합니다.
              */
             State = TutorialStage1State.RoleSelection;
 
@@ -414,28 +415,14 @@ namespace DreamGuardians
                 {
                     yield return PlayDialogueLine(line);
                 }
-
-                yield return PlayDialogueLine(
-                    dialogueData.RoleSelectionPromptLine);
-            }
-            else
-            {
-                yield return PlayDialogueLine(
-                    new TutorialDialogueLine(
-                        "장난감 친구",
-                        "여덟 명이 두 명씩 경찰, 소방관, 요리사, 건축가를 맡아 줘!",
-                        4f));
             }
 
-            if (roleSelection != null)
-            {
-                yield return roleSelection.ShowAndWait();
-            }
+            // RoleSelectionController.ShowAndWait()를 호출하지 않으므로
+            // 직업 선택창은 생성/표시되지 않습니다.
+            roleSelection?.Hide();
 
             if (dialogueData != null)
             {
-                yield return PlayDialogueLine(
-                    dialogueData.RoleSelectionCompleteLine);
                 yield return PlayDialogueLine(
                     dialogueData.EnemyAppearsLine);
             }
