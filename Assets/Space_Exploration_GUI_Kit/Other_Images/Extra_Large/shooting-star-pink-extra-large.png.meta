@@ -1,5 +1,12 @@
 fileFormatVersion: 2
 guid: 608c1a631c1d1694098080df3029b692
+AssetOrigin:
+  serializedVersion: 1
+  productId: 298577
+  packageName: Space Game GUI kit
+  packageVersion: 1.1
+  assetPath: Assets/Space_Exploration_GUI_Kit/Other_Images/Extra_Large/shooting-star-pink-extra-large.png
+  uploadId: 937030
 TextureImporter:
   internalIDToNameTable:
   - first:
@@ -70,7 +77,7 @@ TextureImporter:
   swizzle: 50462976
   cookieLightType: 0
   platformSettings:
-  - serializedVersion: 3
+  - serializedVersion: 4
     buildTarget: DefaultTexturePlatform
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -83,7 +90,7 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 3
+  - serializedVersion: 4
     buildTarget: Standalone
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -100,47 +107,46 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: shooting-star-pink-extra-large_0
+      name: TitleStar
       rect:
         serializedVersion: 2
-        x: 19
-        y: 14
-        width: 626
-        height: 212
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 575
+        y: 22
+        width: 57
+        height: 71
+      alignment: 9
+      pivot: {x: 0.41972914, y: 0.52486753}
       border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
       outline: []
       physicsShape: []
-      tessellationDetail: -1
+      tessellationDetail: 0
       bones: []
-      spriteID: 4754bba64d0f63160800000000000000
-      internalID: 7005051065535776116
+      spriteID: e7a70ae7bb9092841b517c78ac5f3b66
+      internalID: -1346919774
       vertices: []
       indices: 
       edges: []
       weights: []
     outline: []
+    customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: ce8c4ad5ce7c24743b9f167370ff9721
     internalID: 0
     vertices: []
     indices: 
     edges: []
     weights: []
     secondaryTextures: []
+    spriteCustomMetadata:
+      entries:
+      - key: SpriteEditor.SliceSettings
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":64.0,"y":64.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":0,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
-      shooting-star-pink-extra-large_0: 7005051065535776116
+      TitleStar: -1346919774
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 298577
-  packageName: Space Game GUI kit
-  packageVersion: 1.1
-  assetPath: Assets/Space_Exploration_GUI_Kit/Other_Images/Extra_Large/shooting-star-pink-extra-large.png
-  uploadId: 937030
