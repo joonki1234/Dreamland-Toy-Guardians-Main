@@ -5,24 +5,19 @@ using UnityEngine.UI;
 /// <summary>
 /// 로비에서 현재 플레이어의 직업 선택과 준비 상태를 관리한다.
 ///
-/// 현재는 네트워크가 없는 PC 테스트용 로컬 방식이다.
-/// 추후 네트워크 담당 코드에서 직업 선택, Ready 상태,
-/// 현재 접속 인원 값을 동기화할 수 있도록 구성한다.
+/// 이제는 네트워크 연동 버전이다. 실제 선택/준비 값은 로컬 플레이어의
+/// LobbyPlayerState(네트워크 오브젝트)에 저장되고, 화면에는 그 값을 그대로
+/// 반영한다. 오른쪽 플레이어 목록도 실제로 접속한 모든 플레이어를 보여준다.
+///
+/// 전원이 준비를 마치면 자동으로 카운트다운을 시작하고,
+/// 다 되면 RoomManager.LoadGameplayScene()을 호출해 Dreamland_map_3로 이동한다.
 /// </summary>
 public class LobbySelectionController : MonoBehaviour
 {
-    /// <summary>
-    /// 로비에서 선택 가능한 직업 종류.
-    /// None은 아직 직업을 선택하지 않은 상태다.
-    /// </summary>
-    private enum LobbyJob
-    {
-        None,
-        Police,
-        Firefighter,
-        Chef,
-        Builder
-    }
+    [Header("네트워크 연결")]
+    [Tooltip("접속/스폰을 담당하는 RoomManager를 연결합니다.")]
+    [SerializeField]
+    private RoomManager roomManager;
 
     [Header("직업 선택 버튼")]
     [SerializeField]
@@ -62,24 +57,15 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private LobbyPlayerStatusUI playerStatusUI;
 
-    [Tooltip(
-        "오른쪽 상태 목록에 표시할 현재 플레이어 이름입니다. " +
-        "현재는 로컬 테스트용입니다."
-    )]
-    [SerializeField]
-    private string localPlayerName = "플레이어 1";
-
-    [Header("접속 인원 테스트")]
-    [Tooltip(
-        "현재 에디터에서 테스트할 접속 인원입니다. " +
-        "나중에는 네트워크의 실제 접속 인원으로 변경합니다."
-    )]
-    [SerializeField, Range(1, 8)]
-    private int currentPlayerCount = 1;
-
+    [Header("인원 설정")]
     [Tooltip("게임에 접속할 수 있는 최대 플레이어 수입니다.")]
     [SerializeField, Range(1, 8)]
     private int maximumPlayerCount = 8;
+
+    [Header("전원 준비 완료 후 카운트다운")]
+    [Tooltip("모든 플레이어가 준비를 마치면 이 시간(초) 후 자동으로 맵으로 이동합니다.")]
+    [SerializeField, Min(1f)]
+    private float readyCountdownSeconds = 30f;
 
     [Header("직업 버튼 색상")]
     [Tooltip("아직 선택되지 않은 직업 버튼의 기본 색상입니다.")]
@@ -107,36 +93,36 @@ public class LobbySelectionController : MonoBehaviour
     private Color disabledButtonColor =
         new Color32(190, 190, 190, 140);
 
-    private LobbyJob selectedJob = LobbyJob.None;
-    private bool isReady;
+    private bool isCountdownActive;
+    private float countdownRemaining;
 
     private void Awake()
     {
         if (policeButton != null)
         {
             policeButton.onClick.AddListener(
-                () => SelectJob(LobbyJob.Police)
+                () => SelectJob(PlayerJob.Police)
             );
         }
 
         if (firefighterButton != null)
         {
             firefighterButton.onClick.AddListener(
-                () => SelectJob(LobbyJob.Firefighter)
+                () => SelectJob(PlayerJob.Firefighter)
             );
         }
 
         if (chefButton != null)
         {
             chefButton.onClick.AddListener(
-                () => SelectJob(LobbyJob.Chef)
+                () => SelectJob(PlayerJob.Chef)
             );
         }
 
         if (builderButton != null)
         {
             builderButton.onClick.AddListener(
-                () => SelectJob(LobbyJob.Builder)
+                () => SelectJob(PlayerJob.Builder)
             );
         }
 
@@ -148,47 +134,58 @@ public class LobbySelectionController : MonoBehaviour
 
     private void Start()
     {
-        selectedJob = LobbyJob.None;
-        isReady = false;
-
-        maximumPlayerCount = Mathf.Clamp(
-            maximumPlayerCount,
-            1,
-            8
-        );
-
-        currentPlayerCount = Mathf.Clamp(
-            currentPlayerCount,
-            1,
-            maximumPlayerCount
-        );
-
+        maximumPlayerCount = Mathf.Clamp(maximumPlayerCount, 1, 8);
         UpdateUI();
     }
 
+    private void Update()
+    {
+        // 아직 네트워크 접속 전이면 할 일이 없다.
+        if (roomManager == null || roomManager.Runner == null) return;
+
+        UpdateUI();
+        UpdatePlayerStatusList();
+        UpdateReadyCountdown();
+    }
+
     /// <summary>
-    /// 플레이어가 누른 직업을 현재 선택 직업으로 저장한다.
+    /// 로컬 플레이어의 네트워크 로비 상태를 가져온다.
+    /// 아직 스폰되지 않았다면 null을 반환한다.
+    /// </summary>
+    private LobbyPlayerState GetLocalState()
+    {
+        if (roomManager == null || roomManager.Runner == null) return null;
+
+        var runner = roomManager.Runner;
+        var playerObject = runner.GetPlayerObject(runner.LocalPlayer);
+
+        return playerObject != null
+            ? playerObject.GetComponent<LobbyPlayerState>()
+            : null;
+    }
+
+    /// <summary>
+    /// 플레이어가 누른 직업을 로컬 플레이어의 네트워크 상태에 저장한다.
     ///
     /// 이미 선택된 직업을 다시 누르면 선택을 취소한다.
     /// Ready 완료 후에는 직업을 변경하거나 취소할 수 없다.
     /// </summary>
-    private void SelectJob(LobbyJob job)
+    private void SelectJob(PlayerJob job)
     {
-        if (isReady)
+        var state = GetLocalState();
+        if (state == null || state.IsReady)
         {
             return;
         }
 
-        if (selectedJob == job)
+        if (state.HasSelectedJob && state.SelectedJob == job)
         {
-            selectedJob = LobbyJob.None;
+            state.ClearJob();
         }
         else
         {
-            selectedJob = job;
+            state.SetJob(job);
         }
-
-        UpdateUI();
     }
 
     /// <summary>
@@ -197,7 +194,13 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private void ToggleReady()
     {
-        if (selectedJob == LobbyJob.None)
+        var state = GetLocalState();
+        if (state == null)
+        {
+            return;
+        }
+
+        if (!state.HasSelectedJob)
         {
             if (lobbyStatusText != null)
             {
@@ -208,27 +211,32 @@ public class LobbySelectionController : MonoBehaviour
             return;
         }
 
-        isReady = !isReady;
-
-        UpdateUI();
+        state.SetReady(!state.IsReady);
     }
 
     /// <summary>
-    /// 현재 직업, Ready 상태, 접속 인원을 UI에 반영한다.
+    /// 현재 직업, Ready 상태를 UI에 반영한다. (카운트다운 중에는 문구를 건드리지 않는다)
     /// </summary>
     private void UpdateUI()
     {
-        UpdateSelectedJobText();
-        UpdateReadyUI();
-        UpdateJobButtons();
-        UpdateConnectedPlayerText();
-        UpdateLocalPlayerStatus();
+        var state = GetLocalState();
+        bool hasJob = state != null && state.HasSelectedJob;
+        PlayerJob job = hasJob ? state.SelectedJob : PlayerJob.Police;
+        bool ready = state != null && state.IsReady;
+
+        UpdateSelectedJobText(hasJob, job);
+        UpdateJobButtons(hasJob, job, ready);
+
+        if (!isCountdownActive)
+        {
+            UpdateReadyUI(hasJob, ready);
+        }
     }
 
     /// <summary>
     /// 현재 선택한 직업 이름을 중앙 UI에 표시한다.
     /// </summary>
-    private void UpdateSelectedJobText()
+    private void UpdateSelectedJobText(bool hasJob, PlayerJob job)
     {
         if (selectedJobText == null)
         {
@@ -236,15 +244,15 @@ public class LobbySelectionController : MonoBehaviour
         }
 
         selectedJobText.text =
-            $"선택한 직업: {GetJobName(selectedJob)}";
+            $"선택한 직업: {(hasJob ? GetJobName(job) : "없음")}";
     }
 
     /// <summary>
     /// Ready 버튼과 안내 문구를 현재 상태에 맞게 변경한다.
     /// </summary>
-    private void UpdateReadyUI()
+    private void UpdateReadyUI(bool hasJob, bool ready)
     {
-        if (selectedJob == LobbyJob.None)
+        if (!hasJob)
         {
             if (lobbyStatusText != null)
             {
@@ -257,7 +265,7 @@ public class LobbySelectionController : MonoBehaviour
                 readyButton.interactable = false;
             }
         }
-        else if (!isReady)
+        else if (!ready)
         {
             if (lobbyStatusText != null)
             {
@@ -275,7 +283,7 @@ public class LobbySelectionController : MonoBehaviour
             if (lobbyStatusText != null)
             {
                 lobbyStatusText.text =
-                    "준비 완료 - 운영자의 시작을 기다리는 중...";
+                    "준비 완료 - 다른 플레이어를 기다리는 중...";
             }
 
             if (readyButton != null)
@@ -287,34 +295,19 @@ public class LobbySelectionController : MonoBehaviour
         if (readyButtonText != null)
         {
             readyButtonText.text =
-                isReady ? "준비 취소" : "준비";
+                ready ? "준비 취소" : "준비";
         }
     }
 
     /// <summary>
     /// 직업 버튼의 활성화 상태와 색상을 갱신한다.
     /// </summary>
-    private void UpdateJobButtons()
+    private void UpdateJobButtons(bool hasJob, PlayerJob selectedJob, bool isReady)
     {
-        ApplyJobButtonState(
-            policeButton,
-            LobbyJob.Police
-        );
-
-        ApplyJobButtonState(
-            firefighterButton,
-            LobbyJob.Firefighter
-        );
-
-        ApplyJobButtonState(
-            chefButton,
-            LobbyJob.Chef
-        );
-
-        ApplyJobButtonState(
-            builderButton,
-            LobbyJob.Builder
-        );
+        ApplyJobButtonState(policeButton, PlayerJob.Police, hasJob, selectedJob, isReady);
+        ApplyJobButtonState(firefighterButton, PlayerJob.Firefighter, hasJob, selectedJob, isReady);
+        ApplyJobButtonState(chefButton, PlayerJob.Chef, hasJob, selectedJob, isReady);
+        ApplyJobButtonState(builderButton, PlayerJob.Builder, hasJob, selectedJob, isReady);
     }
 
     /// <summary>
@@ -322,7 +315,10 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private void ApplyJobButtonState(
         Button button,
-        LobbyJob buttonJob
+        PlayerJob buttonJob,
+        bool hasJob,
+        PlayerJob selectedJob,
+        bool isReady
     )
     {
         if (button == null)
@@ -330,35 +326,25 @@ public class LobbySelectionController : MonoBehaviour
             return;
         }
 
-        bool isSelected =
-            selectedJob == buttonJob;
+        bool isSelected = hasJob && selectedJob == buttonJob;
 
         button.interactable = !isReady;
 
         ColorBlock colors = button.colors;
 
         colors.normalColor =
-            isSelected
-                ? selectedButtonColor
-                : normalButtonColor;
+            isSelected ? selectedButtonColor : normalButtonColor;
 
         colors.highlightedColor =
-            isSelected
-                ? selectedButtonColor
-                : highlightedButtonColor;
+            isSelected ? selectedButtonColor : highlightedButtonColor;
 
-        colors.pressedColor =
-            pressedButtonColor;
+        colors.pressedColor = pressedButtonColor;
 
         colors.selectedColor =
-            isSelected
-                ? selectedButtonColor
-                : normalButtonColor;
+            isSelected ? selectedButtonColor : normalButtonColor;
 
         colors.disabledColor =
-            isSelected
-                ? selectedButtonColor
-                : disabledButtonColor;
+            isSelected ? selectedButtonColor : disabledButtonColor;
 
         colors.colorMultiplier = 1f;
         colors.fadeDuration = 0.1f;
@@ -367,110 +353,141 @@ public class LobbySelectionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 접속 인원과 최대 인원을 표시한다.
+    /// 실제로 접속한 모든 플레이어의 직업/준비 상태를
+    /// 오른쪽 플레이어 상태 목록에 반영한다.
     /// </summary>
-    private void UpdateConnectedPlayerText()
+    private void UpdatePlayerStatusList()
     {
-        if (connectedPlayerText == null)
+        if (playerStatusUI == null) return;
+
+        var runner = roomManager.Runner;
+        int index = 0;
+
+        foreach (var player in runner.ActivePlayers)
         {
-            return;
+            var playerObject = runner.GetPlayerObject(player);
+            var state = playerObject != null
+                ? playerObject.GetComponent<LobbyPlayerState>()
+                : null;
+
+            string jobName = state != null && state.HasSelectedJob
+                ? GetJobName(state.SelectedJob)
+                : "직업 없음";
+
+            bool ready = state != null && state.IsReady;
+
+            playerStatusUI.SetPlayerStatus(
+                index,
+                $"플레이어 {index + 1}",
+                jobName,
+                ready,
+                true
+            );
+
+            index++;
         }
 
-        connectedPlayerText.text =
-            $"연결된 플레이어: " +
-            $"{currentPlayerCount} / {maximumPlayerCount}";
-    }
-
-    /// <summary>
-    /// 현재 로컬 플레이어의 직업과 Ready 상태를
-    /// 오른쪽 첫 번째 플레이어 상태 줄에 반영한다.
-    ///
-    /// 최종 네트워크 버전에서는 네트워크 담당 코드가
-    /// 각 플레이어의 상태를 직접 전달하게 된다.
-    /// </summary>
-    private void UpdateLocalPlayerStatus()
-    {
-        if (playerStatusUI == null)
+        for (int i = index; i < maximumPlayerCount && i < 8; i++)
         {
-            return;
+            playerStatusUI.RemovePlayerStatus(i);
         }
 
-        playerStatusUI.SetPlayerStatus(
-            0,
-            localPlayerName,
-            GetStatusJobName(selectedJob),
-            isReady,
-            true
-        );
+        if (connectedPlayerText != null)
+        {
+            connectedPlayerText.text =
+                $"연결된 플레이어: {index} / {maximumPlayerCount}";
+        }
     }
 
     /// <summary>
-    /// 네트워크 연결 후 실제 접속 인원을 전달할 때 사용할 함수다.
+    /// 접속한 모든 플레이어가 준비를 마쳤는지 확인하고,
+    /// 그렇다면 카운트다운을 진행하다가 시간이 다 되면 맵으로 이동한다.
+    /// 누군가 준비를 취소하거나 나가면 카운트다운을 취소한다.
     /// </summary>
-    public void SetConnectedPlayerCount(int playerCount)
+    private void UpdateReadyCountdown()
     {
-        currentPlayerCount = Mathf.Clamp(
-            playerCount,
-            1,
-            maximumPlayerCount
-        );
+        bool allReady = AreAllPlayersReady(out int playerCount);
 
-        UpdateConnectedPlayerText();
+        if (allReady && !isCountdownActive)
+        {
+            isCountdownActive = true;
+            countdownRemaining = readyCountdownSeconds;
+        }
+        else if (!allReady && isCountdownActive)
+        {
+            isCountdownActive = false;
+        }
+
+        if (!isCountdownActive) return;
+
+        countdownRemaining -= Time.deltaTime;
+
+        if (lobbyStatusText != null)
+        {
+            int secondsLeft = Mathf.Max(0, Mathf.CeilToInt(countdownRemaining));
+            lobbyStatusText.text =
+                $"모든 플레이어 준비 완료! {secondsLeft}초 후 맵으로 이동합니다";
+        }
+
+        if (countdownRemaining <= 0f)
+        {
+            isCountdownActive = false;
+            roomManager.LoadGameplayScene();
+        }
     }
 
     /// <summary>
-    /// 현재 플레이어가 Ready 상태인지 반환한다.
+    /// 접속한 플레이어가 1명 이상이고, 전원의 IsReady가 true인지 확인한다.
     /// </summary>
-    public bool IsReady()
+    private bool AreAllPlayersReady(out int playerCount)
     {
-        return isReady;
+        playerCount = 0;
+        int readyCount = 0;
+
+        var runner = roomManager.Runner;
+
+        foreach (var player in runner.ActivePlayers)
+        {
+            var playerObject = runner.GetPlayerObject(player);
+            var state = playerObject != null
+                ? playerObject.GetComponent<LobbyPlayerState>()
+                : null;
+
+            if (state == null) continue;
+
+            playerCount++;
+
+            if (state.IsReady)
+            {
+                readyCount++;
+            }
+        }
+
+        return playerCount > 0 && playerCount == readyCount;
     }
 
     /// <summary>
-    /// 현재 선택한 직업의 영문 이름을 반환한다.
-    /// 아직 선택하지 않았다면 None을 반환한다.
+    /// 코드 내부 직업 값을 화면에 표시할 한글로 변환한다.
     /// </summary>
-    public string GetSelectedJob()
-    {
-        return selectedJob.ToString();
-    }
-
-    /// <summary>
-    /// 코드 내부 직업 값을 중앙 UI에 표시할 한글로 변환한다.
-    /// </summary>
-    private string GetJobName(LobbyJob job)
+    private string GetJobName(PlayerJob job)
     {
         switch (job)
         {
-            case LobbyJob.Police:
+            case PlayerJob.Police:
                 return "경찰";
 
-            case LobbyJob.Firefighter:
+            case PlayerJob.Firefighter:
                 return "소방관";
 
-            case LobbyJob.Chef:
+            case PlayerJob.Chef:
                 return "요리사";
 
-            case LobbyJob.Builder:
+            case PlayerJob.Builder:
                 return "건축가";
 
             default:
                 return "없음";
         }
-    }
-
-    /// <summary>
-    /// 오른쪽 플레이어 상태 목록에 표시할 직업 이름을 반환한다.
-    /// 아직 선택하지 않은 경우에는 '직업 없음'으로 표시한다.
-    /// </summary>
-    private string GetStatusJobName(LobbyJob job)
-    {
-        if (job == LobbyJob.None)
-        {
-            return "직업 없음";
-        }
-
-        return GetJobName(job);
     }
 
     private void OnDestroy()

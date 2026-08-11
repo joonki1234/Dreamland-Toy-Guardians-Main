@@ -7,30 +7,68 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// 방 생성/접속(Lobby &amp; Room Session)과, 접속한 플레이어의 캐릭터 스폰을 담당한다.
-/// SimpleStartMenu.cs(FusionIntroShared 데모)에서 검증된 NetworkRunner.StartGame 패턴을 재사용했다.
+/// 전체 접속/로비/입장 흐름을 담당하는 중앙 매니저.
 ///
-/// 사용법:
-/// 1) 씬에 빈 오브젝트를 만들고 이 스크립트를 붙인다.
-/// 2) Player Prefab 필드에 NetworkObject가 붙은 플레이어 프리팹을 연결한다.
-/// 3) 방 이름 입력 UI에서 CreateOrJoinRoom(방이름)을 호출한다.
-/// 4) 직업 선택 UI 버튼에서 RoomManager.SelectedJob 값을 먼저 세팅한 뒤 방에 입장한다.
+/// 1) LobbyScene에 배치해 두면 Start()에서 자동으로 방을 생성/접속한다.
+/// 2) 접속한 로컬 플레이어마다 가벼운 LobbyPlayerState를 스폰하고,
+///    LobbyIntroController에게 "연결 완료, 직업 선택 화면 보여줘"라고 알린다.
+/// 3) 전원 준비 완료 후 LobbySelectionController가 LoadGameplayScene()을 호출하면
+///    Dreamland_map_3로 씬을 전환한다.
+/// 4) Dreamland_map_3에 도착하면(OnSceneLoadDone) 로비에서 고른 직업 그대로
+///    실제 게임 캐릭터(gameplayPlayerPrefab)를 스폰한다.
+///
+/// RoomManager 자신과 NetworkRunner는 DontDestroyOnLoad로 유지되므로
+/// 씬이 바뀌어도 같은 접속이 계속 이어진다.
 /// </summary>
 public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
 {
-    // 로비(직업 선택 화면)에서 미리 골라 둔 직업을 저장해 뒀다가,
-    // 캐릭터 스폰 직후 PlayerJobController.SetJob()에 전달한다.
-    public static PlayerJob SelectedJob = PlayerJob.Police;
-
     [Header("Fusion 연결 설정")]
     [Tooltip("NetworkRunner 컴포넌트만 붙어 있는 빈 프리팹")]
     [SerializeField] private NetworkRunner runnerPrefab;
 
-    [Tooltip("NetworkObject가 붙어 있는 플레이어 프리팹")]
-    [SerializeField] private GameObject playerPrefab;
+    [Tooltip(
+        "같은 이름으로 접속하면 같은 방에 모인다. " +
+        "같은 공간에서 여러 기기가 함께 체험하는 XR 특성상 " +
+        "방 코드 입력 없이 고정된 이름을 사용한다.")]
+    [SerializeField] private string sessionName = "DreamlandRoom";
+
+    [Tooltip("이 오브젝트가 활성화되자마자 자동으로 방을 생성/접속한다.")]
+    [SerializeField] private bool autoConnectOnStart = true;
+
+    [Header("로비 단계 프리팹")]
+    [Tooltip("NetworkObject + LobbyPlayerState가 붙은 가벼운 로비 상태 프리팹")]
+    [SerializeField] private GameObject lobbyPlayerStatePrefab;
+
+    [Header("게임플레이 단계 프리팹")]
+    [Tooltip("NetworkObject + NetworkPlayerMovement + PlayerJobController가 붙은 실제 캐릭터 프리팹")]
+    [SerializeField] private GameObject gameplayPlayerPrefab;
+
+    [Header("씬 경로")]
+    [Tooltip("Build Settings에 등록된 게임 플레이 맵의 씬 파일 경로")]
+    [SerializeField] private string gameplayScenePath = "Assets/GameScene/Dreamland_map_3.unity";
+
+    [Header("연동 (선택)")]
+    [Tooltip("접속이 끝나면 자동으로 ShowJobSelectionScreen()을 호출해 줄 로비 인트로 컨트롤러")]
+    [SerializeField] private LobbyIntroController lobbyIntroController;
 
     private NetworkRunner _runner;
     private bool _isStarting;
+    private bool _gameplaySpawned;
+
+    /// <summary>다른 스크립트(로비 UI 등)가 참조할 수 있도록 노출한다.</summary>
+    public NetworkRunner Runner => _runner;
+
+    /// <summary>로컬 플레이어의 로비 상태. 아직 접속 전이면 null이다.</summary>
+    public LobbyPlayerState LocalLobbyPlayerState { get; private set; }
+
+
+    private void Start()
+    {
+        if (autoConnectOnStart)
+        {
+            CreateOrJoinRoom(sessionName);
+        }
+    }
 
 
     /// <summary>
@@ -62,6 +100,10 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         _runner.name = "NetworkRunner";
         _runner.AddCallbacks(this);
 
+        // 씬이 바뀌어도(로비 -> 맵) 같은 접속을 계속 유지한다.
+        DontDestroyOnLoad(_runner.gameObject);
+        DontDestroyOnLoad(gameObject);
+
         var sceneInfo = new NetworkSceneInfo();
         sceneInfo.AddSceneRef(SceneRef.FromIndex(SceneManager.GetActiveScene().buildIndex));
 
@@ -86,39 +128,101 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
 
     /// <summary>
+    /// 전원 준비 완료 후 로비 UI(LobbySelectionController)가 호출한다.
+    /// Dreamland_map_3로 씬을 전환한다.
+    /// </summary>
+    public void LoadGameplayScene()
+    {
+        if (_runner == null)
+        {
+            Debug.LogError("[RoomManager] 아직 접속되지 않아 씬을 전환할 수 없습니다.");
+            return;
+        }
+
+        int buildIndex = SceneUtility.GetBuildIndexByScenePath(gameplayScenePath);
+
+        if (buildIndex < 0)
+        {
+            Debug.LogError(
+                $"[RoomManager] '{gameplayScenePath}'가 Build Settings에 등록되어 있지 않습니다. " +
+                "File > Build Profiles > Scene List에 추가하세요.");
+            return;
+        }
+
+        _runner.LoadScene(SceneRef.FromIndex(buildIndex), LoadSceneMode.Single, LocalPhysicsMode.Physics3D, true);
+    }
+
+
+    /// <summary>
     /// Shared Mode에서는 새 플레이어가 들어올 때마다 이미 접속해 있는
     /// 모든 클라이언트에게 OnPlayerJoined가 호출된다.
-    /// 따라서 반드시 "그게 나 자신일 때만" 내 캐릭터를 스폰해야 한다.
+    /// 반드시 "그게 나 자신일 때만" 내 로비 상태를 스폰해야 한다.
     /// </summary>
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player)
     {
         if (player != runner.LocalPlayer) return;
-        if (playerPrefab == null)
+
+        if (lobbyPlayerStatePrefab == null)
         {
-            Debug.LogError("[RoomManager] Player Prefab이 연결되지 않았습니다.");
+            Debug.LogError("[RoomManager] Lobby Player State Prefab이 연결되지 않았습니다.");
             return;
         }
+
+        NetworkObject stateObject = runner.Spawn(
+            lobbyPlayerStatePrefab,
+            Vector3.zero,
+            Quaternion.identity,
+            player);
+
+        runner.SetPlayerObject(player, stateObject);
+        LocalLobbyPlayerState = stateObject.GetComponent<LobbyPlayerState>();
+
+        if (lobbyIntroController != null)
+        {
+            lobbyIntroController.ShowJobSelectionScreen();
+        }
+    }
+
+
+    /// <summary>
+    /// 씬 로드가 끝날 때마다 호출된다. Dreamland_map_3에 도착한 경우에만
+    /// 로비에서 고른 직업으로 실제 게임 캐릭터를 스폰한다.
+    /// </summary>
+    public void OnSceneLoadDone(NetworkRunner runner)
+    {
+        string activeSceneName = SceneManager.GetActiveScene().name;
+        string targetSceneName = System.IO.Path.GetFileNameWithoutExtension(gameplayScenePath);
+
+        if (activeSceneName != targetSceneName) return;
+        if (_gameplaySpawned) return;
+
+        if (gameplayPlayerPrefab == null)
+        {
+            Debug.LogError("[RoomManager] Gameplay Player Prefab이 연결되지 않았습니다.");
+            return;
+        }
+
+        _gameplaySpawned = true;
+
+        PlayerJob job =
+            LocalLobbyPlayerState != null && LocalLobbyPlayerState.HasSelectedJob
+                ? LocalLobbyPlayerState.SelectedJob
+                : PlayerJob.Police; // 혹시 못 골랐을 경우를 대비한 안전한 기본값
 
         Vector3 spawnPosition = new Vector3(
             UnityEngine.Random.Range(-2f, 2f),
             1f,
             UnityEngine.Random.Range(-2f, 2f));
 
-        // onBeforeSpawned 콜백은 오브젝트가 네트워크에 올라가기(Spawned() 호출) 전에 실행되므로,
-        // 여기서 CurrentJob을 세팅해야 나뿐 아니라 나중에 들어오는 다른 플레이어에게도
-        // 처음부터 올바른 직업으로 보인다.
         runner.Spawn(
-            playerPrefab,
+            gameplayPlayerPrefab,
             spawnPosition,
             Quaternion.identity,
-            player,
+            runner.LocalPlayer,
             (r, obj) =>
             {
                 var jobController = obj.GetComponent<PlayerJobController>();
-                if (jobController != null)
-                {
-                    jobController.SetJob(SelectedJob);
-                }
+                jobController?.SetJob(job);
             });
     }
 
@@ -144,7 +248,6 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
     public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ReadOnlySpan<byte> data) { }
     public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
-    public void OnSceneLoadDone(NetworkRunner runner) { }
     public void OnSceneLoadStart(NetworkRunner runner) { }
     public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
