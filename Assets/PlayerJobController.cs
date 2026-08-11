@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Fusion;
 using UnityEngine;
 
 public enum PlayerJob
@@ -10,10 +11,12 @@ public enum PlayerJob
     Builder
 }
 
-public class PlayerJobController : MonoBehaviour
+public class PlayerJobController : NetworkBehaviour
 {
-    [Header("현재 선택된 직업")]
-    public PlayerJob currentJob = PlayerJob.Police;
+    // Fusion 2 네트워크 프로퍼티: 값이 바뀌면 모든 클라이언트에서 OnJobChanged가 호출된다.
+    // (currentJob 필드 대신 사용 - [Networked]는 자동 구현 프로퍼티({ get; set; })여야 함)
+    [Networked, OnChangedRender(nameof(OnJobChanged))]
+    public PlayerJob CurrentJob { get; set; }
 
 
     [Header("직업별 모델링 (Models)")]
@@ -87,66 +90,24 @@ public class PlayerJobController : MonoBehaviour
         300000;
 
 
-    private void Start()
+    public override void Spawned()
     {
-        DetectActiveJobFromHierarchy();
-        ApplyJobSettings(currentJob);
+        // Start() 대신 Spawned()에서 초기화한다.
+        // Spawned() 시점에는 Object/Runner가 준비되어 있고, CurrentJob도
+        // 스폰 시 RoomManager가 onBeforeSpawned에서 세팅한 값으로 이미 채워져 있다.
+        ApplyJobSettings(CurrentJob);
     }
 
 
     private void Update()
     {
-        // 플레이 도중 Hierarchy에서 직접 직업 모델과 무기를
-        // 켜고 끄는 테스트 방식에도 대응한다.
-        DetectActiveJobFromHierarchy();
+        // 내 캐릭터(입력 권한을 가진 클라이언트)만 입력에 반응한다.
+        if (!Object.HasInputAuthority) return;
 
         if (Input.GetButtonDown("Fire1"))
         {
             Attack();
         }
-    }
-
-
-    /// <summary>
-    /// 현재 활성화된 모델 또는 무기를 기준으로
-    /// 현재 직업을 자동 감지한다.
-    /// </summary>
-    private void DetectActiveJobFromHierarchy()
-    {
-        if (IsJobActive(modelPolice, weaponPolice))
-        {
-            currentJob = PlayerJob.Police;
-        }
-        else if (IsJobActive(
-                     modelFirefighter,
-                     weaponFirefighter))
-        {
-            currentJob = PlayerJob.Firefighter;
-        }
-        else if (IsJobActive(modelChef, weaponChef))
-        {
-            currentJob = PlayerJob.Chef;
-        }
-        else if (IsJobActive(modelBuilder, weaponBuilder))
-        {
-            currentJob = PlayerJob.Builder;
-        }
-    }
-
-
-    private bool IsJobActive(
-        GameObject modelObject,
-        GameObject weaponObject)
-    {
-        bool modelActive =
-            modelObject != null &&
-            modelObject.activeSelf;
-
-        bool weaponActive =
-            weaponObject != null &&
-            weaponObject.activeSelf;
-
-        return modelActive || weaponActive;
     }
 
 
@@ -158,7 +119,7 @@ public class PlayerJobController : MonoBehaviour
             return;
         }
 
-        switch (currentJob)
+        switch (CurrentJob)
         {
             case PlayerJob.Police:
                 lastAttackTime = Time.time;
@@ -538,13 +499,31 @@ public class PlayerJobController : MonoBehaviour
     }
 
 
-    public void ApplyJobSettings(PlayerJob job)
+    /// <summary>
+    /// 로비에서 고른 직업을 실제로 적용한다.
+    /// State Authority(이 캐릭터를 스폰한 본인)만 CurrentJob을 쓸 수 있다.
+    /// 값이 바뀌면 OnJobChanged가 자동 호출되어 모든 클라이언트에서 모델/무기가 갱신된다.
+    /// </summary>
+    public void SetJob(PlayerJob job)
     {
-        currentJob = job;
+        if (Object.HasStateAuthority)
+        {
+            CurrentJob = job;
+        }
+    }
 
+
+    private void OnJobChanged()
+    {
+        ApplyJobSettings(CurrentJob);
+    }
+
+
+    private void ApplyJobSettings(PlayerJob job)
+    {
         DisableAllObjects();
 
-        switch (currentJob)
+        switch (job)
         {
             case PlayerJob.Police:
                 if (modelPolice != null)
