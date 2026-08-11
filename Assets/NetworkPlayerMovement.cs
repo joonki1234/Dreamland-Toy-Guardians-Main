@@ -1,6 +1,7 @@
 using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
 
 /// <summary>
 /// FPSController.cs를 Photon Fusion 2 Shared Mode 네트워크 이동으로 이식한 버전.
@@ -47,12 +48,20 @@ public class NetworkPlayerMovement : NetworkBehaviour
 
     private CharacterController _cc;
     private SphereCollider _boundarySphereCollider;
+    private TrackedPoseDriver _headTrackedPoseDriver;
     private float _verticalRotation;
 
 
     public override void Spawned()
     {
         _cc = GetComponent<CharacterController>();
+
+        // Player Camera에 TrackedPoseDriver(XR 헤드셋 트래킹)가 붙어 있다면
+        // 그쪽이 이미 카메라 회전을 담당하므로, 아래 Update()에서 마우스로 덮어쓰지 않는다.
+        if (playerCamera != null)
+        {
+            _headTrackedPoseDriver = playerCamera.GetComponent<TrackedPoseDriver>();
+        }
 
         if (playerBoundaryShield != null)
         {
@@ -128,9 +137,18 @@ public class NetworkPlayerMovement : NetworkBehaviour
 
     private void Update()
     {
+        // 스폰 직후 첫 프레임 등 Fusion이 아직 Object를 연결하기 전에
+        // Update()가 먼저 호출될 수 있다 - 안전하게 무시한다.
+        if (Object == null) return;
+
         // 카메라 회전은 네트워크 동기화가 필요 없는 순수 로컬 연출이므로
         // FixedUpdateNetwork가 아닌 일반 Update에서 즉시 처리한다.
         if (!Object.HasInputAuthority) return;
+
+        // XR 헤드셋(TrackedPoseDriver)이 이미 카메라 회전을 담당하고 있다면
+        // 마우스 회전 코드가 그 위에 덮어써서 시야가 안 돌아가는 문제가 생긴다 - 건너뛴다.
+        if (_headTrackedPoseDriver != null && _headTrackedPoseDriver.enabled) return;
+
         if (Mouse.current == null) return;
 
         Vector2 mouseDelta =

@@ -54,12 +54,26 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     private NetworkRunner _runner;
     private bool _isStarting;
     private bool _gameplaySpawned;
+    private bool _devDirectMode;
+    private PlayerJob _devDefaultJob;
 
     /// <summary>다른 스크립트(로비 UI 등)가 참조할 수 있도록 노출한다.</summary>
     public NetworkRunner Runner => _runner;
 
     /// <summary>로컬 플레이어의 로비 상태. 아직 접속 전이면 null이다.</summary>
     public LobbyPlayerState LocalLobbyPlayerState { get; private set; }
+
+
+    /// <summary>
+    /// Dreamland_map_3를 로비를 거치지 않고 단독으로 열어서 테스트할 때 사용한다.
+    /// (DreamlandMapDevEntry.cs가 호출한다) 이 모드에서는 로비 상태/직업 선택 화면을
+    /// 건너뛰고 접속하자마자 바로 지정한 직업으로 게임 캐릭터를 스폰한다.
+    /// </summary>
+    public void EnableDevDirectMode(PlayerJob defaultJob)
+    {
+        _devDirectMode = true;
+        _devDefaultJob = defaultJob;
+    }
 
 
     private void Start()
@@ -162,6 +176,13 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (player != runner.LocalPlayer) return;
 
+        // Dreamland_map_3를 단독으로 열어서 테스트하는 중이면 로비 단계를 통째로 건너뛴다.
+        if (_devDirectMode)
+        {
+            SpawnGameplayCharacter(runner, _devDefaultJob);
+            return;
+        }
+
         if (lobbyPlayerStatePrefab == null)
         {
             Debug.LogError("[RoomManager] Lobby Player State Prefab이 연결되지 않았습니다.");
@@ -187,13 +208,34 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     /// <summary>
     /// 씬 로드가 끝날 때마다 호출된다. Dreamland_map_3에 도착한 경우에만
     /// 로비에서 고른 직업으로 실제 게임 캐릭터를 스폰한다.
+    ///
+    /// (개발용 단독 실행 모드에서는 씬을 "로드"한 게 아니라 이미 그 씬에서
+    /// 시작한 것이므로 이 콜백이 아니라 OnPlayerJoined에서 바로 스폰한다.)
     /// </summary>
     public void OnSceneLoadDone(NetworkRunner runner)
     {
+        if (_devDirectMode) return;
+
         string activeSceneName = SceneManager.GetActiveScene().name;
         string targetSceneName = System.IO.Path.GetFileNameWithoutExtension(gameplayScenePath);
 
         if (activeSceneName != targetSceneName) return;
+
+        PlayerJob job =
+            LocalLobbyPlayerState != null && LocalLobbyPlayerState.HasSelectedJob
+                ? LocalLobbyPlayerState.SelectedJob
+                : PlayerJob.Police; // 혹시 못 골랐을 경우를 대비한 안전한 기본값
+
+        SpawnGameplayCharacter(runner, job);
+    }
+
+
+    /// <summary>
+    /// 실제 게임 캐릭터(gameplayPlayerPrefab)를 지정한 직업으로 스폰한다.
+    /// 정상 흐름(OnSceneLoadDone)과 개발용 단독 실행(OnPlayerJoined) 양쪽에서 공용으로 쓴다.
+    /// </summary>
+    private void SpawnGameplayCharacter(NetworkRunner runner, PlayerJob job)
+    {
         if (_gameplaySpawned) return;
 
         if (gameplayPlayerPrefab == null)
@@ -203,11 +245,6 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         _gameplaySpawned = true;
-
-        PlayerJob job =
-            LocalLobbyPlayerState != null && LocalLobbyPlayerState.HasSelectedJob
-                ? LocalLobbyPlayerState.SelectedJob
-                : PlayerJob.Police; // 혹시 못 골랐을 경우를 대비한 안전한 기본값
 
         Vector3 spawnPosition = new Vector3(
             UnityEngine.Random.Range(-2f, 2f),

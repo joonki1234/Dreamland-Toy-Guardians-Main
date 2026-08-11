@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Fusion;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public enum PlayerJob
 {
@@ -83,6 +84,15 @@ public class PlayerJobController : NetworkBehaviour
     public float maxShotDamagePerEnemy = 18f;
 
 
+    [Header("XR 컨트롤러 입력 (선택)")]
+    [Tooltip(
+        "XRI Default Input Actions의 'XRI Right Interaction/Activate' " +
+        "(또는 Left) 액션을 연결하면 VR 컨트롤러 트리거로도 공격할 수 있습니다. " +
+        "비워두면 마우스 클릭만으로 동작합니다(PC 테스트용).")]
+    [SerializeField]
+    private InputActionReference xrActivateAction;
+
+
     private float lastAttackTime = -999f;
     private bool isSwinging;
 
@@ -99,12 +109,39 @@ public class PlayerJobController : NetworkBehaviour
     }
 
 
+    private void OnEnable()
+    {
+        if (xrActivateAction != null && xrActivateAction.action != null)
+        {
+            xrActivateAction.action.Enable();
+        }
+    }
+
+
+    private void OnDisable()
+    {
+        if (xrActivateAction != null && xrActivateAction.action != null)
+        {
+            xrActivateAction.action.Disable();
+        }
+    }
+
+
     private void Update()
     {
+        // 아직 Fusion에 스폰되지 않은 인스턴스(예: 씬에 직접 남아있는 옛날 오브젝트)라면
+        // Object가 null이라 여기서 죽는다 - 안전하게 무시한다.
+        if (Object == null) return;
+
         // 내 캐릭터(입력 권한을 가진 클라이언트)만 입력에 반응한다.
         if (!Object.HasInputAuthority) return;
 
-        if (Input.GetButtonDown("Fire1"))
+        // PC 테스트: 마우스 왼쪽 클릭. VR: 컨트롤러 트리거(Activate 액션이 연결된 경우).
+        bool mouseFire = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+        bool xrFire = xrActivateAction != null && xrActivateAction.action != null
+            && xrActivateAction.action.WasPressedThisFrame();
+
+        if (mouseFire || xrFire)
         {
             Attack();
         }
