@@ -108,8 +108,38 @@ public class NetworkPlayerMovement : NetworkBehaviour
         if (!Object.HasStateAuthority) return;
 
         Vector2 input = ReadMovementInput();
+
+        // 몸통(transform)이 아니라 "지금 보고 있는 방향"(카메라) 기준으로 이동해야 한다.
+        // 마우스 모드에서는 좌우 회전이 몸통에도 적용되어 transform.forward로도 어느 정도
+        // 맞았지만, XR 헤드트래킹(TrackedPoseDriver)은 카메라만 돌리고 몸통은 그대로 두기
+        // 때문에 transform.forward를 쓰면 시점이 바뀌어도 이동 방향이 고정되어 있었다.
+        // 카메라의 forward/right를 수평으로 눕혀서(피치 무시) 이동 방향을 계산한다.
+        Transform directionSource =
+            playerCamera != null ? playerCamera.transform : transform;
+
+        Vector3 forward = directionSource.forward;
+        forward.y = 0f;
+
+        Vector3 right = directionSource.right;
+        right.y = 0f;
+
+        if (forward.sqrMagnitude <= 0.0001f)
+        {
+            forward = transform.forward;
+            forward.y = 0f;
+        }
+
+        if (right.sqrMagnitude <= 0.0001f)
+        {
+            right = transform.right;
+            right.y = 0f;
+        }
+
+        forward.Normalize();
+        right.Normalize();
+
         Vector3 direction =
-            (transform.forward * input.y + transform.right * input.x).normalized;
+            (forward * input.y + right * input.x).normalized;
 
         if (direction.sqrMagnitude <= 0f) return;
 

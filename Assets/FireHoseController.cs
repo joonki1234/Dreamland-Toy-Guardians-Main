@@ -1,4 +1,5 @@
 using System.Collections;
+using Fusion;
 using UnityEngine;
 
 public class FireHoseController : MonoBehaviour
@@ -16,6 +17,14 @@ public class FireHoseController : MonoBehaviour
     private float defaultSpeed;
     private bool isShooting = false;
 
+    // 내가 조종하는 캐릭터의 무기일 때만 반응하도록 하는 소유권 체크용.
+    private NetworkObject ownerNetworkObject;
+
+    private void Awake()
+    {
+        ownerNetworkObject = GetComponentInParent<NetworkObject>();
+    }
+
     private void Start()
     {
         if (waterParticle != null)
@@ -28,6 +37,8 @@ public class FireHoseController : MonoBehaviour
 
     private void Update()
     {
+        if (ownerNetworkObject != null && !ownerNetworkObject.HasInputAuthority) return;
+
         if (Input.GetButtonDown("Fire1")) StartWater();
         else if (Input.GetButtonUp("Fire1")) StopWater();
 

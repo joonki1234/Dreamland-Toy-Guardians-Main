@@ -56,6 +56,8 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     private bool _gameplaySpawned;
     private bool _devDirectMode;
     private PlayerJob _devDefaultJob;
+    private bool _hasPendingJob;
+    private PlayerJob _pendingJob;
 
     /// <summary>다른 스크립트(로비 UI 등)가 참조할 수 있도록 노출한다.</summary>
     public NetworkRunner Runner => _runner;
@@ -153,6 +155,24 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
+        // LobbyPlayerState는 LobbyScene 안에서 스폰된 오브젝트라, 씬을 전환하면
+        // (Unity가 LobbyScene을 통째로 언로드하면서) 같이 파괴되어 버린다.
+        // 그래서 Dreamland_map_3에서 OnSceneLoadDone이 불릴 때는 이미 늦다 -
+        // 여기, 아직 LobbyScene에 있을 때 값만 미리 복사해 둔다.
+        if (LocalLobbyPlayerState != null)
+        {
+            if (LocalLobbyPlayerState.HasSelectedJob)
+            {
+                _pendingJob = LocalLobbyPlayerState.SelectedJob;
+                _hasPendingJob = true;
+            }
+
+            // 씬과 함께 자동으로 사라지게 두면 Fusion 쪽 동기화 상태가 꼬여서
+            // tick 관련 AssertException이 날 수 있다 - 미리 정상적으로 정리한다.
+            _runner.Despawn(LocalLobbyPlayerState.Object);
+            LocalLobbyPlayerState = null;
+        }
+
         int buildIndex = SceneUtility.GetBuildIndexByScenePath(gameplayScenePath);
 
         if (buildIndex < 0)
@@ -163,7 +183,13 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
             return;
         }
 
-        _runner.LoadScene(SceneRef.FromIndex(buildIndex), LoadSceneMode.Single, LocalPhysicsMode.Physics3D, true);
+        // LocalPhysicsMode.Physics3D를 쓰면 이 씬 전용의 "격리된" PhysicsScene이 생성되는데,
+        // 이건 Multiple Peer 모드(러너마다 물리를 따로 시뮬레이션)를 위한 옵션이라
+        // 우리처럼 Single Peer(Shared Mode, 러너 1개)에서는 아무도 이 격리된 PhysicsScene을
+        // Simulate()해주지 않는다. 그 결과 AddForce/velocity로 초기 속도는 걸리지만
+        // 실제 위치 갱신(중력 포함)이 전혀 일어나지 않아 총알/음식/흙덩이가 허공에 멈춰버렸다.
+        // None으로 두면 Unity 기본(자동 시뮬레이션되는) PhysicsScene을 그대로 사용한다.
+        _runner.LoadScene(SceneRef.FromIndex(buildIndex), LoadSceneMode.Single, LocalPhysicsMode.None, true);
     }
 
 
@@ -221,10 +247,9 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
         if (activeSceneName != targetSceneName) return;
 
-        PlayerJob job =
-            LocalLobbyPlayerState != null && LocalLobbyPlayerState.HasSelectedJob
-                ? LocalLobbyPlayerState.SelectedJob
-                : PlayerJob.Police; // 혹시 못 골랐을 경우를 대비한 안전한 기본값
+        // LobbyPlayerState는 LoadGameplayScene()에서 이미 파괴됐으므로,
+        // 그때 미리 복사해 둔 값(_pendingJob)을 사용한다.
+        PlayerJob job = _hasPendingJob ? _pendingJob : PlayerJob.Police; // 못 골랐을 경우를 대비한 안전한 기본값
 
         SpawnGameplayCharacter(runner, job);
     }

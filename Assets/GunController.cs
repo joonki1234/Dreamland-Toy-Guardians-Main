@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -61,9 +62,26 @@ public class GunController : MonoBehaviour
     private static int nextPoliceShotId =
         500000;
 
+    // 이 무기가 붙어 있는 플레이어의 NetworkObject.
+    // 멀티플레이에서는 "내가 조종하는 캐릭터의 무기"일 때만 내 입력에 반응해야 한다.
+    // 이게 없으면 다른 플레이어의(=화면에 보이는 원격 캐릭터의) 총도
+    // 내가 클릭할 때마다 같이 발사돼 버린다.
+    private NetworkObject ownerNetworkObject;
+
+
+    private void Awake()
+    {
+        ownerNetworkObject = GetComponentInParent<NetworkObject>();
+    }
+
 
     private void Update()
     {
+        if (ownerNetworkObject != null && !ownerNetworkObject.HasInputAuthority)
+        {
+            return;
+        }
+
         if (Mouse.current != null &&
             Mouse.current.leftButton.wasPressedThisFrame)
         {
