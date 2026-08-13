@@ -85,6 +85,12 @@ namespace DreamGuardians
         [SerializeField]
         private AudioSource voiceSource;
 
+        [Tooltip(
+            "voiceClip이 따로 없을 때, 동물의숲 스타일로 대사 길이만큼 " +
+            "무작위 음절을 중얼거려주는 컴포넌트입니다. 비워두면 사용하지 않습니다.")]
+        [SerializeField]
+        private AnimaleseVoicePlayer animaleseVoice;
+
         [SerializeField]
         private UnityEvent onSpeechStarted;
 
@@ -550,6 +556,12 @@ namespace DreamGuardians
                 voiceSource.clip = voiceClip;
                 voiceSource.Play();
             }
+            else if (animaleseVoice != null)
+            {
+                // 정해진 대사 음원이 없으면, 대사가 떠 있는 동안 동물의숲 캐릭터처럼
+                // 알파벳/숫자 음절을 무작위로 빠르게 중얼거려준다.
+                animaleseVoice.PlayBabbleForDuration(duration);
+            }
 
             onSpeechStarted?.Invoke();
 
@@ -597,6 +609,8 @@ namespace DreamGuardians
             {
                 voiceSource.Stop();
             }
+
+            animaleseVoice?.StopBabble();
 
             if (storyFocusRequested)
             {
