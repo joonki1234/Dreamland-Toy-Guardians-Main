@@ -15294,6 +15294,7 @@ GameObject:
   - component: {fileID: 554572265021740435}
   - component: {fileID: 832067869734382761}
   - component: {fileID: 4235806723926247938}
+  - component: {fileID: 6807834408968592922}
   m_Layer: 0
   m_Name: 01_Player
   m_TagString: Untagged
@@ -15445,6 +15446,7 @@ MonoBehaviour:
   - {fileID: 832067869734382761}
   - {fileID: 4808250408771500888}
   - {fileID: 4235806723926247938}
+  - {fileID: 6807834408968592922}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &554572265021740435
 CharacterController:
@@ -15531,6 +15533,22 @@ MonoBehaviour:
   audioListener: {fileID: 3348426691839170231}
   footstepInterval: 0.45
   footstepVolume: 0.35
+--- !u!114 &6807834408968592922
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3076224963965821132}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 755d09ac413d9fb4aa99c62e5f96abfc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VRHandTargetFollower
+  handTarget: {fileID: 7995171305442565149}
+  rightControllerTarget: {fileID: 0}
+  autoFindRightControllerTarget: 1
+  rightControllerTargetName: Right Controller Target
 --- !u!1 &3167499152967314610
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,4 +1,9 @@
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+using System.Reflection;
 using UnityEngine;
+using Fusion;
 
 /// <summary>
 /// Dreamland_map_3를 로비를 거치지 않고 이 씬에서 바로 Play를 눌러
@@ -31,11 +36,50 @@ public class DreamlandMapDevEntry : MonoBehaviour
 
         if (roomManagerPrefab == null)
         {
-            Debug.LogError("[DreamlandMapDevEntry] Room Manager Prefab이 연결되지 않았습니다.");
+            // 런타임에서 안전하게 RoomManager를 생성해서 DevDirectMode로 시작한다.
+            GameObject rmGO = new GameObject("@RoomManager_Dev");
+            RoomManager roomManager = rmGO.AddComponent<RoomManager>();
+
+            // NetworkRunner 템플릿을 하나 만들어서 runnerPrefab 필드에 할당한다.
+            GameObject runnerTemplate = new GameObject("NetworkRunner_Template");
+            var runnerComp = runnerTemplate.AddComponent<NetworkRunner>();
+
+            // private serialized 필드에 값 할당 (reflection 사용)
+            var rmType = typeof(RoomManager);
+            var runnerField = rmType.GetField("runnerPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (runnerField != null)
+            {
+                runnerField.SetValue(roomManager, runnerComp);
+            }
+
+            // gameplayPlayerPrefab는 에디터에서만 AssetDatabase로 로드
+            var gameplayField = rmType.GetField("gameplayPlayerPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
+#if UNITY_EDITOR
+            if (gameplayField != null)
+            {
+                var playerAsset = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/01_Player.prefab");
+                if (playerAsset != null)
+                {
+                    gameplayField.SetValue(roomManager, playerAsset);
+                }
+                else
+                {
+                    Debug.LogWarning("[DreamlandMapDevEntry] Assets/01_Player.prefab 를 에디터에서 찾을 수 없습니다.");
+                }
+            }
+#else
+            if (gameplayField != null)
+            {
+                Debug.LogWarning("[DreamlandMapDevEntry] gameplayPlayerPrefab를 자동 할당할 수 없습니다 (에디터 전용). 수동 설정 필요.");
+            }
+#endif
+
+            // Enable dev mode 및 종료
+            roomManager.EnableDevDirectMode(devDefaultJob);
             return;
         }
 
-        RoomManager roomManager = Instantiate(roomManagerPrefab);
-        roomManager.EnableDevDirectMode(devDefaultJob);
+        RoomManager roomManagerInst = Instantiate(roomManagerPrefab);
+        roomManagerInst.EnableDevDirectMode(devDefaultJob);
     }
 }
