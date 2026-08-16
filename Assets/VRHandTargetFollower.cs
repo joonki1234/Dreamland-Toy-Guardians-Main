@@ -26,6 +26,21 @@ public class VRHandTargetFollower : NetworkBehaviour
     [SerializeField]
     private Transform leftControllerTarget;
 
+    [Header("Right Hand Offset")]
+    [SerializeField]
+    private Vector3 rightHandPositionOffset = Vector3.zero;
+
+    [SerializeField]
+    private Vector3 rightHandRotationOffset = Vector3.zero;
+
+    [Tooltip("Fixed controller-to-hand rotation basis. Author this Transform under Rig_IK; do not derive it from an animated hand bone at runtime.")]
+    [SerializeField]
+    private Transform rightHandGripReference;
+
+    [Header("Local Body Yaw")]
+    [SerializeField]
+    private float bodyYawSmoothing = 10f;
+
     [Header("Controller target auto resolve")]
     [SerializeField]
     private bool autoFindControllerTargets = true;
@@ -45,13 +60,20 @@ public class VRHandTargetFollower : NetworkBehaviour
 
     private TwoBoneIKConstraint rightHandIkConstraint;
     private TwoBoneIKConstraint leftHandIkConstraint;
+    private Transform rightElbowHint;
     private Transform rigRoot;
+    private Transform modelsRoot;
+    private Transform hmdTransform;
+    private Transform controllerTrackingOrigin;
+    private Quaternion modelsBaseLocalRotation = Quaternion.identity;
+    private bool modelsBaseRotationCached;
     private PlayerJobController jobController;
     private PlayerJob lastObservedJob;
     private GameObject currentActiveModel;
 
     private bool _warnedMissingHandTarget;
     private bool _warnedMissingLeftHandTarget;
+    private bool _warnedMissingRightHandGripReference;
     private bool networkSpawned;
 
     private void Awake()
@@ -91,9 +113,19 @@ public class VRHandTargetFollower : NetworkBehaviour
             TryResolveControllerTargets();
         }
 
+        UpdateLocalBodyYaw();
+
         if (handTarget != null && rightControllerTarget != null)
         {
-            SetTargetPose(handTarget, rightControllerTarget);
+            if (rightHandGripReference != null)
+            {
+                SetRightTargetPose(handTarget, rightControllerTarget);
+            }
+            else if (!_warnedMissingRightHandGripReference)
+            {
+                Debug.LogWarning("[VRHandTargetFollower] Fixed 'RightHandGripReference' is missing under Rig_IK.");
+                _warnedMissingRightHandGripReference = true;
+            }
         }
         else if (!_warnedMissingHandTarget)
         {
@@ -126,13 +158,20 @@ public class VRHandTargetFollower : NetworkBehaviour
 
         if (handTarget == null)
         {
-            handTarget = FindOrCreateTarget("HandTarget_R", rigRoot != null ? rigRoot : transform);
+            handTarget = FindTransformByName(rigRoot, "HandTarget_R");
         }
 
         if (leftHandTarget == null)
         {
-            leftHandTarget = FindOrCreateTarget("HandTarget_L", rigRoot != null ? rigRoot : transform);
+            leftHandTarget = FindTransformByName(rigRoot, "HandTarget_L");
         }
+
+        if (rightHandGripReference == null)
+        {
+            rightHandGripReference = FindTransformByName(rigRoot, "RightHandGripReference");
+        }
+
+        ResolveBodyTransforms();
 
         // autoFindControllerTargets and job binding are handled in Spawned().
     }
@@ -265,6 +304,8 @@ public class VRHandTargetFollower : NetworkBehaviour
             rightForearmNames,
             rightHandNames
         );
+
+        ConfigureRightElbowHint(activeModel);
     }
 
     private void RebindTwoBoneIK(
@@ -284,36 +325,17 @@ public class VRHandTargetFollower : NetworkBehaviour
         if (constraint == null)
         {
             Transform parent = rigRoot != null ? rigRoot : transform;
-            TwoBoneIKConstraint foundConstraint = null;
+            Transform constraintTransform = FindTransformByName(parent, constraintName);
+            if (constraintTransform != null)
+            {
+                constraint = constraintTransform.GetComponent<TwoBoneIKConstraint>();
+            }
+        }
 
-            if (parent != null)
-            {
-                Transform[] all = parent.GetComponentsInChildren<Transform>(true);
-                foreach (Transform t in all)
-                {
-                    if (t != null && t.name == constraintName)
-                    {
-                        foundConstraint = t.GetComponent<TwoBoneIKConstraint>();
-                        if (foundConstraint == null)
-                        {
-                            // If GameObject exists but constraint missing, add component to reuse GameObject.
-                            foundConstraint = t.gameObject.AddComponent<TwoBoneIKConstraint>();
-                        }
-                        break;
-                    }
-                }
-            }
-
-            if (foundConstraint != null)
-            {
-                constraint = foundConstraint;
-            }
-            else
-            {
-                GameObject ikObject = new GameObject(constraintName);
-                ikObject.transform.SetParent(parent != null ? parent : transform, false);
-                constraint = ikObject.AddComponent<TwoBoneIKConstraint>();
-            }
+        if (constraint == null)
+        {
+            Debug.LogError($"[VRHandTargetFollower] Prefab IK object '{constraintName}' or its TwoBoneIKConstraint is missing.");
+            return;
         }
 
         constraint.weight = 1f;
@@ -333,6 +355,54 @@ public class VRHandTargetFollower : NetworkBehaviour
             constraint.data.mid = mid;
             constraint.data.tip = tip;
         }
+    }
+
+    private void ConfigureRightElbowHint(GameObject activeModel)
+    {
+        if (rightHandIkConstraint == null || activeModel == null)
+        {
+            return;
+        }
+
+        Transform root = rightHandIkConstraint.data.root;
+        Transform mid = rightHandIkConstraint.data.mid;
+        Transform tip = rightHandIkConstraint.data.tip;
+        if (root == null || mid == null || tip == null)
+        {
+            return;
+        }
+
+        if (rightElbowHint == null)
+        {
+            rightElbowHint = FindTransformByName(rigRoot, "RightElbowHint");
+        }
+
+        if (rightElbowHint == null)
+        {
+            Debug.LogError("[VRHandTargetFollower] Prefab object 'RightElbowHint' is missing under Rig_IK.");
+            return;
+        }
+
+        rightHandIkConstraint.data.hint = rightElbowHint;
+        rightHandIkConstraint.data.hintWeight = 1f;
+    }
+
+    private Transform FindTransformByName(Transform searchRoot, string objectName)
+    {
+        if (searchRoot == null || string.IsNullOrEmpty(objectName))
+        {
+            return null;
+        }
+
+        foreach (Transform candidate in searchRoot.GetComponentsInChildren<Transform>(true))
+        {
+            if (candidate != null && candidate.name == objectName)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private Transform FindBoneInModel(GameObject model, params string[] names)
@@ -486,6 +556,8 @@ public class VRHandTargetFollower : NetworkBehaviour
             return null;
         }
 
+        controllerTrackingOrigin = xrOrigin.transform;
+
         Transform cameraOffset = xrOrigin.transform.Find("Camera Offset");
         if (cameraOffset != null)
         {
@@ -520,28 +592,6 @@ public class VRHandTargetFollower : NetworkBehaviour
         driver.updateType = TrackedPoseDriver.UpdateType.UpdateAndBeforeRender;
     }
 
-    private Transform FindOrCreateTarget(string targetName, Transform parent)
-    {
-        if (parent == null)
-        {
-            parent = transform;
-        }
-
-        foreach (Transform child in parent.GetComponentsInChildren<Transform>(true))
-        {
-            if (child != null && child.name == targetName)
-            {
-                return child;
-            }
-        }
-
-        GameObject targetObject = new GameObject(targetName);
-        targetObject.transform.SetParent(parent, false);
-        targetObject.transform.localPosition = Vector3.zero;
-        targetObject.transform.localRotation = Quaternion.identity;
-        return targetObject.transform;
-    }
-
     private void SetTargetPose(Transform target, Transform source)
     {
         if (target == null || source == null)
@@ -550,5 +600,95 @@ public class VRHandTargetFollower : NetworkBehaviour
         }
 
         target.SetPositionAndRotation(source.position, source.rotation);
+    }
+
+    private void SetRightTargetPose(Transform target, Transform source)
+    {
+        if (target == null || source == null)
+        {
+            return;
+        }
+
+        GetControllerPoseInPlayerSpace(source, out Vector3 controllerPosition, out Quaternion controllerRotation);
+        Vector3 targetPosition = controllerPosition + controllerRotation * rightHandPositionOffset;
+        Quaternion targetRotation = controllerRotation
+            * rightHandGripReference.localRotation
+            * Quaternion.Euler(rightHandRotationOffset);
+        target.SetPositionAndRotation(targetPosition, targetRotation);
+    }
+
+    private void GetControllerPoseInPlayerSpace(
+        Transform source,
+        out Vector3 worldPosition,
+        out Quaternion worldRotation)
+    {
+        if (controllerTrackingOrigin == null)
+        {
+            GetControllerParentTransform();
+        }
+
+        if (controllerTrackingOrigin == null)
+        {
+            worldPosition = source.position;
+            worldRotation = source.rotation;
+            return;
+        }
+
+        Vector3 playerLocalPosition = controllerTrackingOrigin.InverseTransformPoint(source.position);
+        Quaternion playerLocalRotation =
+            Quaternion.Inverse(controllerTrackingOrigin.rotation) * source.rotation;
+
+        worldPosition = transform.TransformPoint(playerLocalPosition);
+        worldRotation = transform.rotation * playerLocalRotation;
+    }
+
+    private void ResolveBodyTransforms()
+    {
+        if (modelsRoot == null)
+        {
+            Transform directModels = transform.Find("Models");
+            modelsRoot = directModels != null ? directModels : FindTransformByName(transform, "Models");
+        }
+
+        if (modelsRoot != null && !modelsBaseRotationCached)
+        {
+            modelsBaseLocalRotation = modelsRoot.localRotation;
+            modelsBaseRotationCached = true;
+        }
+
+        if (hmdTransform == null)
+        {
+            Camera playerCamera = GetComponentInChildren<Camera>(true);
+            if (playerCamera != null)
+            {
+                hmdTransform = playerCamera.transform;
+            }
+        }
+    }
+
+    private void UpdateLocalBodyYaw()
+    {
+        ResolveBodyTransforms();
+        if (modelsRoot == null || hmdTransform == null || !modelsBaseRotationCached)
+        {
+            return;
+        }
+
+        Vector3 playerLocalForward = transform.InverseTransformDirection(hmdTransform.forward);
+        Vector3 flatForward = Vector3.ProjectOnPlane(playerLocalForward, Vector3.up);
+        if (flatForward.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        flatForward.Normalize();
+        float yaw = Mathf.Atan2(flatForward.x, flatForward.z) * Mathf.Rad2Deg;
+        Quaternion targetLocalRotation =
+            Quaternion.AngleAxis(yaw, Vector3.up) * modelsBaseLocalRotation;
+        float blend = 1f - Mathf.Exp(-Mathf.Max(0f, bodyYawSmoothing) * Time.deltaTime);
+        modelsRoot.localRotation = Quaternion.Slerp(
+            modelsRoot.localRotation,
+            targetLocalRotation,
+            blend);
     }
 }
