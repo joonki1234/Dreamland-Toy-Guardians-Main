@@ -46,15 +46,40 @@ public class NetworkPlayerMovement : NetworkBehaviour
     private AudioListener audioListener;
 
 
+    [Header("발자국 소리")]
+
+    [Tooltip("발소리 사이 간격(초)")]
+    [SerializeField, Min(0.05f)]
+    private float footstepInterval = 0.45f;
+
+    [SerializeField, Range(0f, 1f)]
+    private float footstepVolume = 0.35f;
+
+
     private CharacterController _cc;
     private SphereCollider _boundarySphereCollider;
     private TrackedPoseDriver _headTrackedPoseDriver;
     private float _verticalRotation;
+    private AudioSource _footstepAudioSource;
+    private AudioClip[] _footstepClips;
+    private float _footstepTimer;
 
 
     public override void Spawned()
     {
         _cc = GetComponent<CharacterController>();
+
+        // Assets/Audio/Resources/SFX/Footsteps/ 안의 발소리 클립들을 전부 불러온다.
+        _footstepClips = Resources.LoadAll<AudioClip>("SFX/Footsteps");
+
+        _footstepAudioSource = GetComponent<AudioSource>();
+        if (_footstepAudioSource == null)
+        {
+            _footstepAudioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        _footstepAudioSource.playOnAwake = false;
+        _footstepAudioSource.spatialBlend = 1f;
 
         // Player Camera에 TrackedPoseDriver(XR 헤드셋 트래킹)가 붙어 있다면
         // 그쪽이 이미 카메라 회전을 담당하므로, 아래 Update()에서 마우스로 덮어쓰지 않는다.
@@ -141,12 +166,43 @@ public class NetworkPlayerMovement : NetworkBehaviour
         Vector3 direction =
             (forward * input.y + right * input.x).normalized;
 
-        if (direction.sqrMagnitude <= 0f) return;
+        if (direction.sqrMagnitude <= 0f)
+        {
+            // 멈추면 타이머를 리셋해서, 다시 움직이기 시작하자마자 바로 첫 발소리가 나게 한다.
+            _footstepTimer = footstepInterval;
+            return;
+        }
 
         Vector3 movement = direction * moveSpeed * Runner.DeltaTime;
         _cc.Move(movement);
 
         ClampPositionInsideBoundary();
+        UpdateFootsteps();
+    }
+
+
+    /// <summary>
+    /// 이동 중일 때 일정 간격으로 무작위 발소리를 재생한다.
+    /// </summary>
+    private void UpdateFootsteps()
+    {
+        if (_footstepClips == null || _footstepClips.Length == 0 || _footstepAudioSource == null)
+        {
+            return;
+        }
+
+        _footstepTimer += Runner.DeltaTime;
+
+        if (_footstepTimer < footstepInterval)
+        {
+            return;
+        }
+
+        _footstepTimer = 0f;
+
+        AudioClip clip = _footstepClips[Random.Range(0, _footstepClips.Length)];
+        _footstepAudioSource.pitch = Random.Range(0.95f, 1.05f);
+        _footstepAudioSource.PlayOneShot(clip, footstepVolume);
     }
 
 

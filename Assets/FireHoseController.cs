@@ -20,9 +20,29 @@ public class FireHoseController : MonoBehaviour
     // 내가 조종하는 캐릭터의 무기일 때만 반응하도록 하는 소유권 체크용.
     private NetworkObject ownerNetworkObject;
 
+    // 물 분사음(루프). Assets/Audio/Resources/SFX/Firefighter/hose_spray.mp3를 자동으로 불러온다.
+    private AudioSource sfxAudioSource;
+    private const string SpraySfxResourcePath = "SFX/Firefighter/hose_spray";
+
     private void Awake()
     {
         ownerNetworkObject = GetComponentInParent<NetworkObject>();
+
+        sfxAudioSource = GetComponent<AudioSource>();
+        if (sfxAudioSource == null)
+        {
+            sfxAudioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        sfxAudioSource.playOnAwake = false;
+        sfxAudioSource.loop = true;
+        sfxAudioSource.spatialBlend = 1f;
+        sfxAudioSource.volume = 0.4f;
+
+        if (sfxAudioSource.clip == null)
+        {
+            sfxAudioSource.clip = Resources.Load<AudioClip>(SpraySfxResourcePath);
+        }
     }
 
     private void Start()
@@ -54,6 +74,11 @@ public class FireHoseController : MonoBehaviour
         main.startSpeed = defaultSpeed;
         waterParticle.Play();
         isShooting = true;
+
+        if (sfxAudioSource != null && sfxAudioSource.clip != null && !sfxAudioSource.isPlaying)
+        {
+            sfxAudioSource.Play();
+        }
     }
 
     public void StopWater()
@@ -79,6 +104,11 @@ public class FireHoseController : MonoBehaviour
         waterParticle.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         main.startSpeed = defaultSpeed;
         isShooting = false;
+
+        if (sfxAudioSource != null && sfxAudioSource.isPlaying)
+        {
+            sfxAudioSource.Stop();
+        }
     }
 
     private void ProcessWaterHit()

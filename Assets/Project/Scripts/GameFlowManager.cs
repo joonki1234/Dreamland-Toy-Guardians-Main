@@ -173,6 +173,13 @@ public class GameFlowManager : MonoBehaviour
     {
         SetPhase(1);
 
+        // 전투 시작 - 전투음악으로 전환한다.
+        MapMusicController musicController = FindAnyObjectByType<MapMusicController>();
+        if (musicController != null)
+        {
+            musicController.PlayBattle();
+        }
+
         // WAVE 1 START UI 단계
         SetWave1Step(0);
 
