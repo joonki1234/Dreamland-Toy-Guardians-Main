@@ -40,6 +40,10 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private TMP_Text selectedJobText;
 
+    // Toyfriend 말풍선에 표시되는 직업 설명
+    [SerializeField]
+    private TMP_Text jobDescriptionText;
+
     [SerializeField]
     private TMP_Text lobbyStatusText;
 
@@ -141,7 +145,10 @@ public class LobbySelectionController : MonoBehaviour
     private void Update()
     {
         // 아직 네트워크 접속 전이면 할 일이 없다.
-        if (roomManager == null || roomManager.Runner == null) return;
+        if (roomManager == null || roomManager.Runner == null)
+        {
+            return;
+        }
 
         UpdateUI();
         UpdatePlayerStatusList();
@@ -154,7 +161,10 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private LobbyPlayerState GetLocalState()
     {
-        if (roomManager == null || roomManager.Runner == null) return null;
+        if (roomManager == null || roomManager.Runner == null)
+        {
+            return null;
+        }
 
         var runner = roomManager.Runner;
         var playerObject = runner.GetPlayerObject(runner.LocalPlayer);
@@ -173,6 +183,7 @@ public class LobbySelectionController : MonoBehaviour
     private void SelectJob(PlayerJob job)
     {
         var state = GetLocalState();
+
         if (state == null || state.IsReady)
         {
             return;
@@ -195,6 +206,7 @@ public class LobbySelectionController : MonoBehaviour
     private void ToggleReady()
     {
         var state = GetLocalState();
+
         if (state == null)
         {
             return;
@@ -215,42 +227,84 @@ public class LobbySelectionController : MonoBehaviour
     }
 
     /// <summary>
-    /// 현재 직업, Ready 상태를 UI에 반영한다. (카운트다운 중에는 문구를 건드리지 않는다)
+    /// 현재 직업, Ready 상태를 UI에 반영한다.
+    /// 카운트다운 중에는 Ready 안내 문구를 건드리지 않는다.
     /// </summary>
     private void UpdateUI()
     {
         var state = GetLocalState();
-        bool hasJob = state != null && state.HasSelectedJob;
-        PlayerJob job = hasJob ? state.SelectedJob : PlayerJob.Police;
-        bool ready = state != null && state.IsReady;
 
-        UpdateSelectedJobText(hasJob, job);
-        UpdateJobButtons(hasJob, job, ready);
+        bool hasJob =
+            state != null &&
+            state.HasSelectedJob;
+
+        PlayerJob job =
+            hasJob
+                ? state.SelectedJob
+                : PlayerJob.Police;
+
+        bool ready =
+            state != null &&
+            state.IsReady;
+
+        UpdateSelectedJobText(
+            hasJob,
+            job
+        );
+
+        UpdateJobButtons(
+            hasJob,
+            job,
+            ready
+        );
 
         if (!isCountdownActive)
         {
-            UpdateReadyUI(hasJob, ready);
+            UpdateReadyUI(
+                hasJob,
+                ready
+            );
         }
     }
 
     /// <summary>
-    /// 현재 선택한 직업 이름을 중앙 UI에 표시한다.
+    /// 현재 선택한 직업 이름과 Toyfriend의 직업 설명을 표시한다.
     /// </summary>
-    private void UpdateSelectedJobText(bool hasJob, PlayerJob job)
+    private void UpdateSelectedJobText(
+        bool hasJob,
+        PlayerJob job
+    )
     {
-        if (selectedJobText == null)
+        // 기존 선택 직업 표시
+        if (selectedJobText != null)
         {
-            return;
+            selectedJobText.text =
+                $"선택한 직업: {(hasJob ? GetJobName(job) : "없음")}";
         }
 
-        selectedJobText.text =
-            $"선택한 직업: {(hasJob ? GetJobName(job) : "없음")}";
+        // 새로 추가한 Toyfriend 말풍선 설명
+        if (jobDescriptionText != null)
+        {
+            if (hasJob)
+            {
+                jobDescriptionText.text =
+                    GetJobDescription(job);
+            }
+            else
+            {
+                jobDescriptionText.text =
+                    "궁금한 직업을 선택해봐!";
+            }
+        }
     }
 
     /// <summary>
     /// Ready 버튼과 안내 문구를 현재 상태에 맞게 변경한다.
     /// </summary>
-    private void UpdateReadyUI(bool hasJob, bool ready)
+    private void UpdateReadyUI(
+        bool hasJob,
+        bool ready
+    )
     {
         if (!hasJob)
         {
@@ -295,19 +349,52 @@ public class LobbySelectionController : MonoBehaviour
         if (readyButtonText != null)
         {
             readyButtonText.text =
-                ready ? "준비 취소" : "준비";
+                ready
+                    ? "준비 취소"
+                    : "준비";
         }
     }
 
     /// <summary>
     /// 직업 버튼의 활성화 상태와 색상을 갱신한다.
     /// </summary>
-    private void UpdateJobButtons(bool hasJob, PlayerJob selectedJob, bool isReady)
+    private void UpdateJobButtons(
+        bool hasJob,
+        PlayerJob selectedJob,
+        bool isReady
+    )
     {
-        ApplyJobButtonState(policeButton, PlayerJob.Police, hasJob, selectedJob, isReady);
-        ApplyJobButtonState(firefighterButton, PlayerJob.Firefighter, hasJob, selectedJob, isReady);
-        ApplyJobButtonState(chefButton, PlayerJob.Chef, hasJob, selectedJob, isReady);
-        ApplyJobButtonState(builderButton, PlayerJob.Builder, hasJob, selectedJob, isReady);
+        ApplyJobButtonState(
+            policeButton,
+            PlayerJob.Police,
+            hasJob,
+            selectedJob,
+            isReady
+        );
+
+        ApplyJobButtonState(
+            firefighterButton,
+            PlayerJob.Firefighter,
+            hasJob,
+            selectedJob,
+            isReady
+        );
+
+        ApplyJobButtonState(
+            chefButton,
+            PlayerJob.Chef,
+            hasJob,
+            selectedJob,
+            isReady
+        );
+
+        ApplyJobButtonState(
+            builderButton,
+            PlayerJob.Builder,
+            hasJob,
+            selectedJob,
+            isReady
+        );
     }
 
     /// <summary>
@@ -326,25 +413,37 @@ public class LobbySelectionController : MonoBehaviour
             return;
         }
 
-        bool isSelected = hasJob && selectedJob == buttonJob;
+        bool isSelected =
+            hasJob &&
+            selectedJob == buttonJob;
 
         button.interactable = !isReady;
 
-        ColorBlock colors = button.colors;
+        ColorBlock colors =
+            button.colors;
 
         colors.normalColor =
-            isSelected ? selectedButtonColor : normalButtonColor;
+            isSelected
+                ? selectedButtonColor
+                : normalButtonColor;
 
         colors.highlightedColor =
-            isSelected ? selectedButtonColor : highlightedButtonColor;
+            isSelected
+                ? selectedButtonColor
+                : highlightedButtonColor;
 
-        colors.pressedColor = pressedButtonColor;
+        colors.pressedColor =
+            pressedButtonColor;
 
         colors.selectedColor =
-            isSelected ? selectedButtonColor : normalButtonColor;
+            isSelected
+                ? selectedButtonColor
+                : normalButtonColor;
 
         colors.disabledColor =
-            isSelected ? selectedButtonColor : disabledButtonColor;
+            isSelected
+                ? selectedButtonColor
+                : disabledButtonColor;
 
         colors.colorMultiplier = 1f;
         colors.fadeDuration = 0.1f;
@@ -358,23 +457,35 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private void UpdatePlayerStatusList()
     {
-        if (playerStatusUI == null) return;
+        if (playerStatusUI == null)
+        {
+            return;
+        }
 
-        var runner = roomManager.Runner;
+        var runner =
+            roomManager.Runner;
+
         int index = 0;
 
         foreach (var player in runner.ActivePlayers)
         {
-            var playerObject = runner.GetPlayerObject(player);
-            var state = playerObject != null
-                ? playerObject.GetComponent<LobbyPlayerState>()
-                : null;
+            var playerObject =
+                runner.GetPlayerObject(player);
 
-            string jobName = state != null && state.HasSelectedJob
-                ? GetJobName(state.SelectedJob)
-                : "직업 없음";
+            var state =
+                playerObject != null
+                    ? playerObject.GetComponent<LobbyPlayerState>()
+                    : null;
 
-            bool ready = state != null && state.IsReady;
+            string jobName =
+                state != null &&
+                state.HasSelectedJob
+                    ? GetJobName(state.SelectedJob)
+                    : "직업 없음";
+
+            bool ready =
+                state != null &&
+                state.IsReady;
 
             playerStatusUI.SetPlayerStatus(
                 index,
@@ -387,7 +498,11 @@ public class LobbySelectionController : MonoBehaviour
             index++;
         }
 
-        for (int i = index; i < maximumPlayerCount && i < 8; i++)
+        for (
+            int i = index;
+            i < maximumPlayerCount && i < 8;
+            i++
+        )
         {
             playerStatusUI.RemovePlayerStatus(i);
         }
@@ -406,25 +521,46 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private void UpdateReadyCountdown()
     {
-        bool allReady = AreAllPlayersReady(out int playerCount);
+        bool allReady =
+            AreAllPlayersReady(
+                out int playerCount
+            );
 
-        if (allReady && !isCountdownActive)
+        if (
+            allReady &&
+            !isCountdownActive
+        )
         {
             isCountdownActive = true;
-            countdownRemaining = readyCountdownSeconds;
+            countdownRemaining =
+                readyCountdownSeconds;
         }
-        else if (!allReady && isCountdownActive)
+        else if (
+            !allReady &&
+            isCountdownActive
+        )
         {
             isCountdownActive = false;
         }
 
-        if (!isCountdownActive) return;
+        if (!isCountdownActive)
+        {
+            return;
+        }
 
-        countdownRemaining -= Time.deltaTime;
+        countdownRemaining -=
+            Time.deltaTime;
 
         if (lobbyStatusText != null)
         {
-            int secondsLeft = Mathf.Max(0, Mathf.CeilToInt(countdownRemaining));
+            int secondsLeft =
+                Mathf.Max(
+                    0,
+                    Mathf.CeilToInt(
+                        countdownRemaining
+                    )
+                );
+
             lobbyStatusText.text =
                 $"모든 플레이어 준비 완료! {secondsLeft}초 후 맵으로 이동합니다";
         }
@@ -432,28 +568,41 @@ public class LobbySelectionController : MonoBehaviour
         if (countdownRemaining <= 0f)
         {
             isCountdownActive = false;
+
             roomManager.LoadGameplayScene();
         }
     }
 
     /// <summary>
-    /// 접속한 플레이어가 1명 이상이고, 전원의 IsReady가 true인지 확인한다.
+    /// 접속한 플레이어가 1명 이상이고,
+    /// 전원의 IsReady가 true인지 확인한다.
     /// </summary>
-    private bool AreAllPlayersReady(out int playerCount)
+    private bool AreAllPlayersReady(
+        out int playerCount
+    )
     {
         playerCount = 0;
         int readyCount = 0;
 
-        var runner = roomManager.Runner;
+        var runner =
+            roomManager.Runner;
 
-        foreach (var player in runner.ActivePlayers)
+        foreach (
+            var player in runner.ActivePlayers
+        )
         {
-            var playerObject = runner.GetPlayerObject(player);
-            var state = playerObject != null
-                ? playerObject.GetComponent<LobbyPlayerState>()
-                : null;
+            var playerObject =
+                runner.GetPlayerObject(player);
 
-            if (state == null) continue;
+            var state =
+                playerObject != null
+                    ? playerObject.GetComponent<LobbyPlayerState>()
+                    : null;
+
+            if (state == null)
+            {
+                continue;
+            }
 
             playerCount++;
 
@@ -463,13 +612,17 @@ public class LobbySelectionController : MonoBehaviour
             }
         }
 
-        return playerCount > 0 && playerCount == readyCount;
+        return
+            playerCount > 0 &&
+            playerCount == readyCount;
     }
 
     /// <summary>
     /// 코드 내부 직업 값을 화면에 표시할 한글로 변환한다.
     /// </summary>
-    private string GetJobName(PlayerJob job)
+    private string GetJobName(
+        PlayerJob job
+    )
     {
         switch (job)
         {
@@ -487,6 +640,39 @@ public class LobbySelectionController : MonoBehaviour
 
             default:
                 return "없음";
+        }
+    }
+
+    /// <summary>
+    /// Toyfriend가 말풍선에서 보여줄
+    /// 직업별 간단한 설명을 반환한다.
+    /// </summary>
+    private string GetJobDescription(PlayerJob job)
+    {
+        switch (job)
+        {
+            case PlayerJob.Police:
+                return
+                    "테이저건으로 먼 적을\n" +
+                    "빠르고 정확하게 공격해!";
+
+            case PlayerJob.Firefighter:
+                return
+                    "물줄기를 계속 뿜어\n" +
+                    "적에게 지속 피해를 줘!";
+
+            case PlayerJob.Chef:
+                return
+                    "후라이팬으로 여러 요리를\n" +
+                    "포물선으로 던져 공격해!";
+
+            case PlayerJob.Builder:
+                return
+                    "여러 탄환을 퍼뜨려 공격해!\n" +
+                    "적과 가까울수록 더 강해!";
+
+            default:
+                return "";
         }
     }
 
@@ -510,6 +696,7 @@ public class LobbySelectionController : MonoBehaviour
         if (builderButton != null)
         {
             builderButton.onClick.RemoveAllListeners();
+
         }
 
         if (readyButton != null)
