@@ -1051,11 +1051,15 @@ namespace DreamGuardians
                     $"공격 {currentGroupIndex + 1} / {groups.Count}" +
                     $"  ·  전장 악몽 {spawner.ActiveEnemyCount}");
 
+                missionUI?.SetNextWaveCountdown(safeDuration - elapsed);
+
                 elapsed +=
                     Time.deltaTime;
 
                 yield return null;
             }
+
+            missionUI?.HideNextWaveCountdown();
         }
 
 

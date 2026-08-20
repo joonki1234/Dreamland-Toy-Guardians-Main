@@ -22,6 +22,9 @@ namespace DreamGuardians
         private RectTransform healthFillRect;
         private Image healthFillImage;
 
+        private Camera explicitCamera;
+        private bool cameraExplicitlySet;
+
         private void Awake()
         {
             core = GetComponent<CoreState>();
@@ -70,6 +73,19 @@ namespace DreamGuardians
             {
                 Destroy(canvasObject);
             }
+        }
+
+        /// <summary>
+        /// 멀티플레이 환경에서는 씬에 카메라가 여러 개(다른 플레이어 것 포함) 있을 수 있고,
+        /// 이 프로젝트의 플레이어 카메라는 MainCamera 태그도 쓰지 않아 Camera.main이
+        /// 항상 null이다. 스폰 시점에 "내" 카메라가 확정되면 이 메서드로 명시적으로
+        /// 넘겨받아 그 카메라만 계속 사용한다.
+        /// </summary>
+        public void SetCamera(Camera camera)
+        {
+            explicitCamera = camera;
+            cameraExplicitlySet = camera != null;
+            ApplyCamera();
         }
 
         private void HandleHealthChanged(float current, float maximum)
@@ -230,10 +246,14 @@ namespace DreamGuardians
                 return;
             }
 
-            Camera target = Camera.main;
-            if (target == null)
+            Camera target = explicitCamera;
+            if (!cameraExplicitlySet)
             {
-                target = Object.FindAnyObjectByType<Camera>();
+                target = Camera.main;
+                if (target == null)
+                {
+                    target = Object.FindAnyObjectByType<Camera>();
+                }
             }
 
             if (target != null)

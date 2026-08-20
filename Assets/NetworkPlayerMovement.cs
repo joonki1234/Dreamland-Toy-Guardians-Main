@@ -1,3 +1,4 @@
+using DreamGuardians;
 using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -156,6 +157,20 @@ public class NetworkPlayerMovement : NetworkBehaviour
                 {
                     hudFollowers[i].SetCamera(playerCamera);
                 }
+
+                // MissionBannerUI(스테이지 배너/남은 적 수)와 CoreHealthHUD(코어 체력)도
+                // 같은 이유로 카메라가 확정되지 않으면 화면에 아무것도 안 그려진다.
+                // 이 프로젝트의 플레이어 카메라는 MainCamera 태그를 쓰지 않으므로
+                // Camera.main에 의존하는 두 HUD 모두 여기서 명시적으로 카메라를 넘겨준다.
+                MissionBannerUI missionBannerUI =
+                    FindAnyObjectByType<MissionBannerUI>(
+                        FindObjectsInactive.Include);
+                missionBannerUI?.Configure(playerCamera);
+
+                CoreHealthHUD coreHealthHud =
+                    FindAnyObjectByType<CoreHealthHUD>(
+                        FindObjectsInactive.Include);
+                coreHealthHud?.SetCamera(playerCamera);
             }
         }
     }

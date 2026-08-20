@@ -49,6 +49,10 @@ namespace DreamGuardians
         private Text combatCountText;
         private Text combatDetailText;
 
+        private GameObject waveCountdownPanel;
+        private Text waveCountdownLabelText;
+        private Text waveCountdownValueText;
+
         private GameObject rolePanel;
         private Text roleTitleText;
         private Text roleNameText;
@@ -84,6 +88,7 @@ namespace DreamGuardians
         private bool storyFocusActive;
         private bool storyMissionWasActive;
         private bool storyCombatWasActive;
+        private bool storyWaveCountdownWasActive;
         private bool storyRoleWasActive;
         private bool storyBossWasActive;
         private bool storySynergyWasActive;
@@ -385,6 +390,27 @@ namespace DreamGuardians
             }
         }
 
+        /// <summary>
+        /// 다음 웨이브 시작까지 남은 시간을 표시합니다.
+        /// 전투가 진행 중일 때(적이 아직 있을 때)는 호출하지 말고,
+        /// 웨이브 사이 대기 구간에서만 호출하세요.
+        /// </summary>
+        public void SetNextWaveCountdown(float remainingSeconds)
+        {
+            EnsureUI();
+            waveCountdownPanel.SetActive(true);
+            int wholeSeconds = Mathf.Max(0, Mathf.CeilToInt(remainingSeconds));
+            waveCountdownValueText.text = wholeSeconds + "초";
+        }
+
+        public void HideNextWaveCountdown()
+        {
+            if (waveCountdownPanel != null)
+            {
+                waveCountdownPanel.SetActive(false);
+            }
+        }
+
         public void SetRole(PlayerRole role)
         {
             // 플레이 화면 하단의 "현재 직업" HUD는 사용하지 않습니다.
@@ -475,6 +501,7 @@ namespace DreamGuardians
             SetObjective(string.Empty);
             SetProgress(string.Empty);
             HideBossHealth();
+            HideNextWaveCountdown();
         }
 
         /// <summary>
@@ -526,6 +553,7 @@ namespace DreamGuardians
                 storyFocusActive = true;
                 storyMissionWasActive = missionPanel != null && missionPanel.activeSelf;
                 storyCombatWasActive = combatPanel != null && combatPanel.activeSelf;
+                storyWaveCountdownWasActive = waveCountdownPanel != null && waveCountdownPanel.activeSelf;
                 storyRoleWasActive = rolePanel != null && rolePanel.activeSelf;
                 storyBossWasActive = bossPanel != null && bossPanel.activeSelf;
                 storySynergyWasActive = synergyPanel != null && synergyPanel.activeSelf;
@@ -535,6 +563,7 @@ namespace DreamGuardians
 
             missionPanel?.SetActive(false);
             combatPanel?.SetActive(false);
+            waveCountdownPanel?.SetActive(false);
             rolePanel?.SetActive(false);
             bossPanel?.SetActive(false);
             synergyPanel?.SetActive(false);
@@ -575,6 +604,7 @@ namespace DreamGuardians
 
             missionPanel?.SetActive(storyMissionWasActive);
             combatPanel?.SetActive(storyCombatWasActive);
+            waveCountdownPanel?.SetActive(storyWaveCountdownWasActive);
             rolePanel?.SetActive(storyRoleWasActive);
             bossPanel?.SetActive(storyBossWasActive);
             synergyPanel?.SetActive(storySynergyWasActive);
@@ -781,6 +811,7 @@ namespace DreamGuardians
             BuildBanner(root);
             BuildMissionPanel(root);
             BuildCombatPanel(root);
+            BuildWaveCountdownPanel(root);
             BuildRolePanel(root);
             BuildBossPanel(root);
             BuildGuidePanel(root);
@@ -927,6 +958,46 @@ namespace DreamGuardians
             combatCountText.color = new Color(1f, 0.93f, 0.57f, 1f);
 
             combatPanel.SetActive(false);
+        }
+
+        private void BuildWaveCountdownPanel(RectTransform root)
+        {
+            // 남은 적 수 패널(CombatStatus) 바로 아래에 붙여서 같은 카드처럼 보이게 합니다.
+            waveCountdownPanel = CreatePanel(
+                "NextWaveCountdown",
+                root,
+                new Vector2(1f, 1f),
+                new Vector2(268f, 86f),
+                DreamlandUiSkin.KenneyCounterPanel,
+                new Color(0.87f, 0.93f, 1f, 0.94f),
+                true,
+                new Vector2(-22f, -140f),
+                new Vector2(1f, 1f));
+
+            RectTransform rect = waveCountdownPanel.GetComponent<RectTransform>();
+
+            waveCountdownLabelText = CreateText(
+                "CountdownLabel",
+                rect,
+                new Vector2(0.5f, 0.70f),
+                new Vector2(210f, 26f),
+                15,
+                TextAnchor.MiddleCenter,
+                FontStyle.Bold);
+            waveCountdownLabelText.text = "다음 웨이브까지";
+            waveCountdownLabelText.color = new Color(0.75f, 0.97f, 0.95f, 1f);
+
+            waveCountdownValueText = CreateText(
+                "CountdownValue",
+                rect,
+                new Vector2(0.5f, 0.32f),
+                new Vector2(210f, 40f),
+                30,
+                TextAnchor.MiddleCenter,
+                FontStyle.Bold);
+            waveCountdownValueText.color = new Color(1f, 0.93f, 0.57f, 1f);
+
+            waveCountdownPanel.SetActive(false);
         }
 
         private void BuildRolePanel(RectTransform root)
