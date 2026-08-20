@@ -66,6 +66,16 @@ namespace DreamGuardians
         [SerializeField, Min(0.02f)]
         private float beamDuration = 0.26f;
 
+        [Tooltip("발사 시 재생할 효과음입니다. 비워두면 Resources/SFX/Enemy/attack을 자동으로 불러옵니다.")]
+        [SerializeField]
+        private AudioClip attackSfx;
+
+        [SerializeField, Range(0f, 1f)]
+        private float attackSfxVolume = 0.5f;
+
+        private static AudioClip cachedAttackSfx;
+        private const string AttackSfxResourcePath = "SFX/Enemy/attack";
+
         [Header("애니메이션")]
 
         [Tooltip("비워두면 자식에서 Animator를 자동으로 찾습니다.")]
@@ -344,6 +354,29 @@ namespace DreamGuardians
                 beamColor);
 
             targetCore.TakeDamage(coreDamage);
+
+            PlayAttackSfx(muzzlePosition);
+        }
+
+
+        private void PlayAttackSfx(Vector3 position)
+        {
+            AudioClip clip = attackSfx;
+
+            if (clip == null)
+            {
+                if (cachedAttackSfx == null)
+                {
+                    cachedAttackSfx = Resources.Load<AudioClip>(AttackSfxResourcePath);
+                }
+
+                clip = cachedAttackSfx;
+            }
+
+            if (clip != null)
+            {
+                AudioSource.PlayClipAtPoint(clip, position, attackSfxVolume);
+            }
         }
 
 

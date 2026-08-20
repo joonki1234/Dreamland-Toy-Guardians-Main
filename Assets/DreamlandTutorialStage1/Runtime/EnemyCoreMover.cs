@@ -63,6 +63,16 @@ namespace DreamGuardians
         [SerializeField, Min(0f)]
         private float headbuttWindbackDistance = 0.22f;
 
+        [Tooltip("박치기 명중 시 재생할 효과음입니다. 비워두면 Resources/SFX/Enemy/attack_melee를 자동으로 불러옵니다.")]
+        [SerializeField]
+        private AudioClip headbuttAttackSfx;
+
+        [SerializeField, Range(0f, 1f)]
+        private float headbuttAttackSfxVolume = 0.5f;
+
+        private static AudioClip cachedHeadbuttAttackSfx;
+        private const string HeadbuttAttackSfxResourcePath = "SFX/Enemy/attack_melee";
+
 
         [Header("회전 설정")]
 
@@ -428,6 +438,8 @@ namespace DreamGuardians
                 DreamlandCombatFx.SpawnHeadbuttImpact(
                     targetCore.AttackTargetPosition,
                     direction);
+
+                PlayHeadbuttAttackSfx(targetCore.AttackTargetPosition);
             }
 
             elapsed = 0f;
@@ -461,6 +473,26 @@ namespace DreamGuardians
             return targetCore == null ||
                    targetCore.IsDestroyed ||
                    (health != null && health.IsDead);
+        }
+
+        private void PlayHeadbuttAttackSfx(Vector3 position)
+        {
+            AudioClip clip = headbuttAttackSfx;
+
+            if (clip == null)
+            {
+                if (cachedHeadbuttAttackSfx == null)
+                {
+                    cachedHeadbuttAttackSfx = Resources.Load<AudioClip>(HeadbuttAttackSfxResourcePath);
+                }
+
+                clip = cachedHeadbuttAttackSfx;
+            }
+
+            if (clip != null)
+            {
+                AudioSource.PlayClipAtPoint(clip, position, headbuttAttackSfxVolume);
+            }
         }
 
 

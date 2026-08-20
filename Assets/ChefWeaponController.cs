@@ -28,7 +28,17 @@ public class ChefWeaponController : MonoBehaviour
     [Header("음식 발사 물리 설정")]
     public float launchForce = 14f;           
     public float upwardForce = 8f;            
-    public float torqueAmount = 12f;          
+    public float torqueAmount = 12f;
+
+    [Header("웍질 효과음")]
+    [Tooltip("비워두면 Resources/SFX/Chef/pan_swing을 자동으로 불러온다.")]
+    public AudioClip panSwingSfx;
+
+    [Range(0f, 1f)]
+    public float panSwingVolume = 0.5f;
+
+    private static AudioClip cachedPanSwingSfx;
+    private const string PanSwingSfxResourcePath = "SFX/Chef/pan_swing";
 
     private bool isAttacking = false;
 
@@ -83,13 +93,14 @@ public class ChefWeaponController : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, elapsed / tossDuration);
             Quaternion currentRot = Quaternion.Slerp(backRot, tossRot, t);
-            
+
             ApplyRotationAroundHandle(originPos, originRot, currentRot);
             yield return null;
         }
 
         // 🍳 최정점에서 음식 발사
         LaunchRandomFood();
+        PlayPanSwingSfx();
 
         // [STEP 3] 복귀 동작 (손잡이 중심으로 부드럽게 복귀)
         elapsed = 0f;
@@ -129,6 +140,26 @@ public class ChefWeaponController : MonoBehaviour
 
         Vector3 offsetPos = targetRot * handleOffset;
         panTransform.localPosition = originPos + (originRot * handleOffset - offsetPos);
+    }
+
+    private void PlayPanSwingSfx()
+    {
+        AudioClip clip = panSwingSfx;
+
+        if (clip == null)
+        {
+            if (cachedPanSwingSfx == null)
+            {
+                cachedPanSwingSfx = Resources.Load<AudioClip>(PanSwingSfxResourcePath);
+            }
+
+            clip = cachedPanSwingSfx;
+        }
+
+        if (clip != null && panTransform != null)
+        {
+            AudioSource.PlayClipAtPoint(clip, panTransform.position, panSwingVolume);
+        }
     }
 
     private void LaunchRandomFood()

@@ -57,6 +57,18 @@ public class GunController : MonoBehaviour
     public float flashDuration = 0.05f;
 
 
+    [Header("발사음")]
+
+    [Tooltip("비워두면 Resources/SFX/Police/gun_shot을 자동으로 불러온다.")]
+    public AudioClip gunShotSfx;
+
+    [Range(0f, 1f)]
+    public float gunShotVolume = 0.5f;
+
+    private static AudioClip cachedGunShotSfx;
+    private const string GunShotSfxResourcePath = "SFX/Police/gun_shot";
+
+
     private Coroutine flashCoroutine;
 
     private static int nextPoliceShotId =
@@ -188,6 +200,7 @@ public class GunController : MonoBehaviour
         }
 
         PlayMuzzleFlash();
+        PlayGunShotSfx();
 
         Destroy(
             bullet,
@@ -311,6 +324,27 @@ public class GunController : MonoBehaviour
             StartCoroutine(
                 FlashMuzzleRoutine()
             );
+    }
+
+
+    private void PlayGunShotSfx()
+    {
+        AudioClip clip = gunShotSfx;
+
+        if (clip == null)
+        {
+            if (cachedGunShotSfx == null)
+            {
+                cachedGunShotSfx = Resources.Load<AudioClip>(GunShotSfxResourcePath);
+            }
+
+            clip = cachedGunShotSfx;
+        }
+
+        if (clip != null && firePoint != null)
+        {
+            AudioSource.PlayClipAtPoint(clip, firePoint.position, gunShotVolume);
+        }
     }
 
 

@@ -11,6 +11,12 @@ namespace DreamGuardians
         [SerializeField] private bool damageEnabled = true;
         [SerializeField, Min(8)] private int rememberedShotCount = 128;
 
+        // 몬스터 사망 시 재생할 효과음. 비워두면 Resources/SFX/Enemy/death를 자동으로 불러온다.
+        [SerializeField] private AudioClip deathSfx;
+        [SerializeField, Range(0f, 1f)] private float deathSfxVolume = 0.7f;
+        private static AudioClip cachedDeathSfx;
+        private const string DeathSfxResourcePath = "SFX/Enemy/death";
+
         private readonly HashSet<string> processedShotKeys = new HashSet<string>();
         private readonly Queue<string> processedShotOrder = new Queue<string>();
         private RoleSynergyTracker synergyTracker;
@@ -112,8 +118,29 @@ namespace DreamGuardians
 
             IsDead = true;
             damageEnabled = false;
+            PlayDeathSfx();
             Died?.Invoke(this, killingBlow);
             DreamGameEvents.RaiseEnemyDied(this, killingBlow);
+        }
+
+        private void PlayDeathSfx()
+        {
+            AudioClip clip = deathSfx;
+
+            if (clip == null)
+            {
+                if (cachedDeathSfx == null)
+                {
+                    cachedDeathSfx = Resources.Load<AudioClip>(DeathSfxResourcePath);
+                }
+
+                clip = cachedDeathSfx;
+            }
+
+            if (clip != null)
+            {
+                AudioSource.PlayClipAtPoint(clip, transform.position, deathSfxVolume);
+            }
         }
 
         private bool IsDuplicateShot(DamageInfo info)

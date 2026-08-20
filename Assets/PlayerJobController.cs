@@ -49,6 +49,15 @@ public class PlayerJobController : NetworkBehaviour
     [Tooltip("건축가 공격 쿨타임")]
     public float builderCooldown = 0.5f;
 
+    [Tooltip("삽질 시 재생할 효과음. 비워두면 Resources/SFX/Builder/dirt_throw를 자동으로 불러온다.")]
+    public AudioClip dirtThrowSfx;
+
+    [Range(0f, 1f)]
+    public float dirtThrowVolume = 0.5f;
+
+    private static AudioClip cachedDirtThrowSfx;
+    private const string DirtThrowSfxResourcePath = "SFX/Builder/dirt_throw";
+
 
     [Header("건축가 흙 산탄 설정")]
 
@@ -366,6 +375,8 @@ public class PlayerJobController : NetworkBehaviour
             return;
         }
 
+        PlayDirtThrowSfx();
+
         int shardCount =
             Mathf.Max(
                 1,
@@ -533,6 +544,27 @@ public class PlayerJobController : NetworkBehaviour
         );
 
         dirtFlashLight.enabled = false;
+    }
+
+
+    private void PlayDirtThrowSfx()
+    {
+        AudioClip clip = dirtThrowSfx;
+
+        if (clip == null)
+        {
+            if (cachedDirtThrowSfx == null)
+            {
+                cachedDirtThrowSfx = Resources.Load<AudioClip>(DirtThrowSfxResourcePath);
+            }
+
+            clip = cachedDirtThrowSfx;
+        }
+
+        if (clip != null && shovelFirePoint != null)
+        {
+            AudioSource.PlayClipAtPoint(clip, shovelFirePoint.position, dirtThrowVolume);
+        }
     }
 
 

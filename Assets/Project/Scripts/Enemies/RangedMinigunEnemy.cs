@@ -46,6 +46,16 @@ namespace DreamGuardians
         [SerializeField]
         private Color bulletColor = new Color(1f, 0.72f, 0.18f, 1f);
 
+        [Tooltip("발사 시 재생할 효과음입니다. 비워두면 Resources/SFX/Enemy/attack을 자동으로 불러옵니다.")]
+        [SerializeField]
+        private AudioClip attackSfx;
+
+        [SerializeField, Range(0f, 1f)]
+        private float attackSfxVolume = 0.5f;
+
+        private static AudioClip cachedAttackSfx;
+        private const string AttackSfxResourcePath = "SFX/Enemy/attack";
+
         [Tooltip(
             "모델이 이동 방향과 반대로 보일 때 사용하는 Y축 회전 보정값입니다. " +
             "현재 미니건 로봇은 -Z 방향이 정면이므로 180도를 사용합니다.")]
@@ -307,6 +317,29 @@ namespace DreamGuardians
                 coreDamage,
                 bulletSpeed,
                 bulletColor);
+
+            PlayAttackSfx(origin);
+        }
+
+
+        private void PlayAttackSfx(Vector3 position)
+        {
+            AudioClip clip = attackSfx;
+
+            if (clip == null)
+            {
+                if (cachedAttackSfx == null)
+                {
+                    cachedAttackSfx = Resources.Load<AudioClip>(AttackSfxResourcePath);
+                }
+
+                clip = cachedAttackSfx;
+            }
+
+            if (clip != null)
+            {
+                AudioSource.PlayClipAtPoint(clip, position, attackSfxVolume);
+            }
         }
 
 
