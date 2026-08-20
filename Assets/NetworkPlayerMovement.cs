@@ -34,6 +34,18 @@ public class NetworkPlayerMovement : NetworkBehaviour
     [SerializeField]
     private float boundaryPadding = 0.5f;
 
+    [Tooltip(
+        "게임 시작 시 존재하는 네모난 시작 스테이지(길)의 오브젝트 이름. " +
+        "이 오브젝트의 실제 렌더러 크기를 기준으로 사각형 이동 제한을 건다. " +
+        "나중에 십자가 모양으로 열리는 다른 길들은 여기에 포함되지 않으므로 " +
+        "플레이어가 처음부터 그쪽으로 걸어나갈 수 없다.")]
+    [SerializeField]
+    private string startStageObjectName = "Road_0";
+
+    [Tooltip("시작 스테이지 가장자리에 딱 붙지 않도록 안쪽으로 남겨두는 여유 거리")]
+    [SerializeField, Min(0f)]
+    private float startStagePadding = 0.6f;
+
 
     [Header("로컬 전용 오브젝트 (내 화면에만 필요)")]
 
@@ -63,6 +75,12 @@ public class NetworkPlayerMovement : NetworkBehaviour
     private AudioSource _footstepAudioSource;
     private AudioClip[] _footstepClips;
     private float _footstepTimer;
+
+    private bool _hasStageBounds;
+    private float _stageMinX;
+    private float _stageMaxX;
+    private float _stageMinZ;
+    private float _stageMaxZ;
 
 
     public override void Spawned()
@@ -98,6 +116,8 @@ public class NetworkPlayerMovement : NetworkBehaviour
             Debug.LogWarning(
                 "[NetworkPlayerMovement] Player Boundary Shield가 연결되지 않았습니다.");
         }
+
+        ComputeStartStageBounds();
 
         // 입력 권한을 가진(=내가 조종하는) 캐릭터만 카메라/오디오리스너를 켠다.
         // 다른 클라이언트 화면에는 남의 카메라가 보이거나 소리가 겹치면 안 되기 때문.
@@ -256,32 +276,117 @@ public class NetworkPlayerMovement : NetworkBehaviour
 
 
     /// <summary>
-    /// 원본 FPSController.ClampPositionInsideBoundary()와 동일한 로직.
-    /// CharacterController.Move() 이후 위치를 보정하는 방식으로 이식했다.
+    /// 원본 FPSController.ClampPositionInsideBoundary()와 동일한 로직 + 시작 스테이지
+    /// 사각형 제한을 함께 적용한다. CharacterController.Move() 이후 위치를 보정하는
+    /// 방식으로 이식했다.
     /// </summary>
     private void ClampPositionInsideBoundary()
     {
-        if (playerBoundaryShield == null) return;
+        Vector3 position = transform.position;
+        bool changed = false;
 
-        Vector3 boundaryCenter = playerBoundaryShield.position;
-        float boundaryRadius = GetBoundaryWorldRadius();
-        float allowedRadius = Mathf.Max(0f, boundaryRadius - boundaryPadding);
+        if (playerBoundaryShield != null)
+        {
+            Vector3 boundaryCenter = playerBoundaryShield.position;
+            float boundaryRadius = GetBoundaryWorldRadius();
+            float allowedRadius = Mathf.Max(0f, boundaryRadius - boundaryPadding);
 
-        Vector2 centerXZ = new Vector2(boundaryCenter.x, boundaryCenter.z);
-        Vector2 posXZ = new Vector2(transform.position.x, transform.position.z);
-        Vector2 centerToPos = posXZ - centerXZ;
+            Vector2 centerXZ = new Vector2(boundaryCenter.x, boundaryCenter.z);
+            Vector2 posXZ = new Vector2(position.x, position.z);
+            Vector2 centerToPos = posXZ - centerXZ;
 
-        if (centerToPos.sqrMagnitude <= allowedRadius * allowedRadius) return;
+            if (centerToPos.sqrMagnitude > allowedRadius * allowedRadius)
+            {
+                Vector2 clampedXZ = centerXZ + centerToPos.normalized * allowedRadius;
+                position.x = clampedXZ.x;
+                position.z = clampedXZ.y;
+                changed = true;
+            }
+        }
 
-        Vector2 clampedXZ = centerXZ + centerToPos.normalized * allowedRadius;
-        Vector3 clampedPosition = transform.position;
-        clampedPosition.x = clampedXZ.x;
-        clampedPosition.z = clampedXZ.y;
+        // 시작 스테이지(네모난 길) 바깥으로는 아예 나갈 수 없도록 사각형으로 한 번 더 제한한다.
+        // 나중에 십자가 모양으로 열리는 다른 길들은 이 범위 밖이라 여기 걸리면 못 나간다.
+        if (_hasStageBounds)
+        {
+            float clampedX = Mathf.Clamp(position.x, _stageMinX, _stageMaxX);
+            float clampedZ = Mathf.Clamp(position.z, _stageMinZ, _stageMaxZ);
+
+            if (!Mathf.Approximately(clampedX, position.x) ||
+                !Mathf.Approximately(clampedZ, position.z))
+            {
+                position.x = clampedX;
+                position.z = clampedZ;
+                changed = true;
+            }
+        }
+
+        if (!changed) return;
 
         // CharacterController는 위치를 직접 대입하기 전에 잠깐 꺼야 텔레포트가 안전하게 적용된다.
         _cc.enabled = false;
-        transform.position = clampedPosition;
+        transform.position = position;
         _cc.enabled = true;
+    }
+
+
+    /// <summary>
+    /// 씬에서 시작 스테이지(startStageObjectName, 기본 "Road_0") 오브젝트를 찾아
+    /// 그 안의 모든 Renderer를 합친 실제 월드 크기로 사각형 이동 제한 범위를 계산한다.
+    /// 프리팹은 씬 오브젝트를 직접 참조할 수 없기 때문에, 런타임에 이름으로 찾는 방식을 쓴다.
+    /// </summary>
+    private void ComputeStartStageBounds()
+    {
+        if (string.IsNullOrEmpty(startStageObjectName))
+        {
+            return;
+        }
+
+        GameObject stageObject = GameObject.Find(startStageObjectName);
+
+        if (stageObject == null)
+        {
+            Debug.LogWarning(
+                $"[NetworkPlayerMovement] 시작 스테이지 오브젝트 '{startStageObjectName}'를 " +
+                "씬에서 찾지 못했습니다. 사각형 이동 제한이 적용되지 않습니다.");
+            return;
+        }
+
+        Renderer[] renderers = stageObject.GetComponentsInChildren<Renderer>();
+
+        if (renderers.Length == 0)
+        {
+            Debug.LogWarning(
+                $"[NetworkPlayerMovement] '{startStageObjectName}'에 Renderer가 없어 " +
+                "사각형 이동 제한 범위를 계산할 수 없습니다.");
+            return;
+        }
+
+        Bounds worldBounds = renderers[0].bounds;
+
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            worldBounds.Encapsulate(renderers[i].bounds);
+        }
+
+        _stageMinX = worldBounds.min.x + startStagePadding;
+        _stageMaxX = worldBounds.max.x - startStagePadding;
+        _stageMinZ = worldBounds.min.z + startStagePadding;
+        _stageMaxZ = worldBounds.max.z - startStagePadding;
+
+        // 패딩이 너무 크면 범위가 뒤집힐 수 있으니 안전하게 보정한다.
+        if (_stageMinX > _stageMaxX)
+        {
+            float mid = (_stageMinX + _stageMaxX) * 0.5f;
+            _stageMinX = _stageMaxX = mid;
+        }
+
+        if (_stageMinZ > _stageMaxZ)
+        {
+            float mid = (_stageMinZ + _stageMaxZ) * 0.5f;
+            _stageMinZ = _stageMaxZ = mid;
+        }
+
+        _hasStageBounds = true;
     }
 
 
