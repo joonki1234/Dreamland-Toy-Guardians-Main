@@ -276,16 +276,53 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
             1f,
             UnityEngine.Random.Range(-2f, 2f));
 
+        // 장난감 친구(ToyFriend)가 걸어가서 서는 TalkPoint를 바라보는 방향으로
+        // 스폰시켜, 방향을 돌리지 않아도 처음부터 로봇이 눈앞에 보이게 한다.
+        // TalkPoint를 찾지 못하면 기존처럼 identity 회전으로 안전하게 대체한다.
+        //
+        // spawnPosition 자체(무작위 -2~2 범위)를 기준으로 방향을 계산하면
+        // 어쩌다 TalkPoint 바로 위/근처에 스폰될 때 방향이 거의 0벡터가 되어
+        // 회전이 애매해질 수 있으므로, 항상 스폰 영역의 중심(원점)을
+        // 기준으로 방향을 계산해 매번 안정적으로 로봇 쪽을 보게 한다.
+        Quaternion spawnRotation =
+            ComputeSpawnRotationTowardToyFriend(Vector3.zero);
+
         runner.Spawn(
             gameplayPlayerPrefab,
             spawnPosition,
-            Quaternion.identity,
+            spawnRotation,
             runner.LocalPlayer,
             (r, obj) =>
             {
                 var jobController = obj.GetComponent<PlayerJobController>();
                 jobController?.SetJob(job);
             });
+    }
+
+
+    /// <summary>
+    /// map_3의 "TalkPoint"(장난감 친구가 최종적으로 서는 위치)를 바라보는
+    /// 회전값을 계산한다. 씬에서 TalkPoint를 찾지 못하면 기존 기본값
+    /// (Quaternion.identity)을 그대로 반환한다.
+    /// </summary>
+    private Quaternion ComputeSpawnRotationTowardToyFriend(Vector3 spawnPosition)
+    {
+        GameObject talkPointObject = GameObject.Find("TalkPoint");
+
+        if (talkPointObject == null)
+        {
+            return Quaternion.identity;
+        }
+
+        Vector3 direction = talkPointObject.transform.position - spawnPosition;
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            return Quaternion.identity;
+        }
+
+        return Quaternion.LookRotation(direction.normalized, Vector3.up);
     }
 
 

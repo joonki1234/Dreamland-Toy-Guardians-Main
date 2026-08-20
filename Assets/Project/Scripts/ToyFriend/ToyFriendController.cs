@@ -123,6 +123,13 @@ namespace DreamGuardians
         private Vector3 characterBaseLocalScale;
         private static Font runtimeFont;
 
+        // ToyFriendViewHud(화면 좌측 상단 고정 로봇+말풍선 HUD)가 씬에 있는지
+        // 한 번만 찾아서 캐싱한다. 있으면 3D 모델을 아예 표시하지 않고
+        // 그쪽 HUD만 쓴다 - 3D 위치/회전 계산이 어긋나 카메라 코앞에
+        // 뒷통수를 보이며 뜨는 문제를 근본적으로 피하기 위해서다.
+        private bool _hasCheckedForHud;
+        private bool _hasViewHud;
+
         public Transform SpawnPoint => spawnPoint;
         public Transform TalkPoint => talkPoint;
         public bool IsMoving { get; private set; }
@@ -203,8 +210,13 @@ namespace DreamGuardians
 
             if (playerLookTarget != null)
             {
+                // 카메라 회전값을 그대로 복사하면 말풍선(Canvas)의 앞면이
+                // 카메라가 "보고 있는" 방향과 같은 쪽을 향하게 되어
+                // 결과적으로 플레이어에게는 말풍선의 뒷면이 보인다.
+                // 180도를 더해 앞면이 항상 카메라를 향하도록 한다.
                 speechBubbleRoot.transform.rotation =
-                    playerLookTarget.rotation;
+                    playerLookTarget.rotation *
+                    Quaternion.Euler(0f, 180f, 0f);
             }
         }
 
@@ -294,7 +306,14 @@ namespace DreamGuardians
             AudioClip voiceClip = null)
         {
             StopSpeaking();
-            EnsureSpeechBubble();
+
+            // 좌측 상단 고정 HUD로 대체된 경우, 3D 캐릭터 머리 위 월드 말풍선은
+            // 만들지 않는다 - 안 그러면 안 보이는 3D 모델 위치에 말풍선만 따로
+            // 떠 있는 이상한 상태가 될 수 있다.
+            if (!HasViewHud())
+            {
+                EnsureSpeechBubble();
+            }
 
             missionUI ??= Object.FindAnyObjectByType<MissionBannerUI>();
             if (missionUI != null)
@@ -332,6 +351,8 @@ namespace DreamGuardians
                 speechBubbleRoot.SetActive(false);
             }
 
+            ToyFriendViewHud.Instance?.Hide();
+
             if (storyFocusRequested)
             {
                 missionUI?.EndToyFriendStoryFocus();
@@ -341,6 +362,8 @@ namespace DreamGuardians
 
         public void SetVisible(bool visible)
         {
+            // 3D 캐릭터는 map_3 중앙에서 원래대로 걸어다니며 보이도록 그대로 둔다.
+            // (말풍선 내용만 좌측 상단 HUD로 대체한다 - HasViewHud() 관련 로직 참고)
             IsVisible = visible;
 
             if (cachedRenderers == null)
@@ -530,6 +553,8 @@ namespace DreamGuardians
                 speechBubbleRoot.SetActive(true);
             }
 
+            ToyFriendViewHud.Instance?.ShowMessage(message);
+
             if (animator != null)
             {
                 int trigger = celebratory ? HappyHash : NormalHash;
@@ -604,6 +629,8 @@ namespace DreamGuardians
             {
                 speechBubbleRoot.SetActive(false);
             }
+
+            ToyFriendViewHud.Instance?.Hide();
 
             if (voiceSource != null && voiceSource.isPlaying)
             {
@@ -829,6 +856,22 @@ namespace DreamGuardians
             }
 
             return bounds;
+        }
+
+        /// <summary>
+        /// 씬에 ToyFriendViewHud(좌측 상단 고정 로봇+말풍선 HUD)가 있는지
+        /// 한 번만 검사해서 캐싱한다.
+        /// </summary>
+        private bool HasViewHud()
+        {
+            if (!_hasCheckedForHud)
+            {
+                _hasCheckedForHud = true;
+                _hasViewHud = ToyFriendViewHud.Instance != null ||
+                    FindAnyObjectByType<ToyFriendViewHud>() != null;
+            }
+
+            return _hasViewHud;
         }
 
         private bool HasAnimatorParameter(

@@ -141,6 +141,22 @@ public class NetworkPlayerMovement : NetworkBehaviour
         if (isMine)
         {
             Cursor.lockState = CursorLockMode.Locked;
+
+            // 화면 고정 HUD(ToyFriendMapHud 등)가 Camera.main에 의존하면
+            // 멀티플레이에서 남의 카메라를 잘못 따라갈 수 있으므로,
+            // "내" 카메라가 확정된 지금 명시적으로 넘겨준다.
+            if (playerCamera != null)
+            {
+                ViewLockedHudFollower[] hudFollowers =
+                    FindObjectsByType<ViewLockedHudFollower>(
+                        FindObjectsInactive.Include,
+                        FindObjectsSortMode.None);
+
+                for (int i = 0; i < hudFollowers.Length; i++)
+                {
+                    hudFollowers[i].SetCamera(playerCamera);
+                }
+            }
         }
     }
 
@@ -341,7 +357,13 @@ public class NetworkPlayerMovement : NetworkBehaviour
             return;
         }
 
-        GameObject stageObject = GameObject.Find(startStageObjectName);
+        // GameObject.Find()는 "현재 비활성 상태인" 오브젝트를 찾지 못한다.
+        // Road_0은 DreamRoadRevealController가 씬 시작 시 잠깐 꺼두었다가
+        // 스토리 진행에 맞춰 다시 켜는 연출용 오브젝트라서, 스폰 시점에
+        // 마침 비활성 상태면 기존 GameObject.Find()로는 절대 찾을 수 없었다.
+        // (이것이 "경계 제한이 전혀 적용되지 않는" 버그의 원인이었다.)
+        // 비활성 오브젝트도 포함해서 이름으로 찾도록 바꾼다.
+        GameObject stageObject = FindObjectByNameIncludingInactive(startStageObjectName);
 
         if (stageObject == null)
         {
@@ -351,7 +373,9 @@ public class NetworkPlayerMovement : NetworkBehaviour
             return;
         }
 
-        Renderer[] renderers = stageObject.GetComponentsInChildren<Renderer>();
+        // 마찬가지로 Road_0이 비활성 상태일 때는 그 자식 렌더러들도
+        // GetComponentsInChildren(false)로는 찾지 못하므로 true를 넘겨야 한다.
+        Renderer[] renderers = stageObject.GetComponentsInChildren<Renderer>(true);
 
         if (renderers.Length == 0)
         {
@@ -387,6 +411,33 @@ public class NetworkPlayerMovement : NetworkBehaviour
         }
 
         _hasStageBounds = true;
+    }
+
+
+    /// <summary>
+    /// GameObject.Find()와 달리 비활성 상태인 오브젝트도 이름으로 찾는다.
+    /// (씬 시작 연출 때문에 잠깐 꺼져 있는 오브젝트를 찾을 때 사용한다.)
+    /// </summary>
+    private static GameObject FindObjectByNameIncludingInactive(string name)
+    {
+        // 이 클래스(NetworkBehaviour)에는 이미 인스턴스 프로퍼티 "Object"(Fusion의
+        // NetworkObject 접근자)가 있어서, 정적 메서드 안에서 그냥 "Object"라고 쓰면
+        // UnityEngine.Object가 아니라 그 인스턴스 프로퍼티로 해석되어 컴파일 에러가 난다.
+        // 그래서 UnityEngine.Object로 완전한 이름을 명시한다.
+        Transform[] allTransforms =
+            UnityEngine.Object.FindObjectsByType<Transform>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+
+        for (int i = 0; i < allTransforms.Length; i++)
+        {
+            if (allTransforms[i] != null && allTransforms[i].name == name)
+            {
+                return allTransforms[i].gameObject;
+            }
+        }
+
+        return null;
     }
 
 
