@@ -87,6 +87,23 @@ namespace DreamGuardians
             }
         }
 
+        /// <summary>
+        /// 실제 EnemyHealth 데미지 파이프라인을 거치지 않고 체력바를 직접 채웁니다.
+        /// 튜토리얼 명중 연습처럼 몬스터가 무적 상태(damageEnabled=false)라
+        /// HealthChanged가 발생하지 않을 때, 명중 횟수에 맞춰 체력바만 시각적으로
+        /// 줄여 보여주는 용도입니다. 이후 RestoreFullHealth()/실제 데미지가 다시
+        /// HealthChanged를 발생시키면 정상적으로 그쪽 값이 이어받습니다.
+        /// </summary>
+        public void SetManualRatio(float ratio)
+        {
+            if (barRoot != null)
+            {
+                barRoot.SetActive(true);
+            }
+
+            UpdateBar(ratio);
+        }
+
         private void BuildBar()
         {
             if (barRoot != null)

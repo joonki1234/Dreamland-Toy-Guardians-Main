@@ -91,6 +91,35 @@ public sealed class AllyPortalCoreRevealController : MonoBehaviour
     private float road0CompletionHold = 0.55f;
 
 
+    [Header("Core Rise Effect")]
+
+    [Tooltip(
+        "코어가 다 올라와 정착하는 순간 재생할 이펙트 프리팹입니다. " +
+        "비워두면 코드가 장난감 친구 등장 연출(ToyFriendEntranceSequence)과 " +
+        "같은 색의 발광 Point Light를 자동으로 만들어 재생합니다.")]
+    [SerializeField]
+    private GameObject coreRiseEffectPrefab;
+
+    [Tooltip("자동 생성 이펙트의 색상입니다. ToyFriendEntranceSequence의 빛 구슬과 같은 색을 기본값으로 씁니다.")]
+    [SerializeField]
+    private Color coreRiseEffectColor = new Color(0.62f, 1f, 0.92f, 1f);
+
+    [Tooltip("자동 생성 이펙트(Point Light 플래시)가 지속되는 시간입니다.")]
+    [Min(0.05f)]
+    [SerializeField]
+    private float coreRiseEffectDuration = 0.6f;
+
+    [Tooltip("자동 생성 이펙트의 최대 밝기입니다.")]
+    [Min(0f)]
+    [SerializeField]
+    private float coreRiseEffectLightIntensity = 6f;
+
+    [Tooltip("자동 생성 이펙트의 조명 범위입니다.")]
+    [Min(0.1f)]
+    [SerializeField]
+    private float coreRiseEffectLightRange = 4.5f;
+
+
     [Header("Start State")]
 
     [Tooltip("게임 시작 시 포탈과 코어를 자동으로 숨깁니다.")]
@@ -541,6 +570,12 @@ public sealed class AllyPortalCoreRevealController : MonoBehaviour
         core.localScale =
             overshootScale;
 
+        /*
+         * 코어가 다 올라와 오버슈트 크기에 도달한 순간(가장 임팩트 있는 타이밍)에
+         * 등장 이펙트를 재생합니다.
+         */
+        PlayCoreRiseEffect();
+
         elapsed = 0f;
 
 
@@ -572,6 +607,99 @@ public sealed class AllyPortalCoreRevealController : MonoBehaviour
 
         core.localScale =
             coreOriginalLocalScale;
+    }
+
+
+    /// <summary>
+    /// 코어 등장 이펙트를 재생합니다. coreRiseEffectPrefab이 지정돼 있으면
+    /// 그걸 코어 위치에 생성하고, 없으면 발광 Point Light 플래시를
+    /// 코드로 만들어 재생합니다(ToyFriendEntranceSequence의 빛 구슬 생성
+    /// 방식과 같은 접근).
+    /// </summary>
+    private void PlayCoreRiseEffect()
+    {
+        if (core == null)
+        {
+            return;
+        }
+
+        if (coreRiseEffectPrefab != null)
+        {
+            GameObject effect =
+                Instantiate(
+                    coreRiseEffectPrefab,
+                    core.position,
+                    Quaternion.identity);
+
+            Destroy(
+                effect,
+                coreRiseEffectDuration + 2f);
+
+            return;
+        }
+
+        StartCoroutine(
+            PlayProceduralCoreFlash());
+    }
+
+
+    private IEnumerator PlayProceduralCoreFlash()
+    {
+        GameObject flashObject =
+            new GameObject("CoreRiseFlash");
+
+        flashObject.transform.position =
+            core.position;
+
+        Light flashLight =
+            flashObject.AddComponent<Light>();
+
+        flashLight.type = LightType.Point;
+        flashLight.color = coreRiseEffectColor;
+        flashLight.range = coreRiseEffectLightRange;
+        flashLight.intensity = 0f;
+
+        float duration =
+            Mathf.Max(
+                0.05f,
+                coreRiseEffectDuration);
+
+        float riseTime = duration * 0.35f;
+        float fadeTime = duration - riseTime;
+        float elapsed = 0f;
+
+        while (elapsed < riseTime)
+        {
+            elapsed += Time.deltaTime;
+
+            flashLight.intensity =
+                Mathf.Lerp(
+                    0f,
+                    coreRiseEffectLightIntensity,
+                    Mathf.Clamp01(elapsed / riseTime));
+
+            yield return null;
+        }
+
+        flashLight.intensity =
+            coreRiseEffectLightIntensity;
+
+        elapsed = 0f;
+
+        while (elapsed < fadeTime)
+        {
+            elapsed += Time.deltaTime;
+
+            flashLight.intensity =
+                Mathf.Lerp(
+                    coreRiseEffectLightIntensity,
+                    0f,
+                    Mathf.Clamp01(elapsed / fadeTime));
+
+            yield return null;
+        }
+
+        Destroy(flashObject);
     }
 
 

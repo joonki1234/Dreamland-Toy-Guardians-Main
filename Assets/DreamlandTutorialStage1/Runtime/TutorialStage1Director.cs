@@ -69,6 +69,16 @@ namespace DreamGuardians
         [SerializeField, Min(0f)]
         private float waveStartDelay = 2f;
 
+        [Tooltip(
+            "튜토리얼 적이 코어 실루엣과 겹쳐서 시야를 가리지 않도록 " +
+            "카메라 정면 기준 옆으로 얼마나 비켜서 스폰할지입니다.")]
+        [SerializeField]
+        private float tutorialSpawnSidewaysOffset = 3f;
+
+        [Tooltip("튜토리얼 적을 코어보다 눈에 띄게 하기 위해 지면보다 얼마나 높게 스폰할지입니다.")]
+        [SerializeField, Min(0f)]
+        private float tutorialSpawnHeightOffset = 1.2f;
+
 
         private readonly Dictionary<string, int>
             hitCountsByPlayer =
@@ -76,6 +86,7 @@ namespace DreamGuardians
 
 
         private EnemyHealth tutorialEnemy;
+        private CoreHealthHUD coreHealthHud;
 
         private Coroutine flowRoutine;
         private Coroutine transitionToWaveRoutine;
@@ -191,6 +202,29 @@ namespace DreamGuardians
         }
 
 
+        /// <summary>
+        /// DreamEnemySpawner가 들고 있는 CoreState에서 CoreHealthHUD를 찾아
+        /// 캐싱합니다. CoreHealthHUD는 CoreState.Awake()에서 AddComponent로
+        /// 붙기 때문에 씬에 미리 배치된 참조가 없어 매번 GetComponent로 찾습니다.
+        /// </summary>
+        private CoreHealthHUD GetCoreHealthHud()
+        {
+            if (coreHealthHud != null)
+            {
+                return coreHealthHud;
+            }
+
+            CoreState core = spawner != null ? spawner.TargetCore : null;
+
+            if (core != null)
+            {
+                coreHealthHud = core.GetComponent<CoreHealthHUD>();
+            }
+
+            return coreHealthHud;
+        }
+
+
         public void Configure(
             DreamEnemySpawner enemySpawner,
             Stage1WaveController waveController,
@@ -293,6 +327,10 @@ namespace DreamGuardians
         {
             State =
                 TutorialStage1State.Intro;
+
+            // 튜토리얼 안내(등장 연출~대사) 중에는 코어 체력이 아직 의미가 없으니
+            // 실제 사격 연습이 시작되기 전까지 숨겨둡니다.
+            GetCoreHealthHud()?.SetVisible(false);
 
 
             /*
@@ -468,6 +506,9 @@ namespace DreamGuardians
 
             tutorialEnemy.SetDamageEnabled(false);
 
+            // 안내가 끝나고 실제 사격 연습이 시작되니 코어 체력을 다시 보여줍니다.
+            GetCoreHealthHud()?.SetVisible(true);
+
             State =
                 TutorialStage1State.ShootingPractice;
 
@@ -614,6 +655,38 @@ namespace DreamGuardians
                 cameraTransform.position +
                 forward * 9f;
 
+            // 코어가 정면에 있으면 튜토리얼 적과 겹쳐서 시야를 가릴 수 있으므로,
+            // 코어가 있는 반대쪽으로 살짝 비켜서 스폰합니다.
+            Vector3 right = cameraTransform.right;
+            right.y = 0f;
+
+            if (right.sqrMagnitude > 0.0001f)
+            {
+                right.Normalize();
+
+                CoreState core =
+                    spawner != null ? spawner.TargetCore : null;
+
+                float sideSign = 1f;
+
+                if (core != null)
+                {
+                    Vector3 toCore =
+                        core.transform.position -
+                        cameraTransform.position;
+
+                    // 코어가 카메라 오른쪽에 있으면(내적이 양수) 반대인
+                    // 왼쪽으로, 왼쪽에 있으면 오른쪽으로 비킵니다.
+                    sideSign =
+                        Vector3.Dot(toCore, right) >= 0f
+                            ? -1f
+                            : 1f;
+                }
+
+                desiredPosition +=
+                    right * (tutorialSpawnSidewaysOffset * sideSign);
+            }
+
             Vector3 groundProbeOrigin =
                 desiredPosition +
                 Vector3.up * 10f;
@@ -637,6 +710,9 @@ namespace DreamGuardians
                     cameraTransform.position.y -
                     1.55f;
             }
+
+            // 코어보다 눈에 띄도록 살짝 더 높은 위치에 스폰합니다.
+            desiredPosition.y += tutorialSpawnHeightOffset;
 
 
             tutorialSpawnPoint.position =
@@ -689,13 +765,32 @@ namespace DreamGuardians
                 out int currentCount);
 
 
-            hitCountsByPlayer[playerId] =
+            int updatedCount =
                 Mathf.Min(
                     requiredHitsPerPlayer,
                     currentCount + 1);
 
+            hitCountsByPlayer[playerId] = updatedCount;
+
 
             RefreshShootingProgress();
+
+            // 튜토리얼 더미는 SetDamageEnabled(false)로 무적이라 실제 HP가
+            // 안 줄어드니, 명중 횟수에 맞춰 월드 체력바만 3등분으로 직접
+            // 채워줍니다(3회 명중 시 완전히 빔). 실제로 죽이지는 않으므로
+            // 이후 EnablePurificationPhase()의 IsDead 체크나 전역
+            // EnemyDied 이벤트에는 영향이 없습니다.
+            EnemyWorldHealthBar tutorialHealthBar =
+                tutorialEnemy.GetComponent<EnemyWorldHealthBar>();
+
+            if (tutorialHealthBar != null)
+            {
+                float remainingRatio =
+                    1f -
+                    (float)updatedCount / requiredHitsPerPlayer;
+
+                tutorialHealthBar.SetManualRatio(remainingRatio);
+            }
 
 
             if (GetCompletedPlayerCount() <
@@ -1174,6 +1269,9 @@ namespace DreamGuardians
             starlightBlueprintCompleted = false;
             stage1CompletionEventRaised = false;
 
+            // 안내 도중 스킵했을 수도 있으니 코어 체력은 확실히 다시 보이게 합니다.
+            GetCoreHealthHud()?.SetVisible(true);
+
 
             missionUI?.SetObjective(
                 string.Empty);
@@ -1224,6 +1322,8 @@ namespace DreamGuardians
             starlightBlueprintCompleted = false;
             stage1CompletionEventRaised = false;
             RoleSynergyProgression.Unlock();
+
+            GetCoreHealthHud()?.SetVisible(true);
 
 
             State =

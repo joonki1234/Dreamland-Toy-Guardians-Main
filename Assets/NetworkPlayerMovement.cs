@@ -171,6 +171,14 @@ public class NetworkPlayerMovement : NetworkBehaviour
                     FindAnyObjectByType<CoreHealthHUD>(
                         FindObjectsInactive.Include);
                 coreHealthHud?.SetCamera(playerCamera);
+
+                // ToyFriendController도 playerLookTarget이 비어 있으면 Camera.main에
+                // 의존하는데(항상 null), 그러면 장난감 친구가 말할 때/평상시에
+                // 플레이어를 전혀 바라보지 못한다. 여기서 명시적으로 넘겨준다.
+                ToyFriendController toyFriend =
+                    FindAnyObjectByType<ToyFriendController>(
+                        FindObjectsInactive.Include);
+                toyFriend?.SetPlayerLookTarget(playerCamera.transform);
             }
         }
     }

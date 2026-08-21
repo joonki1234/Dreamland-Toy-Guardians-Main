@@ -35,6 +35,13 @@ namespace DreamGuardians
         private Camera explicitCamera;
         private bool cameraExplicitlySet;
 
+        // AllyPortalCoreRevealController가 등장 연출 중에 코어 GameObject를
+        // SetActive(false)→(true)로 껐다 켠다. 그때마다 OnEnable이 다시 불려서
+        // 예전에는 무조건 canvasObject를 다시 켜버렸는데, 그러면 SetVisible(false)로
+        // 숨겨둔 게 바로 되살아나 버린다. 마지막으로 요청받은 표시 여부를 기억해뒀다가
+        // OnEnable에서도 그 값을 그대로 따르게 한다.
+        private bool requestedVisible = true;
+
         private void Awake()
         {
             core = GetComponent<CoreState>();
@@ -54,7 +61,7 @@ namespace DreamGuardians
             EnsureUI();
             if (canvasObject != null)
             {
-                canvasObject.SetActive(true);
+                canvasObject.SetActive(requestedVisible);
             }
             Refresh();
         }
@@ -96,6 +103,21 @@ namespace DreamGuardians
             explicitCamera = camera;
             cameraExplicitlySet = camera != null;
             ApplyCamera();
+        }
+
+        /// <summary>
+        /// 튜토리얼 안내 구간처럼 코어 체력 정보가 아직 의미 없는 순간에
+        /// HUD 전체를 잠깐 숨겼다 다시 보이게 할 때 사용합니다.
+        /// </summary>
+        public void SetVisible(bool visible)
+        {
+            requestedVisible = visible;
+            EnsureUI();
+
+            if (canvasObject != null)
+            {
+                canvasObject.SetActive(visible);
+            }
         }
 
         /// <summary>

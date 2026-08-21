@@ -195,6 +195,28 @@ namespace DreamGuardians
             }
         }
 
+        private void Update()
+        {
+            // 이동 중이거나 말하는 중에는 각각의 루틴(MoveToRoutine/SpeakingRoutine)이
+            // 이미 RotateTowards로 회전을 처리하므로, 가만히 서 있을 때만 여기서
+            // 계속 플레이어 쪽을 바라보게 한다. 새 회전 로직 없이 기존
+            // RotateTowards/GetTargetRotation을 그대로 재사용한다.
+            if (IsMoving || IsSpeaking || !IsVisible)
+            {
+                return;
+            }
+
+            if (playerLookTarget == null && Camera.main != null)
+            {
+                playerLookTarget = Camera.main.transform;
+            }
+
+            if (playerLookTarget != null)
+            {
+                RotateTowards(playerLookTarget.position);
+            }
+        }
+
         private void LateUpdate()
         {
             if (speechBubbleRoot == null ||
@@ -226,6 +248,23 @@ namespace DreamGuardians
         public void SetAutomaticEntrance(bool enabled)
         {
             playEntranceOnStart = enabled;
+        }
+
+        /// <summary>
+        /// playerLookTarget이 비어 있으면 이 스크립트 곳곳에서 Camera.main으로
+        /// 대체하는데, 이 프로젝트의 플레이어 카메라는 MainCamera 태그를 쓰지
+        /// 않아서 Camera.main이 항상 null이다(멀티플레이에서 남의 카메라를 잘못
+        /// 잡는 걸 막으려고 일부러 안 씀). 그래서 말할 때/등장 시 회전, 말풍선
+        /// 정면 처리, 평상시 플레이어 응시가 전부 동작하지 않고 있었다.
+        /// 로컬 플레이어 카메라가 확정되는 시점(NetworkPlayerMovement.Spawned())에
+        /// 여기로 명시적으로 넘겨받는다.
+        /// </summary>
+        public void SetPlayerLookTarget(Transform target)
+        {
+            if (target != null)
+            {
+                playerLookTarget = target;
+            }
         }
 
         /// <summary>
