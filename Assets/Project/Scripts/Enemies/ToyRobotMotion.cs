@@ -51,6 +51,13 @@ namespace DreamGuardians
         [SerializeField, Min(0.1f)]
         private float smoothing = 14f;
 
+        [Header("Body Bounce (modelRoot only, never the AI root)")]
+        [SerializeField, Range(0f, 0.2f)]
+        private float bounceHeight = 0.05f;
+
+        [SerializeField, Range(0f, 0.1f)]
+        private float swayAmount = 0.025f;
+
         [Header("Runtime Check")]
         [SerializeField]
         private string runtimeStatus = "Not initialized";
@@ -64,6 +71,8 @@ namespace DreamGuardians
         private Quaternion rightArmStartRotation;
         private Quaternion leftLegStartRotation;
         private Quaternion rightLegStartRotation;
+
+        private Vector3 modelRootStartLocalPosition;
 
         private float phase;
         private bool initialized;
@@ -270,6 +279,55 @@ namespace DreamGuardians
                 Vector3.forward,
                 headTilt,
                 deltaTime);
+
+            // 한 걸음(팔/다리 스윙 반 주기)마다 두 번 튀도록 phase를 그대로 재사용한다.
+            // EnemyCoreMover가 읽는 AI 루트 transform.position은 절대 건드리지 않고
+            // modelRoot(시각 전용 자식)의 localPosition에만 오프셋을 준다.
+            float bounce =
+                isApproaching
+                    ? Mathf.Abs(Mathf.Sin(phase)) * bounceHeight
+                    : 0f;
+
+            float sway =
+                isApproaching
+                    ? Mathf.Sin(phase * 0.5f) * swayAmount
+                    : 0f;
+
+            ApplyModelRootOffset(
+                bounce,
+                sway,
+                deltaTime);
+        }
+
+        /// <summary>
+        /// modelRoot의 localPosition에 위아래 바운스(y)와 좌우 흔들림(x)을
+        /// 부드럽게 적용한다. modelRoot가 없으면 아무 것도 하지 않는다.
+        /// </summary>
+        private void ApplyModelRootOffset(
+            float bounce,
+            float sway,
+            float deltaTime)
+        {
+            if (modelRoot == null)
+            {
+                return;
+            }
+
+            Vector3 desiredLocalPosition =
+                modelRootStartLocalPosition +
+                new Vector3(sway, bounce, 0f);
+
+            float blend =
+                1f -
+                Mathf.Exp(
+                    -smoothing *
+                    deltaTime);
+
+            modelRoot.localPosition =
+                Vector3.Lerp(
+                    modelRoot.localPosition,
+                    desiredLocalPosition,
+                    blend);
         }
 
         private void FindRobotParts()
@@ -489,6 +547,11 @@ namespace DreamGuardians
 
         private void CaptureInitialPose()
         {
+            modelRootStartLocalPosition =
+                modelRoot != null
+                    ? modelRoot.localPosition
+                    : Vector3.zero;
+
             headStartRotation =
                 GetLocalRotation(head);
 
@@ -552,6 +615,11 @@ namespace DreamGuardians
                 Vector3.right,
                 0f,
                 Vector3.forward,
+                0f,
+                deltaTime);
+
+            ApplyModelRootOffset(
+                0f,
                 0f,
                 deltaTime);
         }
