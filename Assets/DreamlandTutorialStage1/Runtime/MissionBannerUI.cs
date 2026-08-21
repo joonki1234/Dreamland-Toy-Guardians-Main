@@ -70,8 +70,8 @@ namespace DreamGuardians
         private Text roleNameText;
 
         private GameObject bossPanel;
-        private Text bossNameText;
-        private Text bossHealthText;
+        private TextMeshProUGUI bossNameText;
+        private TextMeshProUGUI bossHealthText;
         private RectTransform bossFillRect;
         private Image bossFillImage;
 
@@ -82,13 +82,13 @@ namespace DreamGuardians
         private CanvasGroup guideGroup;
         private Image guidePortrait;
         private GameObject guidePortraitFallback;
-        private Text guidePortraitFallbackText;
-        private Text guideSpeaker;
-        private Text guideMessage;
+        private TextMeshProUGUI guidePortraitFallbackText;
+        private TextMeshProUGUI guideSpeaker;
+        private TextMeshProUGUI guideMessage;
 
         private GameObject synergyPanel;
-        private Text synergyTitle;
-        private Text synergyMessage;
+        private TextMeshProUGUI synergyTitle;
+        private TextMeshProUGUI synergyMessage;
 
         private Coroutine bannerRoutine;
         private Coroutine dialogueRoutine;
@@ -1076,38 +1076,41 @@ namespace DreamGuardians
 
         private void BuildBossPanel(RectTransform root)
         {
+            // 로봇 대화창/로비 JobSelectPanel과 같은 유리 패널을 사용합니다.
             bossPanel = CreatePanel(
                 "BossHealthHUD",
                 root,
                 new Vector2(0.5f, 1f),
                 new Vector2(860f, 178f),
-                DreamlandUiSkin.KenneyBossPanel,
-                new Color(0.94f, 0.88f, 1f, 0.97f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
                 true,
                 new Vector2(0f, -120f),
                 new Vector2(0.5f, 1f));
 
             RectTransform rect = bossPanel.GetComponent<RectTransform>();
-            bossNameText = CreateText(
+            bossNameText = CreateTmpText(
                 "BossName",
                 rect,
                 new Vector2(0f, 0.67f),
                 new Vector2(520f, 42f),
                 27,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveDisplayFont,
                 new Vector2(48f, 0f),
                 new Vector2(0f, 0.5f));
-            bossNameText.color = new Color(1f, 0.73f, 0.86f, 1f);
+            bossNameText.color = new Color(1f, 0.78f, 0.88f, 1f);
 
-            bossHealthText = CreateText(
+            bossHealthText = CreateTmpText(
                 "BossHP",
                 rect,
                 new Vector2(1f, 0.67f),
                 new Vector2(190f, 42f),
                 25,
-                TextAnchor.MiddleRight,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineRight,
+                FontStyles.Bold,
+                waveDisplayFont,
                 new Vector2(-42f, 0f),
                 new Vector2(1f, 0.5f));
 
@@ -1177,8 +1180,8 @@ namespace DreamGuardians
                 root,
                 new Vector2(0f, 0f),
                 new Vector2(548f, 158f),
-                DreamlandUiSkin.KenneyCounterPanel,
-                new Color(1f, 1f, 1f, 0.68f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
                 true,
                 new Vector2(24f, 26f),
                 new Vector2(0f, 0f));
@@ -1186,23 +1189,17 @@ namespace DreamGuardians
             guideGroup = guidePanel.AddComponent<CanvasGroup>();
             RectTransform rect = guidePanel.GetComponent<RectTransform>();
 
-            GameObject inner = CreatePanel(
-                "GuideInner",
-                rect,
-                new Vector2(0.5f, 0.5f),
-                new Vector2(510f, 124f),
-                null,
-                new Color(0.91f, 0.97f, 1f, 0.92f),
-                false);
-            inner.transform.SetAsFirstSibling();
+            // 예전 "GuideInner" 흰색 사각형은 KenneyCounterPanel이 밋밋해서 억지로
+            // 밝게 덮으려던 흔적입니다. 진짜 유리 패널 자체가 이미 반투명 네온 재질을
+            // 갖고 있어서 더 필요 없습니다(로봇 대화창/로비 JobSelectPanel도 안 씀).
 
             GameObject portraitFrame = CreatePanel(
                 "PortraitFrame",
                 rect,
                 new Vector2(0f, 0.5f),
                 new Vector2(104f, 104f),
-                DreamlandUiSkin.KenneyMissionPanel,
-                new Color(0.76f, 0.92f, 1f, 0.98f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
                 true,
                 new Vector2(66f, 0f),
                 new Vector2(0.5f, 0.5f));
@@ -1229,53 +1226,49 @@ namespace DreamGuardians
             fallbackRect.offsetMin = Vector2.zero;
             fallbackRect.offsetMax = Vector2.zero;
 
-            guidePortraitFallbackText = CreateText(
+            guidePortraitFallbackText = CreateTmpText(
                 "FallbackLabel",
                 fallbackRect,
                 new Vector2(0.5f, 0.5f),
                 new Vector2(78f, 42f),
                 20,
-                TextAnchor.MiddleCenter,
-                FontStyle.Bold);
+                TextAlignmentOptions.Center,
+                FontStyles.Bold,
+                waveBodyFont);
             guidePortraitFallbackText.text = "친구";
-            guidePortraitFallbackText.color = new Color(0.34f, 0.64f, 0.78f, 1f);
+            guidePortraitFallbackText.color = new Color(0.80f, 0.94f, 0.94f, 1f);
             guidePortraitFallback.SetActive(toyFriendPortrait == null);
 
-            guideSpeaker = CreateText(
+            // 유리 패널 위에 바로 얹히는 글씨라 다른 패널들처럼 어두운 아웃라인이
+            // 필요합니다(예전엔 밝은 GuideInner 사각형 위였어서 아웃라인을 꺼뒀습니다).
+            guideSpeaker = CreateTmpText(
                 "Speaker",
                 rect,
                 new Vector2(0f, 0.76f),
                 new Vector2(330f, 28f),
                 18,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveBodyFont,
                 new Vector2(132f, 0f),
                 new Vector2(0f, 0.5f));
-            guideSpeaker.color = new Color(0.27f, 0.66f, 0.64f, 1f);
-            Outline speakerOutline = guideSpeaker.GetComponent<Outline>();
-            if (speakerOutline != null)
-            {
-                speakerOutline.enabled = false;
-            }
+            guideSpeaker.color = new Color(0.80f, 0.96f, 0.94f, 1f);
 
-            guideMessage = CreateText(
+            guideMessage = CreateTmpText(
                 "Message",
                 rect,
                 new Vector2(0f, 0.33f),
                 new Vector2(376f, 70f),
                 21,
-                TextAnchor.MiddleLeft,
-                FontStyle.Normal,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Normal,
+                waveBodyFont,
                 new Vector2(132f, 0f),
                 new Vector2(0f, 0.5f));
-            guideMessage.color = new Color(0.10f, 0.17f, 0.25f, 1f);
-            guideMessage.resizeTextMinSize = 17;
-            guideMessage.resizeTextMaxSize = 21;
-            Outline messageOutline = guideMessage.GetComponent<Outline>();
-            if (messageOutline != null)
-            {
-                messageOutline.enabled = false;
-            }
+            guideMessage.color = new Color(0.95f, 0.98f, 1f, 1f);
+            guideMessage.fontSizeMin = 17;
+            guideMessage.fontSizeMax = 21;
+            guideMessage.enableAutoSizing = true;
 
             guidePanel.SetActive(false);
         }
@@ -1287,8 +1280,8 @@ namespace DreamGuardians
                 root,
                 new Vector2(0.5f, 0.36f),
                 new Vector2(648f, 176f),
-                DreamlandUiSkin.SciFiWindow,
-                new Color(1f, 1f, 1f, 0.95f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
                 true);
 
             RectTransform rect = synergyPanel.GetComponent<RectTransform>();
@@ -1313,26 +1306,28 @@ namespace DreamGuardians
             icon.sprite = DreamlandUiSkin.SciFiRocket;
             icon.preserveAspect = true;
 
-            synergyTitle = CreateText(
+            synergyTitle = CreateTmpText(
                 "SynergyTitle",
                 rect,
                 new Vector2(0f, 0.62f),
                 new Vector2(400f, 38f),
                 26,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveDisplayFont,
                 new Vector2(128f, 0f),
                 new Vector2(0f, 0.5f));
-            synergyTitle.color = new Color(0.52f, 1f, 1f, 1f);
+            synergyTitle.color = new Color(0.60f, 1f, 1f, 1f);
 
-            synergyMessage = CreateText(
+            synergyMessage = CreateTmpText(
                 "SynergyMessage",
                 rect,
                 new Vector2(0f, 0.37f),
                 new Vector2(400f, 44f),
                 22,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveBodyFont,
                 new Vector2(128f, 0f),
                 new Vector2(0f, 0.5f));
 
