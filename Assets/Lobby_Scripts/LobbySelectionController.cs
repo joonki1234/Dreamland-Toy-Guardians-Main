@@ -53,6 +53,13 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private TMP_Text connectedPlayerText;
 
+    [Header("장난감 친구 Ready 반응")]
+    [SerializeField]
+    private Image toyfriendPortrait;
+
+    [SerializeField]
+    private Sprite readyPortraitSprite;
+
     [Header("플레이어 상태 목록 연결")]
     [Tooltip(
         "오른쪽 플레이어 상태 목록을 관리하는 " +
@@ -99,9 +106,18 @@ public class LobbySelectionController : MonoBehaviour
 
     private bool isCountdownActive;
     private float countdownRemaining;
+    private Sprite defaultPortraitSprite;
 
     private void Awake()
     {
+        if (toyfriendPortrait != null)
+        {
+            defaultPortraitSprite =
+                toyfriendPortrait.overrideSprite != null
+                    ? toyfriendPortrait.overrideSprite
+                    : toyfriendPortrait.sprite;
+        }
+
         if (policeButton != null)
         {
             policeButton.onClick.AddListener(
@@ -249,7 +265,8 @@ public class LobbySelectionController : MonoBehaviour
 
         UpdateSelectedJobText(
             hasJob,
-            job
+            job,
+            ready
         );
 
         UpdateJobButtons(
@@ -272,7 +289,8 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private void UpdateSelectedJobText(
         bool hasJob,
-        PlayerJob job
+        PlayerJob job,
+        bool ready
     )
     {
         // 기존 선택 직업 표시
@@ -285,7 +303,12 @@ public class LobbySelectionController : MonoBehaviour
         // 새로 추가한 Toyfriend 말풍선 설명
         if (jobDescriptionText != null)
         {
-            if (hasJob)
+            if (ready)
+            {
+                jobDescriptionText.text =
+                    "좋은 선택이야~!";
+            }
+            else if (hasJob)
             {
                 jobDescriptionText.text =
                     GetJobDescription(job);
@@ -294,6 +317,21 @@ public class LobbySelectionController : MonoBehaviour
             {
                 jobDescriptionText.text =
                     "궁금한 직업을 선택해봐!";
+            }
+        }
+
+        if (toyfriendPortrait != null)
+        {
+            Sprite targetPortraitSprite =
+                ready && readyPortraitSprite != null
+                    ? readyPortraitSprite
+                    : defaultPortraitSprite;
+
+            if (toyfriendPortrait.overrideSprite !=
+                targetPortraitSprite)
+            {
+                toyfriendPortrait.overrideSprite =
+                    targetPortraitSprite;
             }
         }
     }

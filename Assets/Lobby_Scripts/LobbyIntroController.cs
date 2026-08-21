@@ -14,6 +14,9 @@ public class LobbyIntroController : MonoBehaviour
     [SerializeField]
     private GameObject playerStatusGroup;
 
+    [SerializeField]
+    private LobbyContactController lobbyContactController;
+
 
     [Header("안내 글자 연결")]
     [SerializeField]
@@ -272,6 +275,26 @@ public class LobbyIntroController : MonoBehaviour
             introRoutine = null;
         }
 
+        introRoutine =
+            StartCoroutine(
+                CompleteLobbyTransitionRoutine()
+            );
+    }
+
+
+    private IEnumerator CompleteLobbyTransitionRoutine()
+    {
+        // 네트워크 연결 완료 후 인트로 화면의 페이드 아웃이
+        // 완전히 끝날 때까지 로비 연락 시퀀스를 시작하지 않는다.
+        if (lobbyIntroPanel != null &&
+            lobbyIntroPanel.activeSelf &&
+            introCanvasGroup != null &&
+            introCanvasGroup.alpha > 0f)
+        {
+            yield return StartCoroutine(
+                FadeOutIntroRoutine()
+            );
+        }
 
         // 인트로 화면 끄기
         if (lobbyIntroPanel != null)
@@ -280,10 +303,12 @@ public class LobbyIntroController : MonoBehaviour
         }
 
 
-        // 직업 선택 화면 켜기
+        // 연락 시퀀스가 연결된 경우 직업 선택 화면은 대화가 끝난 뒤 켠다.
         if (jobSelectPanel != null)
         {
-            jobSelectPanel.SetActive(true);
+            jobSelectPanel.SetActive(
+                lobbyContactController == null
+            );
         }
 
 
@@ -294,9 +319,19 @@ public class LobbyIntroController : MonoBehaviour
         }
 
 
-        // 직업 선택 화면이 등장한 순간
-        // BGM을 서서히 재생
-        StartLobbyBGM();
+        if (lobbyContactController != null)
+        {
+            lobbyContactController.BeginContactSequence(
+                StartLobbyBGM
+            );
+        }
+        else
+        {
+            // 연락 기능이 없으면 기존 시점에 BGM을 재생한다.
+            StartLobbyBGM();
+        }
+
+        introRoutine = null;
     }
 
 
@@ -359,6 +394,7 @@ public class LobbyIntroController : MonoBehaviour
             lobbyBGMVolume;
 
         bgmFadeRoutine = null;
+
     }
 
 
