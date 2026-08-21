@@ -36,6 +36,18 @@ namespace DreamGuardians
         [SerializeField, Min(0.05f)]
         private float arrivalTolerance = 0.35f;
 
+        [Tooltip("궤도를 도는 동안의 속도입니다(초당 각도).")]
+        [SerializeField]
+        private float orbitAngularSpeed = 14f;
+
+        [Tooltip("공격 사거리에 도달한 뒤, 한 번에 얼마나 오래 궤도를 도는지(초)입니다. 이동하는 동안은 공격하지 않습니다.")]
+        [SerializeField, Min(0.1f)]
+        private float orbitMoveDuration = 1.8f;
+
+        [Tooltip("궤도 이동을 멈추고 제자리에서 레이저를 쏘는 시간(초)입니다.")]
+        [SerializeField, Min(0.1f)]
+        private float orbitPauseDuration = 1.6f;
+
         [Header("호버링")]
 
         [SerializeField, Min(0f)]
@@ -92,6 +104,10 @@ namespace DreamGuardians
         private CoreState targetCore;
         private EnemyHealth health;
         private Vector3 attackDestination;
+        private float orbitAngleDegrees;
+        private bool hasReachedOrbit;
+        private bool isOrbitMoving = true;
+        private float orbitPhaseTimer;
         private float nextAttackTime;
         private float hoverTimeOffset;
         private bool isDead;
@@ -155,21 +171,73 @@ namespace DreamGuardians
                 return;
             }
 
-            Vector3 toDestination =
-                attackDestination - transform.position;
-
-            if (toDestination.magnitude > arrivalTolerance)
+            if (!hasReachedOrbit)
             {
-                transform.position =
-                    Vector3.MoveTowards(
-                        transform.position,
-                        attackDestination,
-                        moveSpeed * Time.deltaTime);
+                // 처음 도달하기 전에는 목표 지점을 고정해서(각도를 돌리지 않음)
+                // moveSpeed와 상관없이 확실히 도착할 수 있게 한다. 예전에는 여기서도
+                // 매 프레임 각도를 돌려버려서, moveSpeed가 궤도 속도를 못 따라가면
+                // 영원히 도착하지 못해 레이저를 한 번도 못 쏘는 문제가 있었다.
+                Vector3 toInitial =
+                    attackDestination - transform.position;
 
-                RotateTowards(toDestination);
+                if (toInitial.magnitude > arrivalTolerance)
+                {
+                    transform.position =
+                        Vector3.MoveTowards(
+                            transform.position,
+                            attackDestination,
+                            moveSpeed * Time.deltaTime);
+
+                    RotateTowards(toInitial);
+                    return;
+                }
+
+                hasReachedOrbit = true;
+                isOrbitMoving = true;
+                orbitPhaseTimer = orbitMoveDuration;
+            }
+
+            orbitPhaseTimer -= Time.deltaTime;
+
+            if (isOrbitMoving)
+            {
+                // 궤도를 도는 구간: 각도를 계속 돌려서 코어 주위를 이동한다.
+                // 이 구간에서는 공격하지 않는다.
+                UpdateOrbitDestination();
+                HoverTowardsAttackDestination();
+
+                if (orbitPhaseTimer <= 0f)
+                {
+                    isOrbitMoving = false;
+                    orbitPhaseTimer = orbitPauseDuration;
+
+                    // 멈추자마자 바로 쏘지 않고 아주 잠깐 조준하는 느낌을 준다.
+                    nextAttackTime =
+                        Mathf.Max(nextAttackTime, Time.time + 0.15f);
+                }
+
                 return;
             }
 
+            // 멈춰서 쏘는 구간: 각도를 더 이상 돌리지 않아 attackDestination이
+            // 고정되고, 그 자리에서 호버링하며 계속 공격한다.
+            HoverTowardsAttackDestination();
+            TryAttackCore();
+
+            if (orbitPhaseTimer <= 0f)
+            {
+                isOrbitMoving = true;
+                orbitPhaseTimer = orbitMoveDuration;
+            }
+        }
+
+
+        /// <summary>
+        /// 현재 attackDestination(고정이든 궤도 회전 중이든)에 호버링 흔들림을
+        /// 더한 지점으로 이동하고, 코어 쪽을 바라보게 회전한다.
+        /// </summary>
+        private void HoverTowardsAttackDestination()
+        {
             Vector3 hoverDestination = attackDestination;
 
             hoverDestination.y +=
@@ -187,8 +255,36 @@ namespace DreamGuardians
             RotateTowards(
                 targetCore.AttackTargetPosition -
                 transform.position);
+        }
 
-            TryAttackCore();
+
+        /// <summary>
+        /// orbitAngleDegrees를 계속 증가시켜 attackDestination을 코어 중심,
+        /// attackRange 반지름, flightHeight 높이의 원 위를 도는 지점으로 갱신한다.
+        /// </summary>
+        private void UpdateOrbitDestination()
+        {
+            orbitAngleDegrees +=
+                orbitAngularSpeed * Time.deltaTime;
+
+            Vector3 corePosition =
+                targetCore.transform.position;
+
+            float radians =
+                orbitAngleDegrees * Mathf.Deg2Rad;
+
+            Vector3 orbitDirection =
+                new Vector3(
+                    Mathf.Cos(radians),
+                    0f,
+                    Mathf.Sin(radians));
+
+            attackDestination =
+                corePosition +
+                orbitDirection * attackRange;
+
+            attackDestination.y =
+                corePosition.y + flightHeight;
         }
 
 
@@ -232,6 +328,18 @@ namespace DreamGuardians
             }
 
             outwardDirection.Normalize();
+
+            // 이후 Update()의 UpdateOrbitDestination()이 이 각도부터 계속 회전시킨다.
+            // 여기서 계산하는 초기 attackDestination은 궤도 진입 전 첫 접근 목표일
+            // 뿐이고, 매 프레임 각도 기준으로 다시 계산되므로 값 자체는 유지할
+            // 필요가 없다.
+            orbitAngleDegrees =
+                Mathf.Atan2(
+                    outwardDirection.z,
+                    outwardDirection.x) *
+                Mathf.Rad2Deg;
+
+            hasReachedOrbit = false;
 
             attackDestination =
                 corePosition +
