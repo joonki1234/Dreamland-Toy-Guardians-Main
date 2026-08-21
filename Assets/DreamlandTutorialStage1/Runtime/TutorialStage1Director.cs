@@ -506,8 +506,8 @@ namespace DreamGuardians
 
             tutorialEnemy.SetDamageEnabled(false);
 
-            // 안내가 끝나고 실제 사격 연습이 시작되니 코어 체력을 다시 보여줍니다.
-            GetCoreHealthHud()?.SetVisible(true);
+            // 코어 체력은 튜토리얼 내내(사격 연습, 정화 연습 포함) 숨겨두고
+            // 실제 Stage 1이 시작될 때(TransitionToWaveRoutine)만 보여줍니다.
 
             State =
                 TutorialStage1State.ShootingPractice;
@@ -1082,6 +1082,9 @@ namespace DreamGuardians
 
             transitionToWaveRoutine = null;
             State = TutorialStage1State.Wave1;
+
+            // 튜토리얼 내내 숨겨뒀던 코어 체력을 실제 Stage 1 시작과 함께 보여줍니다.
+            GetCoreHealthHud()?.SetVisible(true);
 
             // Stage1WaveController의 Started 이벤트가 발생하면서
             // 포탈 A와 Road_1이 등장합니다.
