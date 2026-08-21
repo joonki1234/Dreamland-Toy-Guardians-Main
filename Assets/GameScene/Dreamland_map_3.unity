@@ -30317,7 +30317,7 @@ MonoBehaviour:
   customBannerRoot: {fileID: 1358047092}
   customBannerTitle: {fileID: 754781543}
   customBannerSubtitle: {fileID: 1360605894}
-  toyFriendPortrait: {fileID: 0}
+  toyFriendPortrait: {fileID: 21300000, guid: 466ac85ae1424b94c9c793ec95390144, type: 3}
   customGuideRoot: {fileID: 0}
   customGuidePortrait: {fileID: 0}
   customGuideSpeaker: {fileID: 0}
