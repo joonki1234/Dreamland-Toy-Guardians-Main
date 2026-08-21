@@ -60,6 +60,21 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private Sprite readyPortraitSprite;
 
+    [Header("장난감 친구 목소리")]
+    [Tooltip(
+        "직업 설명 문구가 바뀔 때 재생할 동물의숲 스타일 중얼거림 보이스입니다. " +
+        "map_3(게임플레이 맵)의 장난감 친구와 같은 목소리로 통일하려면 " +
+        "AnimaleseVoicePlayer의 voiceName/pitchRange/syllableInterval 설정도 동일하게 맞추세요."
+    )]
+    [SerializeField]
+    private AnimaleseVoicePlayer robotVoice;
+
+    [Tooltip("문구가 바뀔 때 중얼거림을 재생할 시간(초)입니다.")]
+    [SerializeField, Min(0.1f)]
+    private float robotVoiceDuration = 1.4f;
+
+    private string lastSpokenDescription;
+
     [Header("플레이어 상태 목록 연결")]
     [Tooltip(
         "오른쪽 플레이어 상태 목록을 관리하는 " +
@@ -303,20 +318,30 @@ public class LobbySelectionController : MonoBehaviour
         // 새로 추가한 Toyfriend 말풍선 설명
         if (jobDescriptionText != null)
         {
+            string description;
+
             if (ready)
             {
-                jobDescriptionText.text =
-                    "좋은 선택이야~!";
+                description = "좋은 선택이야~!";
             }
             else if (hasJob)
             {
-                jobDescriptionText.text =
-                    GetJobDescription(job);
+                description = GetJobDescription(job);
             }
             else
             {
-                jobDescriptionText.text =
-                    "궁금한 직업을 선택해봐!";
+                description = "궁금한 직업을 선택해봐!";
+            }
+
+            jobDescriptionText.text = description;
+
+            // Update()에서 매 프레임 호출되므로, 문구가 실제로 바뀌었을 때만
+            // 중얼거림 보이스를 재생한다 (매 프레임 재생되는 것을 방지).
+            if (robotVoice != null &&
+                description != lastSpokenDescription)
+            {
+                lastSpokenDescription = description;
+                robotVoice.PlayBabbleForDuration(robotVoiceDuration);
             }
         }
 
