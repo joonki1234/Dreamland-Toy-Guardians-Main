@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 
 namespace DreamGuardians
@@ -9,6 +10,17 @@ namespace DreamGuardians
         [Header("Core Health")]
         [SerializeField, Min(1f)] private float maxHealth = 100f;
         [SerializeField, Min(0f)] private float currentHealth = 100f;
+
+        [Header("Core Health HUD Theme (스타트/로비씬과 통일)")]
+        [Tooltip("CoreHealthHUD의 체력 숫자에 쓸 폰트입니다. Assets/Fonts/HSJiptokki-Black SDF를 지정하세요.")]
+        [SerializeField] private TMP_FontAsset hudDisplayFont;
+        [Tooltip("CoreHealthHUD의 \"코어 상태\" 라벨에 쓸 폰트입니다. Assets/Fonts/HS두꺼비체 SDF를 지정하세요.")]
+        [SerializeField] private TMP_FontAsset hudBodyFont;
+        [Tooltip(
+            "로봇 대화창/로비 JobSelectPanel과 같은 반투명 네온 유리 패널 원본입니다. " +
+            "Sci-Fi UI 아틀라스의 \"window\" 서브스프라이트(guid 56d84991286850f428b4e7df0cca7380, " +
+            "fileID 21300000)를 직접 지정하세요.")]
+        [SerializeField] private Sprite hudGlassPanel;
 
         [Header("Dream Energy")]
         [SerializeField, Min(0f)] private float currentEnergy;
@@ -100,10 +112,16 @@ namespace DreamGuardians
 
         private void EnsureHealthHud()
         {
-            if (GetComponent<CoreHealthHUD>() == null)
+            CoreHealthHUD hud = GetComponent<CoreHealthHUD>();
+            if (hud == null)
             {
-                gameObject.AddComponent<CoreHealthHUD>();
+                hud = gameObject.AddComponent<CoreHealthHUD>();
             }
+
+            // CoreHealthHUD는 AddComponent로 런타임에 붙기 때문에 씬 파일에서
+            // 직접 필드를 연결할 방법이 없다. 대신 씬에 이미 배치돼 있는 CoreState
+            // 쪽에서 테마 에셋(폰트/유리 패널)을 받아 그대로 전달한다.
+            hud.Configure(hudDisplayFont, hudBodyFont, hudGlassPanel);
         }
 
         private void EnsureEnergyTarget()

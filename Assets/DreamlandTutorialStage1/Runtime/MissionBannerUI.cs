@@ -31,27 +31,39 @@ namespace DreamGuardians
         [Header("Timing")]
         [SerializeField, Min(0.2f)] private float defaultBannerDuration = 2f;
 
+        [Header("Wave Banner / Combat Panel Fonts (스타트/로비씬과 통일)")]
+        [Tooltip("스테이지 시작 배너 제목, 남은 적 수 숫자처럼 큰 글씨에 쓰는 폰트입니다. Assets/Fonts/HSJiptokki-Black SDF를 지정하세요.")]
+        [SerializeField] private TMP_FontAsset waveDisplayFont;
+        [Tooltip("배너 부제목, 웨이브 라벨, 상세 설명처럼 본문 글씨에 쓰는 폰트입니다. Assets/Fonts/HS두꺼비체 SDF를 지정하세요.")]
+        [SerializeField] private TMP_FontAsset waveBodyFont;
+        [Tooltip(
+            "로봇 대화창(ToyFriendMapHud)/로비 JobSelectPanel과 같은 반투명 네온 유리 패널입니다. " +
+            "DreamlandUiSkin.SciFiWindow는 이 스프라이트를 별도 PNG로 잘라내는 과정에서 " +
+            "원본의 투명도가 사라진 사본이라 여기서는 쓰지 않고, Sci-Fi UI 아틀라스의 " +
+            "\"window\" 서브스프라이트(guid 56d84991286850f428b4e7df0cca7380, fileID 21300000)를 직접 지정하세요.")]
+        [SerializeField] private Sprite waveGlassPanel;
+
         private Canvas canvas;
         private static Font runtimeFont;
 
         private GameObject bannerPanel;
         private CanvasGroup bannerGroup;
-        private Text bannerTitle;
-        private Text bannerSubtitle;
+        private TextMeshProUGUI bannerTitle;
+        private TextMeshProUGUI bannerSubtitle;
 
         private GameObject missionPanel;
         private RectTransform missionPanelRect;
-        private Text objectiveText;
+        private TextMeshProUGUI objectiveText;
         private RectTransform objectiveTextRect;
 
         private GameObject combatPanel;
-        private Text combatWaveText;
-        private Text combatCountText;
-        private Text combatDetailText;
+        private TextMeshProUGUI combatWaveText;
+        private TextMeshProUGUI combatCountText;
+        private TextMeshProUGUI combatDetailText;
 
         private GameObject waveCountdownPanel;
-        private Text waveCountdownLabelText;
-        private Text waveCountdownValueText;
+        private TextMeshProUGUI waveCountdownLabelText;
+        private TextMeshProUGUI waveCountdownValueText;
 
         private GameObject rolePanel;
         private Text roleTitleText;
@@ -231,9 +243,10 @@ namespace DreamGuardians
             // 한 줄 목표는 기존의 컴팩트한 카드 크기를 유지하고,
             // 자동 줄바꿈으로 두 줄 이상이 되는 목표만 카드 높이를 늘립니다.
             Canvas.ForceUpdateCanvases();
+            objectiveText.ForceMeshUpdate();
             float preferredHeight = objectiveText.preferredHeight;
-            int renderedLineCount = objectiveText.cachedTextGenerator != null
-                ? objectiveText.cachedTextGenerator.lineCount
+            int renderedLineCount = objectiveText.textInfo != null
+                ? objectiveText.textInfo.lineCount
                 : 1;
             bool multiline = renderedLineCount > 1 ||
                 preferredHeight > 38f ||
@@ -252,8 +265,8 @@ namespace DreamGuardians
             objectiveTextRect.anchoredPosition = new Vector2(34f, 0f);
 
             // 두 줄 목표에서는 글자를 억지로 작게 줄이기보다 충분한 세로 공간을 줍니다.
-            objectiveText.resizeTextMinSize = multiline ? 19 : 16;
-            objectiveText.resizeTextMaxSize = 24;
+            objectiveText.fontSizeMin = multiline ? 19 : 16;
+            objectiveText.fontSizeMax = 24;
         }
 
         /// <summary>
@@ -825,52 +838,57 @@ namespace DreamGuardians
 
         private void BuildBanner(RectTransform root)
         {
-            // Strategic warning 프레임의 원본 비율(약 3.1:1)에 맞춰
-            // 세로가 눌리지 않도록 높이를 확보합니다.
+            // 로봇 대화창(ToyFriendMapHud)/로비 JobSelectPanel과 똑같은 Sci-Fi UI 유리
+            // 패널 원본을 사용합니다. 색은 흰색 1(불투명)로 둬서 스프라이트 자체의
+            // 반투명 유리 알파값이 그대로 살아나게 합니다(추가로 알파를 곱해서
+            // 흐리게 만들면 원본의 유리/네온 느낌이 사라집니다).
             bannerPanel = CreatePanel(
                 "MissionStartBanner",
                 root,
                 new Vector2(0.5f, 0.62f),
                 new Vector2(840f, 250f),
-                DreamlandUiSkin.StrategicWarningPanel,
-                new Color(0.88f, 0.98f, 1f, 0.98f),
-                false);
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
+                true);
 
             bannerGroup = bannerPanel.AddComponent<CanvasGroup>();
             RectTransform rect = bannerPanel.GetComponent<RectTransform>();
 
-            bannerTitle = CreateText(
+            bannerTitle = CreateTmpText(
                 "Title",
                 rect,
                 new Vector2(0.5f, 0.61f),
                 new Vector2(650f, 70f),
                 43,
-                TextAnchor.MiddleCenter,
-                FontStyle.Bold);
-            bannerTitle.color = new Color(0.78f, 1f, 1f, 1f);
+                TextAlignmentOptions.Center,
+                FontStyles.Bold,
+                waveDisplayFont);
+            bannerTitle.color = new Color(0.92f, 0.99f, 1f, 1f);
 
-            bannerSubtitle = CreateText(
+            bannerSubtitle = CreateTmpText(
                 "Subtitle",
                 rect,
                 new Vector2(0.5f, 0.36f),
                 new Vector2(660f, 58f),
                 27,
-                TextAnchor.MiddleCenter,
-                FontStyle.Normal);
-            bannerSubtitle.color = Color.white;
+                TextAlignmentOptions.Center,
+                FontStyles.Normal,
+                waveBodyFont);
+            bannerSubtitle.color = new Color(0.83f, 0.93f, 0.98f, 1f);
 
             bannerPanel.SetActive(false);
         }
 
         private void BuildMissionPanel(RectTransform root)
         {
+            // 남은 적 수 패널과 같은 Sci-Fi UI 유리 원본을 써서 통일합니다.
             missionPanel = CreatePanel(
                 "MissionObjective",
                 root,
                 new Vector2(0f, 1f),
                 new Vector2(442f, 118f),
-                DreamlandUiSkin.KenneyMissionPanel,
-                new Color(0.86f, 0.92f, 1f, 0.96f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
                 true,
                 new Vector2(22f, -18f),
                 new Vector2(0f, 1f));
@@ -878,30 +896,33 @@ namespace DreamGuardians
             RectTransform rect = missionPanel.GetComponent<RectTransform>();
             missionPanelRect = rect;
 
-            Text label = CreateText(
+            TextMeshProUGUI label = CreateTmpText(
                 "MissionLabel",
                 rect,
                 new Vector2(0f, 0.72f),
                 new Vector2(260f, 28f),
                 18,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveBodyFont,
                 new Vector2(34f, 0f),
                 new Vector2(0f, 0.5f));
             label.text = "현재 목표";
-            label.color = new Color(0.76f, 0.98f, 0.95f, 1f);
+            label.color = new Color(0.80f, 0.96f, 0.94f, 1f);
 
-            objectiveText = CreateText(
+            objectiveText = CreateTmpText(
                 "Objective",
                 rect,
                 new Vector2(0f, 0.34f),
                 new Vector2(370f, 54f),
                 24,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveBodyFont,
                 new Vector2(34f, 0f),
                 new Vector2(0f, 0.5f));
-            objectiveText.color = new Color(1f, 0.99f, 1f, 1f);
+            objectiveText.color = new Color(0.96f, 0.99f, 1f, 1f);
+            objectiveText.enableAutoSizing = true;
             objectiveTextRect = objectiveText.GetComponent<RectTransform>();
             missionPanel.SetActive(false);
         }
@@ -913,49 +934,52 @@ namespace DreamGuardians
                 root,
                 new Vector2(1f, 1f),
                 new Vector2(338f, 112f),
-                DreamlandUiSkin.KenneyCounterPanel,
-                new Color(0.87f, 0.93f, 1f, 0.96f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
                 true,
                 new Vector2(-22f, -18f),
                 new Vector2(1f, 1f));
 
             RectTransform rect = combatPanel.GetComponent<RectTransform>();
 
-            combatWaveText = CreateText(
+            combatWaveText = CreateTmpText(
                 "Wave",
                 rect,
                 new Vector2(0f, 0.70f),
                 new Vector2(170f, 28f),
                 17,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveBodyFont,
                 new Vector2(28f, 0f),
                 new Vector2(0f, 0.5f));
-            combatWaveText.color = new Color(0.75f, 0.97f, 0.95f, 1f);
+            combatWaveText.color = new Color(0.80f, 0.94f, 0.94f, 1f);
 
-            combatDetailText = CreateText(
+            combatDetailText = CreateTmpText(
                 "Detail",
                 rect,
                 new Vector2(0f, 0.32f),
                 new Vector2(176f, 36f),
                 16,
-                TextAnchor.MiddleLeft,
-                FontStyle.Bold,
+                TextAlignmentOptions.MidlineLeft,
+                FontStyles.Bold,
+                waveBodyFont,
                 new Vector2(28f, 0f),
                 new Vector2(0f, 0.5f));
-            combatDetailText.color = new Color(0.99f, 0.99f, 1f, 1f);
+            combatDetailText.color = new Color(0.93f, 0.97f, 1f, 1f);
 
-            combatCountText = CreateText(
+            combatCountText = CreateTmpText(
                 "EnemyCount",
                 rect,
                 new Vector2(1f, 0.50f),
                 new Vector2(122f, 66f),
                 40,
-                TextAnchor.MiddleCenter,
-                FontStyle.Bold,
+                TextAlignmentOptions.Center,
+                FontStyles.Bold,
+                waveDisplayFont,
                 new Vector2(-18f, 0f),
                 new Vector2(1f, 0.5f));
-            combatCountText.color = new Color(1f, 0.93f, 0.57f, 1f);
+            combatCountText.color = new Color(1f, 0.74f, 0.28f, 1f);
 
             combatPanel.SetActive(false);
         }
@@ -968,34 +992,36 @@ namespace DreamGuardians
                 root,
                 new Vector2(1f, 1f),
                 new Vector2(268f, 86f),
-                DreamlandUiSkin.KenneyCounterPanel,
-                new Color(0.87f, 0.93f, 1f, 0.94f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white,
                 true,
                 new Vector2(-22f, -140f),
                 new Vector2(1f, 1f));
 
             RectTransform rect = waveCountdownPanel.GetComponent<RectTransform>();
 
-            waveCountdownLabelText = CreateText(
+            waveCountdownLabelText = CreateTmpText(
                 "CountdownLabel",
                 rect,
                 new Vector2(0.5f, 0.70f),
                 new Vector2(210f, 26f),
                 15,
-                TextAnchor.MiddleCenter,
-                FontStyle.Bold);
+                TextAlignmentOptions.Center,
+                FontStyles.Bold,
+                waveBodyFont);
             waveCountdownLabelText.text = "다음 웨이브까지";
-            waveCountdownLabelText.color = new Color(0.75f, 0.97f, 0.95f, 1f);
+            waveCountdownLabelText.color = new Color(0.80f, 0.94f, 0.94f, 1f);
 
-            waveCountdownValueText = CreateText(
+            waveCountdownValueText = CreateTmpText(
                 "CountdownValue",
                 rect,
                 new Vector2(0.5f, 0.32f),
                 new Vector2(210f, 40f),
                 30,
-                TextAnchor.MiddleCenter,
-                FontStyle.Bold);
-            waveCountdownValueText.color = new Color(1f, 0.93f, 0.57f, 1f);
+                TextAlignmentOptions.Center,
+                FontStyles.Bold,
+                waveDisplayFont);
+            waveCountdownValueText.color = new Color(1f, 0.74f, 0.28f, 1f);
 
             waveCountdownPanel.SetActive(false);
         }
@@ -1361,6 +1387,26 @@ namespace DreamGuardians
                 : Image.Type.Simple;
             image.color = color;
             image.raycastTarget = false;
+
+            if (image.type == Image.Type.Sliced)
+            {
+                // 9-slice 보더(스프라이트 픽셀 단위)가 패널의 실제 표시 크기보다 크면
+                // 위/아래(또는 좌/우) 보더끼리 서로 겹쳐서 패널이 반으로 갈라진 것처럼
+                // 깨져 보인다(예: CombatStatus 338x112 vs SciFiWindow 보더 95+95=190).
+                // 가장 큰 보더 값이 짧은 변의 절반보다 크면 pixelsPerUnitMultiplier로
+                // 보더를 화면상 더 작게 축소해서 항상 패널 안에 들어오게 한다.
+                Vector4 border = sprite.border;
+                float largestBorder = Mathf.Max(
+                    border.x, border.y, border.z, border.w);
+                float shortestSide = Mathf.Min(size.x, size.y);
+                float safeBorder = shortestSide * 0.4f;
+
+                if (largestBorder > safeBorder && safeBorder > 0f)
+                {
+                    image.pixelsPerUnitMultiplier = largestBorder / safeBorder;
+                }
+            }
+
             return panel;
         }
 
@@ -1434,6 +1480,59 @@ namespace DreamGuardians
             Outline outline = textObject.AddComponent<Outline>();
             outline.effectColor = new Color(0f, 0f, 0f, 0.90f);
             outline.effectDistance = new Vector2(2f, -2f);
+            outline.useGraphicAlpha = true;
+
+            return text;
+        }
+
+        /// <summary>
+        /// MissionStartBanner/CombatStatus 패널 전용 TextMeshPro 생성 헬퍼입니다.
+        /// 다른 패널은 계속 레거시 CreateText()(동적 OS 폰트)를 쓰므로 건드리지 않습니다.
+        /// </summary>
+        private static TextMeshProUGUI CreateTmpText(
+            string objectName,
+            Transform parent,
+            Vector2 anchor,
+            Vector2 size,
+            int fontSize,
+            TextAlignmentOptions alignment,
+            FontStyles fontStyle,
+            TMP_FontAsset font,
+            Vector2? anchoredPosition = null,
+            Vector2? pivot = null)
+        {
+            GameObject textObject = new GameObject(
+                objectName,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(parent, false);
+
+            RectTransform rect = textObject.GetComponent<RectTransform>();
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = pivot ?? new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPosition ?? Vector2.zero;
+            rect.sizeDelta = size;
+
+            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
+            if (font != null)
+            {
+                text.font = font;
+            }
+            text.fontSize = fontSize;
+            text.fontStyle = fontStyle;
+            text.alignment = alignment;
+            text.enableWordWrapping = true;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.color = Color.white;
+            text.raycastTarget = false;
+
+            // 반투명 유리 패널이라 뒤로 하늘/네온 테두리가 비쳐서 배경이 일정하지 않다.
+            // 밝은 글씨 뒤에 어두운 아웃라인을 깔아서 어떤 배경 위에서도 읽히게 한다.
+            Outline outline = textObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0.04f, 0.05f, 0.08f, 0.85f);
+            outline.effectDistance = new Vector2(1.4f, -1.4f);
             outline.useGraphicAlpha = true;
 
             return text;

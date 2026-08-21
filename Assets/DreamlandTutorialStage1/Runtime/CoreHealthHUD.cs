@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -5,20 +6,29 @@ namespace DreamGuardians
 {
     /// <summary>
     /// 코어 체력을 화면 상단 중앙에 고정 표시하는 Sci-Fi HUD입니다.
-    /// Strategic Warfare의 상태 패널 + Sci-Fi GUI Skin 게이지를 사용합니다.
+    /// 로봇 대화창(ToyFriendMapHud)/로비 JobSelectPanel과 같은 Sci-Fi UI 유리 패널 +
+    /// 스타트/로비씬과 같은 TextMeshPro 폰트를 사용해 게임 전체와 통일된 느낌을 줍니다.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(CoreState))]
     public sealed class CoreHealthHUD : MonoBehaviour
     {
-        private static Font runtimeFont;
+        [Tooltip("코어 체력 숫자(예: 100 / 100)에 쓰는 폰트입니다. Assets/Fonts/HSJiptokki-Black SDF를 지정하세요.")]
+        [SerializeField] private TMP_FontAsset displayFont;
+        [Tooltip("\"코어 상태\" 라벨에 쓰는 폰트입니다. Assets/Fonts/HS두꺼비체 SDF를 지정하세요.")]
+        [SerializeField] private TMP_FontAsset bodyFont;
+        [Tooltip(
+            "로봇 대화창/로비 JobSelectPanel과 같은 반투명 네온 유리 패널 원본입니다. " +
+            "Sci-Fi UI 아틀라스의 \"window\" 서브스프라이트(guid 56d84991286850f428b4e7df0cca7380, " +
+            "fileID 21300000)를 직접 지정하세요.")]
+        [SerializeField] private Sprite glassPanel;
 
         private CoreState core;
         private Canvas canvas;
         private GameObject canvasObject;
         private GameObject panel;
-        private Text healthText;
-        private Text labelText;
+        private TextMeshProUGUI healthText;
+        private TextMeshProUGUI labelText;
         private RectTransform healthFillRect;
         private Image healthFillImage;
 
@@ -86,6 +96,44 @@ namespace DreamGuardians
             explicitCamera = camera;
             cameraExplicitlySet = camera != null;
             ApplyCamera();
+        }
+
+        /// <summary>
+        /// CoreHealthHUD는 CoreState.Awake()에서 AddComponent로 붙기 때문에 씬 파일에서
+        /// 직접 폰트/패널 필드를 연결할 방법이 없다. AddComponent가 이 컴포넌트의
+        /// Awake()(→ EnsureUI())를 즉시 실행시키므로, 여기서는 이미 만들어진 UI에
+        /// 테마를 다시 적용한다.
+        /// </summary>
+        public void Configure(
+            TMP_FontAsset newDisplayFont,
+            TMP_FontAsset newBodyFont,
+            Sprite newGlassPanel)
+        {
+            displayFont = newDisplayFont;
+            bodyFont = newBodyFont;
+            glassPanel = newGlassPanel;
+
+            EnsureUI();
+            ApplyTheme();
+        }
+
+        private void ApplyTheme()
+        {
+            if (labelText != null && bodyFont != null)
+            {
+                labelText.font = bodyFont;
+            }
+
+            if (healthText != null && displayFont != null)
+            {
+                healthText.font = displayFont;
+            }
+
+            if (panel != null && glassPanel != null)
+            {
+                Image panelImage = panel.GetComponent<Image>();
+                ApplySlicedSprite(panelImage, glassPanel, panel.GetComponent<RectTransform>().sizeDelta);
+            }
         }
 
         private void HandleHealthChanged(float current, float maximum)
@@ -164,46 +212,46 @@ namespace DreamGuardians
 
             RectTransform root = canvasObject.GetComponent<RectTransform>();
 
+            // 로봇 대화창/로비와 같은 유리 패널을 실제로 보이는 배경으로 사용합니다
+            // (예전에는 이 패널이 투명한 레이아웃 껍데기였고 실제로 보이는 건 아래 바뿐이었습니다).
             panel = CreatePanel(
                 "CoreStatusPanel",
                 root,
-                DreamlandUiSkin.KenneyCoreBarBlue,
+                glassPanel != null ? glassPanel : DreamlandUiSkin.SciFiWindow,
                 new Vector2(0.5f, 1f),
                 new Vector2(560f, 118f),
                 new Vector2(0f, -10f),
                 new Vector2(0.5f, 1f));
 
-            // The shell is only a layout root. The visible Kenney bar is built below.
-            Image panelImage = panel.GetComponent<Image>();
-            panelImage.color = new Color(1f, 1f, 1f, 0f);
-
             RectTransform panelRect = panel.GetComponent<RectTransform>();
 
-            labelText = CreateText(
+            labelText = CreateTmpText(
                 "CoreLabel",
                 panelRect,
                 "코어 상태",
                 new Vector2(0f, 0.72f),
                 new Vector2(250f, 34f),
                 22,
-                TextAnchor.MiddleLeft,
+                TextAlignmentOptions.MidlineLeft,
+                bodyFont,
                 new Vector2(46f, 0f),
                 new Vector2(0f, 0.5f));
-            labelText.fontStyle = FontStyle.Bold;
-            labelText.color = new Color(0.76f, 0.98f, 0.97f, 1f);
+            labelText.fontStyle = FontStyles.Bold;
+            labelText.color = new Color(0.80f, 0.96f, 0.94f, 1f);
 
-            healthText = CreateText(
+            healthText = CreateTmpText(
                 "CoreHP",
                 panelRect,
                 "100 / 100",
                 new Vector2(1f, 0.72f),
                 new Vector2(172f, 36f),
                 26,
-                TextAnchor.MiddleRight,
+                TextAlignmentOptions.MidlineRight,
+                displayFont,
                 new Vector2(-34f, 0f),
                 new Vector2(1f, 0.5f));
-            healthText.fontStyle = FontStyle.Bold;
-            healthText.color = new Color(1f, 0.99f, 1f, 1f);
+            healthText.fontStyle = FontStyles.Bold;
+            healthText.color = new Color(0.97f, 0.99f, 1f, 1f);
 
             GameObject barBg = CreatePanel(
                 "CoreBarBackground",
@@ -288,24 +336,52 @@ namespace DreamGuardians
             rect.sizeDelta = size;
 
             Image image = panelObject.GetComponent<Image>();
-            image.sprite = sprite;
-            image.type = sprite != null && sprite.border.sqrMagnitude > 0f
-                ? Image.Type.Sliced
-                : Image.Type.Simple;
             image.color = Color.white;
             image.raycastTarget = false;
+            ApplySlicedSprite(image, sprite, size);
 
             return panelObject;
         }
 
-        private static Text CreateText(
+        /// <summary>
+        /// 9-slice 보더가 패널의 실제 표시 크기보다 크면 위/아래(또는 좌/우) 보더끼리
+        /// 겹쳐서 패널이 반으로 갈라진 것처럼 깨져 보인다(MissionBannerUI에서 겪었던
+        /// 것과 같은 문제). 짧은 변의 40%를 넘으면 pixelsPerUnitMultiplier로 자동 축소한다.
+        /// </summary>
+        private static void ApplySlicedSprite(Image image, Sprite sprite, Vector2 size)
+        {
+            image.sprite = sprite;
+            image.type = sprite != null && sprite.border.sqrMagnitude > 0f
+                ? Image.Type.Sliced
+                : Image.Type.Simple;
+            image.pixelsPerUnitMultiplier = 1f;
+
+            if (image.type != Image.Type.Sliced)
+            {
+                return;
+            }
+
+            Vector4 border = sprite.border;
+            float largestBorder = Mathf.Max(
+                border.x, border.y, border.z, border.w);
+            float shortestSide = Mathf.Min(size.x, size.y);
+            float safeBorder = shortestSide * 0.4f;
+
+            if (largestBorder > safeBorder && safeBorder > 0f)
+            {
+                image.pixelsPerUnitMultiplier = largestBorder / safeBorder;
+            }
+        }
+
+        private static TextMeshProUGUI CreateTmpText(
             string objectName,
             Transform parent,
             string value,
             Vector2 anchor,
             Vector2 size,
             int fontSize,
-            TextAnchor alignment,
+            TextAlignmentOptions alignment,
+            TMP_FontAsset font,
             Vector2 anchoredPosition,
             Vector2 pivot)
         {
@@ -313,7 +389,7 @@ namespace DreamGuardians
                 objectName,
                 typeof(RectTransform),
                 typeof(CanvasRenderer),
-                typeof(Text));
+                typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
 
             RectTransform rect = textObject.GetComponent<RectTransform>();
@@ -323,14 +399,17 @@ namespace DreamGuardians
             rect.anchoredPosition = anchoredPosition;
             rect.sizeDelta = size;
 
-            Text text = textObject.GetComponent<Text>();
+            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
             text.text = value;
-            text.font = GetRuntimeFont();
+            if (font != null)
+            {
+                text.font = font;
+            }
             text.fontSize = fontSize;
             text.alignment = alignment;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = Mathf.Max(15, fontSize - 7);
-            text.resizeTextMaxSize = fontSize;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = Mathf.Max(15, fontSize - 7);
+            text.fontSizeMax = fontSize;
             text.color = Color.white;
             text.raycastTarget = false;
 
@@ -338,35 +417,6 @@ namespace DreamGuardians
             outline.effectColor = new Color(0f, 0f, 0f, 0.90f);
             outline.effectDistance = new Vector2(2f, -2f);
             return text;
-        }
-
-        private static Font GetRuntimeFont()
-        {
-            if (runtimeFont != null)
-            {
-                return runtimeFont;
-            }
-
-            string[] preferredFonts =
-            {
-                "Malgun Gothic",
-                "Noto Sans CJK KR",
-                "Noto Sans KR",
-                "Apple SD Gothic Neo",
-                "Arial"
-            };
-
-            try
-            {
-                runtimeFont = Font.CreateDynamicFontFromOSFont(preferredFonts, 28);
-            }
-            catch
-            {
-                runtimeFont = null;
-            }
-
-            runtimeFont ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            return runtimeFont;
         }
     }
 }

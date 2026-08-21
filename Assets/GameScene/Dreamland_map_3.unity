@@ -28990,6 +28990,9 @@ MonoBehaviour:
   attackTargetLocalOffset: {x: 0, y: 0, z: 0}
   autoAlignEnergyTarget: 1
   lockAttackTargetToCoreRoot: 1
+  hudDisplayFont: {fileID: 11400000, guid: c365f9ea06fb59947945b838a9281568, type: 2}
+  hudBodyFont: {fileID: 11400000, guid: 346e82d34a0cf6c4dbf7d1a7563df9c3, type: 2}
+  hudGlassPanel: {fileID: 21300000, guid: 56d84991286850f428b4e7df0cca7380, type: 3}
 --- !u!95 &2030681473 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 9174072185818352041, guid: e46b0bd7ad30e6645abbee66608c3f74, type: 3}
@@ -30320,6 +30323,9 @@ MonoBehaviour:
   customGuideSpeaker: {fileID: 0}
   customGuideMessage: {fileID: 0}
   defaultBannerDuration: 2
+  waveDisplayFont: {fileID: 11400000, guid: c365f9ea06fb59947945b838a9281568, type: 2}
+  waveBodyFont: {fileID: 11400000, guid: 346e82d34a0cf6c4dbf7d1a7563df9c3, type: 2}
+  waveGlassPanel: {fileID: 21300000, guid: 56d84991286850f428b4e7df0cca7380, type: 3}
 --- !u!4 &2125966796
 Transform:
   m_ObjectHideFlags: 0
