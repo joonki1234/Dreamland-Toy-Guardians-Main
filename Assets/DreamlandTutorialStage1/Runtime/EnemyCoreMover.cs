@@ -85,6 +85,27 @@ namespace DreamGuardians
         private float modelYawOffset;
 
 
+        [Header("회피 기동 (원거리 미니건 적 전용)")]
+
+        [Tooltip(
+            "켜면 접근 중에는 좌우로 흔들리며 다가오고, 도착해서 공격할 때는 " +
+            "그 자리에서 좌우로 사이드스텝합니다. 근접 로봇에는 켜지 마세요.")]
+        [SerializeField]
+        private bool useZigzagMovement;
+
+        [Tooltip("좌우 흔들림/사이드스텝 폭입니다(미터). 도착 후에는 도착 지점 기준 이 범위를 벗어나지 않습니다.")]
+        [SerializeField, Min(0f)]
+        private float zigzagAmplitude = 1.2f;
+
+        [Tooltip("좌우 흔들림/사이드스텝이 초당 몇 번 왕복하는지입니다.")]
+        [SerializeField, Min(0f)]
+        private float zigzagFrequency = 1.2f;
+
+        // useZigzagMovement일 때만 쓰는, 지그재그 오프셋이 섞이지 않은 순수 경로 위치.
+        // transform.position에는 매 프레임 이 값 + 사인파 오프셋을 그대로 대입하므로,
+        // 오프셋이 프레임마다 누적되어 원래 경로에서 계속 멀어지는 일이 없다.
+        private Vector3 zigzagPathPosition;
+
 
         private EnemyHealth health;
         private float nextAttackTime;
@@ -118,6 +139,8 @@ namespace DreamGuardians
 
             // 적이 생성된 순간의 바닥 높이를 저장한다.
             fixedHeight = transform.position.y;
+
+            zigzagPathPosition = transform.position;
         }
 
 
@@ -128,6 +151,7 @@ namespace DreamGuardians
             // 오브젝트 풀링 등으로 다시 활성화될 경우
             // 현재 높이를 새 기준 높이로 저장한다.
             fixedHeight = transform.position.y;
+            zigzagPathPosition = transform.position;
 
             // 이전 활성화 상태의 유인 정보를 초기화한다.
             ClearLure();
@@ -173,6 +197,15 @@ namespace DreamGuardians
             if (isBeingKnockedBack)
             {
                 IsAttackingCore = false;
+
+                // 넉백이 transform.position을 직접 바꾸는 동안에도 순수 경로 위치를
+                // 계속 맞춰둬서, 넉백이 끝난 뒤 지그재그 오프셋이 예전 위치를
+                // 기준으로 다시 계산되어 순간이동하듯 튀는 일이 없게 한다.
+                if (useZigzagMovement)
+                {
+                    zigzagPathPosition = transform.position;
+                }
+
                 return;
             }
 
@@ -277,8 +310,13 @@ namespace DreamGuardians
         private bool MoveTowardsPosition(
             Vector3 destination)
         {
+            // 지그재그를 쓰는 동안은 오프셋이 섞이지 않은 순수 경로 위치를 기준으로
+            // 거리/방향을 계산한다. 그래야 좌우로 흔들리는 동안에도 도착 판정과
+            // 다음 이동 방향이 실제 시각적 흔들림에 영향받지 않고 항상 정확하다.
             Vector3 currentPosition =
-                transform.position;
+                useZigzagMovement
+                    ? zigzagPathPosition
+                    : transform.position;
 
             // 목표 높이를 현재 적 높이와 같게 만들어
             // 위아래 이동을 방지한다.
@@ -296,6 +334,12 @@ namespace DreamGuardians
 
             if (distance <= arrivalDistance)
             {
+                if (useZigzagMovement)
+                {
+                    zigzagPathPosition = currentPosition;
+                    ApplySidestepAtDestination(destination);
+                }
+
                 return true;
             }
 
@@ -306,7 +350,7 @@ namespace DreamGuardians
                     0.0001f
                 );
 
-            Vector3 nextPosition =
+            Vector3 nextPathPosition =
                 currentPosition +
                 direction *
                 moveSpeed *
@@ -314,16 +358,106 @@ namespace DreamGuardians
 
             if (keepSpawnHeight)
             {
-                nextPosition.y =
+                nextPathPosition.y =
                     fixedHeight;
             }
 
+            Vector3 renderedPosition =
+                nextPathPosition;
+
+            if (useZigzagMovement)
+            {
+                zigzagPathPosition = nextPathPosition;
+
+                // 진행 방향에 수직인 축으로 사인파를 얹어 "전진하면서 좌우로
+                // 흔들리는" 웨이브를 만든다. 순수 전진(nextPathPosition)은
+                // 그대로 보장되고, 여기에 흔들림만 더해지는 구조라 전진 속도가
+                // 깎이거나 뒤로 가는 일이 없다.
+                Vector3 perpendicular =
+                    new Vector3(
+                        -direction.z,
+                        0f,
+                        direction.x);
+
+                float lateralOffset =
+                    Mathf.Sin(
+                        Time.time *
+                        zigzagFrequency *
+                        Mathf.PI *
+                        2f) *
+                    zigzagAmplitude;
+
+                renderedPosition =
+                    nextPathPosition +
+                    perpendicular *
+                    lateralOffset;
+            }
+
             transform.position =
-                nextPosition;
+                renderedPosition;
 
             RotateTowards(direction);
 
             return false;
+        }
+
+
+        /// <summary>
+        /// 지그재그 적이 공격 지점에 도착한 뒤, 그 자리에 멈추는 대신 도착
+        /// 지점(destination)을 기준으로 좌우로만 사이드스텝하게 한다.
+        /// 매 프레임 "고정된 도착 지점 + 그 순간의 사인 값"으로 절대 위치를
+        /// 다시 계산하므로 오프셋이 누적되지 않고, 항상 zigzagAmplitude
+        /// 범위 안에서만 움직인다(코어→적 방향 기준이 아니라 이동 경로 기준
+        /// 진행 방향의 수직 축을 계속 씁니다).
+        /// </summary>
+        private void ApplySidestepAtDestination(
+            Vector3 destination)
+        {
+            if (targetCore == null)
+            {
+                transform.position = destination;
+                return;
+            }
+
+            Vector3 toDestination =
+                destination -
+                targetCore.transform.position;
+
+            toDestination.y = 0f;
+
+            if (toDestination.sqrMagnitude <= 0.0001f)
+            {
+                transform.position = destination;
+                return;
+            }
+
+            Vector3 outward = toDestination.normalized;
+
+            Vector3 perpendicular =
+                new Vector3(
+                    -outward.z,
+                    0f,
+                    outward.x);
+
+            float lateralOffset =
+                Mathf.Sin(
+                    Time.time *
+                    zigzagFrequency *
+                    Mathf.PI *
+                    2f) *
+                zigzagAmplitude;
+
+            Vector3 desiredPosition =
+                destination +
+                perpendicular *
+                lateralOffset;
+
+            if (keepSpawnHeight)
+            {
+                desiredPosition.y = fixedHeight;
+            }
+
+            transform.position = desiredPosition;
         }
 
 
@@ -586,6 +720,23 @@ namespace DreamGuardians
             attackInterval = Mathf.Max(0.1f, interval);
             modelYawOffset = yawOffset;
             IsAttackingCore = false;
+        }
+
+
+        /// <summary>
+        /// 원거리 미니건 적처럼 접근 중 좌우로 흔들리고, 도착해서 공격할 때는
+        /// 도착 지점 근처에서 사이드스텝하도록 켠다. Configure() 이후에 호출하세요.
+        /// 근접 로봇에는 호출하지 마세요.
+        /// </summary>
+        public void SetZigzagMovement(
+            bool enabled,
+            float amplitude,
+            float frequency)
+        {
+            useZigzagMovement = enabled;
+            zigzagAmplitude = Mathf.Max(0f, amplitude);
+            zigzagFrequency = Mathf.Max(0f, frequency);
+            zigzagPathPosition = transform.position;
         }
 
 

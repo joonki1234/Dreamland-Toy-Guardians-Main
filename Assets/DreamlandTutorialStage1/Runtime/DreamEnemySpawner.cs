@@ -573,6 +573,14 @@ namespace DreamGuardians
                     configuredAttackInterval,
                     configuredModelYawOffset);
 
+                // 원거리 미니건 적만 접근 중 좌우로 흔들리고, 도착해서 쏠 때
+                // 그 자리에서 사이드스텝하게 합니다. 근접 로봇은 대상이 아닙니다.
+                if (rangedEnemy != null)
+                {
+                    // 처음 값(1.2, 1.2)은 너무 빠르게 흔들려서 반으로 줄였습니다.
+                    mover.SetZigzagMovement(true, 0.7f, 0.55f);
+                }
+
                 StartRiftSpawn(
                     enemyObject,
                     mover,

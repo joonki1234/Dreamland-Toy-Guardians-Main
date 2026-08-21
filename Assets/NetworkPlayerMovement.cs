@@ -22,6 +22,13 @@ public class NetworkPlayerMovement : NetworkBehaviour
     [Tooltip("마우스 회전 감도")]
     public float mouseSensitivity = 0.1f;
 
+    [Tooltip(
+        "항상 아래로 적용하는 힘입니다. CharacterController.Move()는 자동으로 " +
+        "중력을 적용하지 않아서, 이게 없으면 턱이나 지형 이음매를 살짝 타고 " +
+        "오른 뒤 다시 내려올 방법이 없어 계속 위로 떠 있게 됩니다.")]
+    [SerializeField, Min(0f)]
+    private float groundStickForce = 12f;
+
 
     [Header("플레이어 이동 경계")]
 
@@ -225,18 +232,31 @@ public class NetworkPlayerMovement : NetworkBehaviour
         Vector3 direction =
             (forward * input.y + right * input.x).normalized;
 
-        if (direction.sqrMagnitude <= 0f)
-        {
-            // 멈추면 타이머를 리셋해서, 다시 움직이기 시작하자마자 바로 첫 발소리가 나게 한다.
-            _footstepTimer = footstepInterval;
-            return;
-        }
+        bool isMoving = direction.sqrMagnitude > 0f;
 
-        Vector3 movement = direction * moveSpeed * Runner.DeltaTime;
+        Vector3 movement =
+            isMoving
+                ? direction * moveSpeed * Runner.DeltaTime
+                : Vector3.zero;
+
+        // 중력은 입력 여부와 상관없이 항상 적용한다. 안 그러면 서 있을 때는
+        // 물론이고, 걷는 도중 지형 턱을 살짝 타고 오른 뒤에도 다시 내려올
+        // 방법이 없어 계속 떠 있게 된다.
+        movement += Vector3.down * groundStickForce * Runner.DeltaTime;
+
         _cc.Move(movement);
 
         ClampPositionInsideBoundary();
-        UpdateFootsteps();
+
+        if (isMoving)
+        {
+            UpdateFootsteps();
+        }
+        else
+        {
+            // 멈추면 타이머를 리셋해서, 다시 움직이기 시작하자마자 바로 첫 발소리가 나게 한다.
+            _footstepTimer = footstepInterval;
+        }
     }
 
 
