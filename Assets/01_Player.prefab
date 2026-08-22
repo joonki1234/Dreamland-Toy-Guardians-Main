@@ -5402,6 +5402,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5107617722784294868}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &910000000000000008
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000000000000009}
+  m_Layer: 0
+  m_Name: RightHandGripReference
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &910000000000000009
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000000000000008}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5107617722784294868}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &968529859093567357
 GameObject:
   m_ObjectHideFlags: 0
@@ -15418,6 +15449,7 @@ GameObject:
   - component: {fileID: 832067869734382761}
   - component: {fileID: 4235806723926247938}
   - component: {fileID: 6807834408968592922}
+  - component: {fileID: 7315928461034278850}
   m_Layer: 0
   m_Name: 01_Player
   m_TagString: Untagged
@@ -15501,6 +15533,8 @@ MonoBehaviour:
   dirtFlashLight: {fileID: 0}
   throwForce: 50
   builderCooldown: 0.3
+  dirtThrowSfx: {fileID: 0}
+  dirtThrowVolume: 0.5
   dirtShardCount: 6
   horizontalSpreadAngle: 12
   verticalSpreadAngle: 5
@@ -15650,8 +15684,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NetworkPlayerMovement
   moveSpeed: 5
   mouseSensitivity: 0.1
+  groundStickForce: 12
   playerBoundaryShield: {fileID: 0}
   boundaryPadding: 0.5
+  startStageObjectName: Road_0
+  startStagePadding: 0.6
   playerCamera: {fileID: 1580302067779740869}
   audioListener: {fileID: 3348426691839170231}
   footstepInterval: 0.45
@@ -15681,37 +15718,56 @@ MonoBehaviour:
   leftControllerTargetName: Left Controller Target
   rightHandIkName: RightHand_IK
   leftHandIkName: LeftHand_IK
---- !u!1 &910000000000000008
-GameObject:
+--- !u!114 &7315928461034278850
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 910000000000000009}
-  m_Layer: 0
-  m_Name: RightHandGripReference
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &910000000000000009
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 910000000000000008}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 5107617722784294868}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_GameObject: {fileID: 3076224963965821132}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d7f72bb891d4afeb0821952a5c91bb1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerJobSkillController
+  jobController: {fileID: 4808250408771500888}
+  skillOrigin: {fileID: 1194774703862181001}
+  skillDirection: {fileID: 1194774703862181001}
+  policeCooldown: 0
+  firefighterCooldown: 0
+  chefCooldown: 0
+  builderCooldown: 0
+  policeSkill:
+    maxTargetDistance: 30
+    targetMask:
+      serializedVersion: 2
+      m_Bits: 4294967295
+    attackRadius: 4
+    damageTickCount: 6
+    damagePerTick: 5
+    enemyMask:
+      serializedVersion: 2
+      m_Bits: 4294967295
+    preparationTime: 0.5
+    firingDuration: 1.5
+    gunVisualSource: {fileID: 1407079245061431675}
+    gunCount: 6
+    gunFormationRadius: 4
+    gunHeight: 2.7
+    gunRotationOffset: {x: 0, y: 0, z: 0}
+    lightningBeamMaterial: {fileID: 2100000, guid: 82a37fe4ca7e43d29fa5f7cc173074bd, type: 2}
+    lightningSegmentCount: 14
+    lightningJitter: 0.3
+    lightningRefreshInterval: 0.08
+    lightningBeamWidth: 0.18
+    electricCrackSound: {fileID: 8300000, guid: 847a3069b5d3f5d43ad02e84ee55f851, type: 3}
+    electricCrackVolume: 1
+    electricImpactSound: {fileID: 8300000, guid: 1dabd037812bed242babbe28c8d4679d, type: 3}
+    electricImpactVolume: 1
+    electricFireSound: {fileID: 8300000, guid: f1cb5d83282f2904a85f73111d068616, type: 3}
+    electricFireVolume: 1
+    electricSoundMinDistance: 7
+    electricSoundMaxDistance: 25
 --- !u!1 &3167499152967314610
 GameObject:
   m_ObjectHideFlags: 0
@@ -16865,6 +16921,8 @@ MonoBehaviour:
   bulletRotationOffset: {x: 90, y: 0, z: 0}
   muzzleFlashLight: {fileID: 8603577484441096663}
   flashDuration: 0.05
+  gunShotSfx: {fileID: 0}
+  gunShotVolume: 0.5
 --- !u!4 &1787123878137854913 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 975f39bd024bb824990302eff7e92d8f, type: 3}
