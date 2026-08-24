@@ -15798,6 +15798,40 @@ MonoBehaviour:
     audioMinDistance: 3
     audioMaxDistance: 30
     audioDopplerLevel: 0.1
+  chefSkill:
+    specialMenuFoodPrefab: {fileID: 2180760668271749146, guid: b40b999e6f795ff4e8f83639608fc615, type: 3}
+    giantFoodScaleMultiplier: 10
+    minTargetDistance: 2.5
+    maxTargetDistance: 12
+    dropHeight: 60
+    initialFallSpeed: 2
+    fallAcceleration: 14
+    maxFallSpeed: 45
+    explosionDelay: 0.5
+    explosionRadius: 5
+    explosionDamage: 60
+    explosionVfxPrefab: {fileID: 358637981425055526, guid: 8eb503696b886e04faff8fc0f480d473, type: 3}
+    explosionVfxScale: 2
+    explosionVfxHeightOffset: 0.15
+    groundLayerMask:
+      serializedVersion: 2
+      m_Bits: 256
+    groundRayStartHeight: 3
+    groundRayDistance: 20
+    monsterLayerMask:
+      serializedVersion: 2
+      m_Bits: 128
+    fallSound: {fileID: 8300000, guid: 415881cda1d44d6e8e5c69e3ffc8c2ff, type: 3}
+    fallSoundVolume: 0.8
+    fallPitchMin: 0.9
+    fallPitchMax: 1.15
+    audioMinDistance: 3
+    audioMaxDistance: 30
+    audioDopplerLevel: 0.1
+    landingSound: {fileID: 0}
+    landingSoundVolume: 1
+    explosionSound: {fileID: 8300000, guid: 457ec8ecacd74fc397248e555d7ee5f7, type: 3}
+    explosionSoundVolume: 1
 --- !u!1 &3167499152967314610
 GameObject:
   m_ObjectHideFlags: 0

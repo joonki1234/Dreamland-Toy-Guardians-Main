@@ -21,7 +21,7 @@ public sealed class PlayerJobSkillController : MonoBehaviour
     [Header("직업별 쿨타임 (초)")]
     [Min(0f)] [SerializeField] private float policeCooldown = 10f;
     [Min(0f)] [SerializeField] private float firefighterCooldown = 15f;
-    [Min(0f)] [SerializeField] private float chefCooldown = 12f;
+    [Min(0f)] [SerializeField] private float chefCooldown = 0f;
     [Min(0f)] [SerializeField] private float builderCooldown = 8f;
 
     [Header("직업별 스킬 구현")]
