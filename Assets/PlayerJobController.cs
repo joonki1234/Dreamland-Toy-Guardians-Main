@@ -145,6 +145,10 @@ public class PlayerJobController : NetworkBehaviour
         // 내 캐릭터(입력 권한을 가진 클라이언트)만 입력에 반응한다.
         if (!Object.HasInputAuthority) return;
 
+#if UNITY_EDITOR
+        PollEditorJobDebugInput();
+#endif
+
         // PC 테스트: 마우스 왼쪽 클릭. VR: 컨트롤러 트리거(Activate 액션이 연결된 경우).
         bool mouseFire = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
         bool xrFire = xrActivateAction != null && xrActivateAction.action != null
@@ -155,6 +159,47 @@ public class PlayerJobController : NetworkBehaviour
             Attack();
         }
     }
+
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// 게임 씬을 직접 실행했을 때 로컬 플레이어의 직업을 빠르게 바꾸는 Editor 전용 입력입니다.
+    /// 실제 변경은 기존 SetJob을 거쳐 Fusion State Authority 규칙을 그대로 따릅니다.
+    /// </summary>
+    private void PollEditorJobDebugInput()
+    {
+        if (Keyboard.current == null || !Object.HasStateAuthority)
+        {
+            return;
+        }
+
+        PlayerJob debugJob;
+
+        if (Keyboard.current.f1Key.wasPressedThisFrame)
+        {
+            debugJob = PlayerJob.Police;
+        }
+        else if (Keyboard.current.f2Key.wasPressedThisFrame)
+        {
+            debugJob = PlayerJob.Firefighter;
+        }
+        else if (Keyboard.current.f3Key.wasPressedThisFrame)
+        {
+            debugJob = PlayerJob.Chef;
+        }
+        else if (Keyboard.current.f4Key.wasPressedThisFrame)
+        {
+            debugJob = PlayerJob.Builder;
+        }
+        else
+        {
+            return;
+        }
+
+        SetJob(debugJob);
+        Debug.Log($"[Job Debug/Editor] Local Player → {debugJob}", this);
+    }
+#endif
 
 
     public void Attack()

@@ -15768,6 +15768,36 @@ MonoBehaviour:
     electricFireVolume: 1
     electricSoundMinDistance: 7
     electricSoundMaxDistance: 25
+  firefighterSkill:
+    fireTruckPrefab: {fileID: 4099370215177171018, guid: c46294246861d5c42830673473714463, type: 3}
+    spawnDistance: 2.5
+    spawnHeightOffset: 0
+    groundLayerMask:
+      serializedVersion: 2
+      m_Bits: 256
+    groundRayStartHeight: 3
+    groundRayDistance: 10
+    moveSpeed: 8
+    cleanupDistance: 100
+    hitboxWidth: 2.5
+    hitboxHeight: 2
+    hitboxLength: 3
+    knockbackDistance: 4
+    knockbackDuration: 0.3
+    monsterLayerMask:
+      serializedVersion: 2
+      m_Bits: 128
+    truckDamage: 50
+    sirenSound: {fileID: 8300000, guid: 74c46c75481843709fc64f3c3f8d8e77, type: 3}
+    sirenVolume: 0.8
+    spawnSound: {fileID: 8300000, guid: e90356b5de6545bc96af89538e22911c, type: 3}
+    spawnSoundVolume: 1
+    impactSound: {fileID: 8300000, guid: 08e7f7c112ca4a7bb368ac19c74035aa, type: 3}
+    impactVolume: 1
+    impactSoundMinInterval: 0.1
+    audioMinDistance: 3
+    audioMaxDistance: 30
+    audioDopplerLevel: 0.1
 --- !u!1 &3167499152967314610
 GameObject:
   m_ObjectHideFlags: 0
