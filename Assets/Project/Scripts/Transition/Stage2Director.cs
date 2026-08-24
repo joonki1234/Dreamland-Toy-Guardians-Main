@@ -395,8 +395,7 @@ public sealed class Stage2Director : MonoBehaviour
         missionUI?.ClearPersistentText();
 
         // 23번 대사부터 보스 전조 스토리가 이어지므로 전투 중 숨었던
-        // 장난감 친구를 다시 불러 직접 말하게 합니다. 이후 전환/보스 Director가
-        // 같은 친구를 이어서 사용하도록 여기서는 다시 숨기지 않습니다.
+        // 장난감 친구를 다시 불러 직접 말하게 합니다.
         if (toyFriend != null)
         {
             yield return toyFriend.ShowForStory(
@@ -436,6 +435,15 @@ public sealed class Stage2Director : MonoBehaviour
         if (completionDuration > 0f)
         {
             yield return new WaitForSeconds(completionDuration);
+        }
+
+        // 스테이지 클리어 대사가 끝나면 장난감 친구는 게임 중반부터 다시
+        // 사라집니다. 보스 등장 연출에서는 FinalBossDirector가 자체적으로
+        // ShowForStory()/HideForCombat()을 다시 호출해 이어서 사용합니다.
+        if (toyFriend != null)
+        {
+            yield return toyFriend.HideForCombat(
+                toyFriendStoryTransitionDuration);
         }
 
         completionRoutine = null;
