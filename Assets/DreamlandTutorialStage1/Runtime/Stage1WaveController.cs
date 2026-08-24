@@ -102,13 +102,13 @@ namespace DreamGuardians
 
         [Header("Stage 1 원거리 적")]
 
-        [Tooltip("두 번째 공격에 기존 근접 적과 함께 추가되는 원거리 적 수")]
+        [Tooltip("두 번째 공격에 기존 근접 적과 함께 추가되는 원거리 적 수 (4방향 합계, 방향당 3마리)")]
         [SerializeField, Min(0)]
-        private int secondWaveRangedEnemyCount = 3;
+        private int secondWaveRangedEnemyCount = 12;
 
-        [Tooltip("최종 공격에 기존 근접 적과 함께 추가되는 원거리 적 수")]
+        [Tooltip("최종 공격에 기존 근접 적과 함께 추가되는 원거리 적 수 (4방향 합계, 방향당 4마리)")]
         [SerializeField, Min(0)]
-        private int finalWaveRangedEnemyCount = 4;
+        private int finalWaveRangedEnemyCount = 16;
 
         [Tooltip(
             "Portal A와 Road_1 준비가 끝난 뒤 " +
@@ -125,6 +125,12 @@ namespace DreamGuardians
         [Tooltip("2차 공격 종료 후 장난감 친구가 나타나고 사라지는 데 걸리는 시간")]
         [SerializeField, Min(0f)]
         private float toyFriendStoryTransitionDuration = 0.35f;
+
+        [Tooltip(
+            "웨이브 종료 후 시너지 해금 같은 연출이 transitionDelay보다 길어져도 " +
+            "\"다음 웨이브까지\" 카운트다운이 최소 이 시간만큼은 보이도록 합니다.")]
+        [SerializeField, Min(0f)]
+        private float minNextWaveCountdown = 3f;
 
 
         [Header("환경 준비 안전 설정")]
@@ -144,14 +150,20 @@ namespace DreamGuardians
         private bool combatCompleted;
         private bool failed;
 
+        /// <summary>
+        /// 4방향(Portal A~D + Road_1~4)을 한 번에 여는 준비 단계 값입니다.
+        /// 8인 협동 기준으로 웨이브마다 방향을 하나씩 순서대로 여는 대신,
+        /// 1차 공격 시작 전에 4방향을 전부 열어둡니다.
+        /// EnemyPortalStageController.HandleStage1PreparationRequested가
+        /// 이 값을 이 값으로 알아보고 RunStage1PreparationAll()을 실행합니다.
+        /// </summary>
+        public const int AllDirectionsPreparationStep = 100;
+
         /*
          * 현재 포탈과 길 준비 완료를 기다리고 있는 단계입니다.
          *
          * -1 = 준비를 기다리지 않는 상태
-         *  0 = Portal A + Road_1
-         *  1 = Portal B + Road_2
-         *  2 = Portal C + Road_3
-         *  3 = Portal D + Road_4
+         * AllDirectionsPreparationStep = Portal A~D + Road_1~4 전부
          */
         private int waitingPreparationStep = -1;
 
@@ -175,17 +187,8 @@ namespace DreamGuardians
         /// <summary>
         /// 포탈과 길을 준비해야 할 때 발생합니다.
         ///
-        /// step 0:
-        /// Portal A + Road_1
-        ///
-        /// step 1:
-        /// Portal B + Road_2
-        ///
-        /// step 2:
-        /// Portal C + Road_3
-        ///
-        /// step 3:
-        /// Portal D + Road_4
+        /// step AllDirectionsPreparationStep:
+        /// Portal A~D + Road_1~4를 한 번에 준비 (1차 공격 시작 전 1회만 발생)
         /// </summary>
         public event Action<int> EnvironmentPreparationRequested;
 
@@ -279,10 +282,13 @@ namespace DreamGuardians
         {
             groups = new List<WaveGroup>
             {
+                // 8인 협동 기준으로 4방향(Road_1~4)에서 동시에 나오도록,
+                // 기존 수치를 "한 방향당 마릿수"로 보고 4배로 늘렸습니다.
+                // (예전: 근접 3 → 지금: 방향당 3 × 4방향 = 12)
                 new WaveGroup
                 {
                     label = "1차 공격",
-                    enemyCount = 3,
+                    enemyCount = 12,
                     spawnInterval = 2.5f,
                     healthMultiplier = 1f,
                     preDelay = 0.5f,
@@ -293,7 +299,7 @@ namespace DreamGuardians
                 new WaveGroup
                 {
                     label = "2차 공격",
-                    enemyCount = 3,
+                    enemyCount = 12,
                     spawnInterval = 2.5f,
                     healthMultiplier = 1.25f,
                     preDelay = 0.5f,
@@ -304,7 +310,7 @@ namespace DreamGuardians
                 new WaveGroup
                 {
                     label = "최종 공격",
-                    enemyCount = 6,
+                    enemyCount = 24,
                     spawnInterval = 1.8f,
                     healthMultiplier = 1.5f,
                     preDelay = 0.5f,
@@ -400,14 +406,12 @@ namespace DreamGuardians
             /*
              * Stage 1 시작 침식:
              *
-             * Portal A
-             * → Road_1
-             *
+             * 8인 협동 기준으로 Portal A~D + Road_1~4를 전부 한 번에 엽니다.
              * 아직 적은 생성하지 않습니다.
              */
             yield return WaitForEnvironmentPreparation(
-                0,
-                "Portal A와 Road_1");
+                AllDirectionsPreparationStep,
+                "Portal A~D와 Road_1~4 전부");
 
 
             if (failed)
@@ -429,10 +433,8 @@ namespace DreamGuardians
 
             /*
              * 현재 Stage 1 공격 그룹은 세 개입니다.
-             *
-             * index 0 → 준비 단계 1 → Portal B + Road_2
-             * index 1 → 준비 단계 2 → Portal C + Road_3
-             * index 2 → 준비 단계 3 → Portal D + Road_4
+             * 4방향은 이미 위에서 한 번에 다 열렸으므로, 여기서는
+             * 웨이브마다 추가로 포탈/길을 열 필요가 없습니다.
              */
             for (int index = 0;
                  index < groups.Count;
@@ -477,24 +479,6 @@ namespace DreamGuardians
                     $"  ·  전장 악몽 {spawner.ActiveEnemyCount}");
 
 
-                int preparationStep =
-                    index + 1;
-
-
-                /*
-                 * 반드시 포탈과 길 준비가 끝날 때까지 기다립니다.
-                 */
-                yield return WaitForEnvironmentPreparation(
-                    preparationStep,
-                    $"공격 {index + 1} 포탈과 길");
-
-
-                if (failed)
-                {
-                    yield break;
-                }
-
-
                 /*
                  * 길 생성이 끝난 뒤 적이 바로 튀어나오지 않도록
                  * 짧게 추가 대기합니다.
@@ -524,6 +508,13 @@ namespace DreamGuardians
                     $"원거리 {rangedEnemyCount})를 생성합니다. " +
                     $"스폰 간격 {group.spawnInterval:0.0}초.",
                     this);
+
+                // 마릿수가 늘면서 스폰 자체가 수십 초 걸리게 됐는데, 스폰이
+                // 다 끝날 때까지는 "전장 악몽" 표시가 스폰 시작 직전 값(0마리)에
+                // 멈춰 있었습니다. 스폰이 진행되는 동안에도 계속 갱신하도록
+                // 별도 코루틴을 같이 돌립니다.
+                StartCoroutine(
+                    TickProgressWhileSpawning(index));
 
                 yield return SpawnWaveGroup(
                     group,
@@ -567,9 +558,13 @@ namespace DreamGuardians
                 }
 
 
+                // 시너지 해금 연출(occupiedTransitionTime)이 transitionDelay보다
+                // 길면 남는 시간이 0 이하가 되어 "다음 웨이브까지" 카운트다운이
+                // 아예 안 뜨는 문제가 있었습니다. 최소한 minNextWaveCountdown
+                // 만큼은 항상 카운트다운이 보이도록 바닥값을 둡니다.
                 float remainingTransitionDelay =
                     Mathf.Max(
-                        0f,
+                        minNextWaveCountdown,
                         group.transitionDelay - occupiedTransitionTime);
 
                 if (remainingTransitionDelay > 0f)
@@ -890,6 +885,25 @@ namespace DreamGuardians
                 missionUI?.SetProgress(
                     $"공격 {groupIndex + 1} / {groups.Count}" +
                     $"  ·  남은 악몽 {spawner.ActiveEnemyCount}");
+
+                yield return null;
+            }
+        }
+
+
+        /// <summary>
+        /// SpawnWaveGroup()이 적을 하나씩 순차 생성하는 동안(간격 때문에
+        /// 수십 초 걸릴 수 있음) "전장 악몽" 표시를 계속 갱신한다.
+        /// 스폰이 끝나면(runningSpawnRoutineCount가 다시 줄어들면) 저절로
+        /// 멈추고, 이후에는 WaitForWaveClear()가 이어서 갱신을 맡는다.
+        /// </summary>
+        private IEnumerator TickProgressWhileSpawning(int groupIndex)
+        {
+            while (!failed && runningSpawnRoutineCount > 0)
+            {
+                missionUI?.SetProgress(
+                    $"공격 {groupIndex + 1} / {groups.Count}" +
+                    $"  ·  전장 악몽 {spawner.ActiveEnemyCount}");
 
                 yield return null;
             }
@@ -1260,6 +1274,11 @@ namespace DreamGuardians
                 Mathf.Max(
                     0f,
                     clearSequenceDuration);
+
+            minNextWaveCountdown =
+                Mathf.Max(
+                    0f,
+                    minNextWaveCountdown);
 
             targetStageDurationSeconds =
                 Mathf.Max(

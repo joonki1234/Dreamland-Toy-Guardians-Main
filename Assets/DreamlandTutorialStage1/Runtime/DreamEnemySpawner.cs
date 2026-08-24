@@ -158,23 +158,55 @@ namespace DreamGuardians
                     this);
             }
 
-            int waveSpawnIndex = 0;
+            // 근접/원거리를 각자 독립된 스폰 포인트 커서로 순환시킵니다.
+            // 예전에는 하나의 공용 커서(waveSpawnIndex)를 근접/원거리 모두가
+            // 같이 썼는데, 타입 교대 주기(예: 12:12 = 2칸마다 교대)가 방향 개수
+            // (4)와 딱 맞아떨어지면 짝수 방향은 항상 근접만, 홀수 방향은 항상
+            // 원거리만 걸리는 편중이 생겼습니다. 타입별로 커서를 분리하면
+            // 어떤 비율/개수여도 각 타입이 4방향에 고르게 퍼집니다.
+            int primarySpawnIndex = 0;
+            int additionalSpawnIndex = 0;
             int additionalSpawned = 0;
             int additionalAccumulator = 0;
 
             for (int i = 0; i < safeCount; i++)
             {
+                additionalAccumulator +=
+                    safeAdditionalCount;
+
+                bool spawnAdditional =
+                    additionalSpawned < safeAdditionalCount &&
+                    additionalAccumulator >= safeCount;
+
+                if (spawnAdditional)
+                {
+                    additionalAccumulator -= safeCount;
+                    additionalSpawned++;
+                }
+
                 Transform selectedSpawnPoint = null;
 
                 if (waveSpawnPoints.Count > 0)
                 {
-                    int pointIndex =
-                        waveSpawnIndex % waveSpawnPoints.Count;
+                    int pointIndex;
+
+                    if (spawnAdditional)
+                    {
+                        pointIndex =
+                            additionalSpawnIndex % waveSpawnPoints.Count;
+
+                        additionalSpawnIndex++;
+                    }
+                    else
+                    {
+                        pointIndex =
+                            primarySpawnIndex % waveSpawnPoints.Count;
+
+                        primarySpawnIndex++;
+                    }
 
                     selectedSpawnPoint =
                         waveSpawnPoints[pointIndex];
-
-                    waveSpawnIndex++;
                 }
 
                 // 웨이브 중 포탈이 강제로 꺼진 경우를 대비합니다.
@@ -189,19 +221,6 @@ namespace DreamGuardians
 
                     selectedSpawnPoint =
                         GetNextSpawnPoint();
-                }
-
-                additionalAccumulator +=
-                    safeAdditionalCount;
-
-                bool spawnAdditional =
-                    additionalSpawned < safeAdditionalCount &&
-                    additionalAccumulator >= safeCount;
-
-                if (spawnAdditional)
-                {
-                    additionalAccumulator -= safeCount;
-                    additionalSpawned++;
                 }
 
                 SpawnCombatEnemyAtPoint(
