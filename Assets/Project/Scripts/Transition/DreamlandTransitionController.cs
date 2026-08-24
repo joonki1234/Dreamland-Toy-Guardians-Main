@@ -94,6 +94,13 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     [SerializeField]
     private Transform treeBorder;
 
+    [Tooltip(
+        "보스가 실제로 부수고 등장하는 성(FinalBossDirector의 castleAnchor와 " +
+        "동일한 오브젝트). CastleScene이 등장할 때 함께 미리 보여줘서 " +
+        "보스전 시작과 동시에 등장&파괴가 겹쳐 임팩트가 약해지는 것을 방지합니다.")]
+    [SerializeField]
+    private Transform bossCastle;
+
 
     [Header("적 흡수 연출")]
 
@@ -511,7 +518,12 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
     private IEnumerator EnemyAbsorptionRoutine()
     {
-        ApplyStage2PortalState();
+        // ApplyStage2PortalState()는 finalDreamland를 일단 꺼서
+        // DreamWorldRevealController가 Part_1~4/fence를 보여줄 때만 다시 켜지도록
+        // 하는 "Stage 2 시작" 전용 초기화다. Stage 2 웨이브가 끝난 지금 다시 호출하면
+        // 이미 등장해 있던 소품들이 잠깐 꺼졌다가(FullVRTransition에서 finalDreamland가
+        // 다시 켜질 때) 되살아나는 것처럼 보인다. Stage 2 진입 시 이미 적용된 상태이므로
+        // 여기서는 다시 호출하지 않는다.
         CapturePortalBaseScale();
 
         missionUI?.ClearPersistentText();
@@ -724,6 +736,30 @@ public sealed class DreamlandTransitionController : MonoBehaviour
                 castleStartScaleMultiplier,
                 castleOvershootScaleMultiplier,
                 castleRevealDuration);
+        }
+
+        /*
+         * 보스가 부수고 등장할 진짜 성도 이 시점에 미리 세워둡니다.
+         * 이렇게 하면 플레이어가 성을 한동안 눈으로 본 뒤 보스전이
+         * 시작되면서 극적으로 부서지는 흐름이 되고, 예전처럼 등장하자마자
+         * 바로 부서져서 임팩트가 약해지는 문제가 사라집니다.
+         */
+        if (bossCastle == null)
+        {
+            Debug.LogWarning(
+                "[DreamTransition] bossCastle이 연결되어 있지 않아 " +
+                "보스가 부술 성을 미리 세워두지 못했습니다.",
+                this);
+        }
+        else if (!bossCastle.gameObject.activeSelf)
+        {
+            bossCastle.gameObject.SetActive(true);
+
+            Debug.Log(
+                "[DreamTransition] 보스가 부술 성(" +
+                bossCastle.name +
+                ")을 FullVR 전환 중 미리 세워뒀습니다.",
+                this);
         }
 
 

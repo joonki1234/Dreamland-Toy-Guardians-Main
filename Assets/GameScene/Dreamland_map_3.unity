@@ -16836,6 +16836,7 @@ MonoBehaviour:
   dreamFloor: {fileID: 459303545}
   castleScene: {fileID: 1980337105}
   treeBorder: {fileID: 1443910801}
+  bossCastle: {fileID: 91751293}
   enemyAbsorptionDuration: 3
   portalPulseAmount: 0.12
   absorptionTitle: DREAM ENERGY CONVERGENCE
@@ -28211,13 +28212,13 @@ MonoBehaviour:
   wave1DronePerDirection: 2
   wave1SpawnInterval: 0.45
   wave1HealthMultiplier: 1.5
-  wave1ToWave2Delay: 15
+  wave1ToWave2Delay: 25
   wave2MeleePerDirection: 4
   wave2RangedPerDirection: 3
   wave2DronePerDirection: 3
   wave2SpawnInterval: 0.3
   wave2HealthMultiplier: 1.8
-  wave2ToFinalDelay: 15
+  wave2ToFinalDelay: 25
   finalMeleePerDirection: 6
   finalRangedPerDirection: 4
   finalDronePerDirection: 4

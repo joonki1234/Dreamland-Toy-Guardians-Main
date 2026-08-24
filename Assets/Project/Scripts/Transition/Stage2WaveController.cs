@@ -102,7 +102,7 @@ public sealed class Stage2WaveController : MonoBehaviour
         "두 번째 공격을 시작하기까지의 시간")]
     [Min(0f)]
     [SerializeField]
-    private float wave1ToWave2Delay = 15f;
+    private float wave1ToWave2Delay = 25f;
 
 
     [Header("Stage 2 두 번째 공격")]
@@ -135,7 +135,7 @@ public sealed class Stage2WaveController : MonoBehaviour
         "최종 공격을 시작하기까지의 시간")]
     [Min(0f)]
     [SerializeField]
-    private float wave2ToFinalDelay = 15f;
+    private float wave2ToFinalDelay = 25f;
 
 
     [Header("Stage 2 최종 공격")]
