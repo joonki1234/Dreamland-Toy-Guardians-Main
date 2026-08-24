@@ -168,6 +168,16 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private Material eyeMaterial;
     private Light eyeLight;
 
+    // Camera.main은 이 프로젝트 어디에도 MainCamera 태그가 없어 항상 null입니다.
+    // NetworkPlayerMovement.Spawned()에서 로컬 플레이어의 카메라를 직접 넘겨받아
+    // 눈이 실제 보는 사람을 향하도록 합니다.
+    private static Camera localViewerCamera;
+
+    public static void SetLocalViewerCamera(Camera camera)
+    {
+        localViewerCamera = camera;
+    }
+
     public bool IsPhaseMoving => phaseMoving;
 
     private static readonly int BaseColorId =
@@ -1056,10 +1066,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
         // Prefer the player's view direction so the red eyes are always placed
         // on the visible face of the box. Fall back to the core direction.
         Vector3 forward = Vector3.zero;
-        Camera mainCamera = Camera.main;
-        if (mainCamera != null)
+        Camera viewerCamera = localViewerCamera;
+        if (viewerCamera != null)
         {
-            forward = mainCamera.transform.position - bounds.center;
+            forward = viewerCamera.transform.position - bounds.center;
         }
         else if (targetCore != null)
         {

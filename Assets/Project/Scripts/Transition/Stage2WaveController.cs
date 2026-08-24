@@ -28,6 +28,9 @@ public sealed class Stage2WaveController : MonoBehaviour
         Final
     }
 
+    // Stage 1에서 A~D 4방향을 동시에 열어두는 것과 동일하게 맞춥니다.
+    private const int DirectionCount = 4;
+
 
     [Header("References")]
 
@@ -53,6 +56,10 @@ public sealed class Stage2WaveController : MonoBehaviour
     [SerializeField]
     private GameObject droneEnemyPrefab;
 
+    [Tooltip("Stage 2 두 번째 공격부터 추가로 생성할 원거리 미니건 적 프리팹")]
+    [SerializeField]
+    private GameObject rangedEnemyPrefab;
+
     [Header("Stage 2 시작")]
 
     [Tooltip(
@@ -72,13 +79,19 @@ public sealed class Stage2WaveController : MonoBehaviour
 
     [Header("Stage 2 첫 번째 공격")]
 
-    [Min(1)]
+    [Tooltip("방향(A~D)당 근접 적 수")]
+    [Min(0)]
     [SerializeField]
-    private int wave1EnemyCount = 6;
+    private int wave1MeleePerDirection = 3;
+
+    [Tooltip("방향(A~D)당 드론 적 수")]
+    [Min(0)]
+    [SerializeField]
+    private int wave1DronePerDirection = 2;
 
     [Min(0f)]
     [SerializeField]
-    private float wave1SpawnInterval = 1.5f;
+    private float wave1SpawnInterval = 0.45f;
 
     [Min(0.1f)]
     [SerializeField]
@@ -94,18 +107,24 @@ public sealed class Stage2WaveController : MonoBehaviour
 
     [Header("Stage 2 두 번째 공격")]
 
-    [Min(1)]
-    [SerializeField]
-    private int wave2EnemyCount = 8;
-
-    [Tooltip("기존 근접 적 수에 추가되는 비행 드론 수")]
+    [Tooltip("방향(A~D)당 근접 적 수")]
     [Min(0)]
     [SerializeField]
-    private int wave2DroneEnemyCount = 2;
+    private int wave2MeleePerDirection = 4;
+
+    [Tooltip("방향(A~D)당 원거리 미니건 적 수")]
+    [Min(0)]
+    [SerializeField]
+    private int wave2RangedPerDirection = 3;
+
+    [Tooltip("방향(A~D)당 드론 적 수")]
+    [Min(0)]
+    [SerializeField]
+    private int wave2DronePerDirection = 3;
 
     [Min(0f)]
     [SerializeField]
-    private float wave2SpawnInterval = 1.2f;
+    private float wave2SpawnInterval = 0.3f;
 
     [Min(0.1f)]
     [SerializeField]
@@ -121,18 +140,24 @@ public sealed class Stage2WaveController : MonoBehaviour
 
     [Header("Stage 2 최종 공격")]
 
-    [Min(1)]
-    [SerializeField]
-    private int finalWaveEnemyCount = 10;
-
-    [Tooltip("기존 근접 적 수에 추가되는 비행 드론 수")]
+    [Tooltip("방향(A~D)당 근접 적 수")]
     [Min(0)]
     [SerializeField]
-    private int finalWaveDroneEnemyCount = 4;
+    private int finalMeleePerDirection = 6;
+
+    [Tooltip("방향(A~D)당 원거리 미니건 적 수")]
+    [Min(0)]
+    [SerializeField]
+    private int finalRangedPerDirection = 4;
+
+    [Tooltip("방향(A~D)당 드론 적 수")]
+    [Min(0)]
+    [SerializeField]
+    private int finalDronePerDirection = 4;
 
     [Min(0f)]
     [SerializeField]
-    private float finalWaveSpawnInterval = 1f;
+    private float finalWaveSpawnInterval = 0.25f;
 
     [Min(0.1f)]
     [SerializeField]
@@ -422,13 +447,15 @@ public sealed class Stage2WaveController : MonoBehaviour
             yield break;
         }
 
-        // 첫 번째 공격
+        // 첫 번째 공격 (원거리 없음)
         StartSpawnRoutine(
             Stage2WavePhase.First,
             "Stage 2 첫 번째 공격",
             null,
-            wave1EnemyCount,
+            droneEnemyPrefab,
+            wave1MeleePerDirection,
             0,
+            wave1DronePerDirection,
             wave1SpawnInterval,
             wave1HealthMultiplier);
 
@@ -447,9 +474,11 @@ public sealed class Stage2WaveController : MonoBehaviour
         StartSpawnRoutine(
             Stage2WavePhase.Second,
             "Stage 2 두 번째 공격",
+            rangedEnemyPrefab,
             droneEnemyPrefab,
-            wave2EnemyCount,
-            wave2DroneEnemyCount,
+            wave2MeleePerDirection,
+            wave2RangedPerDirection,
+            wave2DronePerDirection,
             wave2SpawnInterval,
             wave2HealthMultiplier);
 
@@ -468,9 +497,11 @@ public sealed class Stage2WaveController : MonoBehaviour
         StartSpawnRoutine(
             Stage2WavePhase.Final,
             "Stage 2 최종 공격",
+            rangedEnemyPrefab,
             droneEnemyPrefab,
-            finalWaveEnemyCount,
-            finalWaveDroneEnemyCount,
+            finalMeleePerDirection,
+            finalRangedPerDirection,
+            finalDronePerDirection,
             finalWaveSpawnInterval,
             finalWaveHealthMultiplier);
 
@@ -518,9 +549,11 @@ public sealed class Stage2WaveController : MonoBehaviour
     private void StartSpawnRoutine(
         Stage2WavePhase phase,
         string waveLabel,
-        GameObject additionalPrefab,
-        int enemyCount,
-        int additionalEnemyCount,
+        GameObject rangedPrefab,
+        GameObject dronePrefab,
+        int meleePerDirection,
+        int rangedPerDirection,
+        int dronePerDirection,
         float spawnInterval,
         float healthMultiplier)
     {
@@ -532,9 +565,11 @@ public sealed class Stage2WaveController : MonoBehaviour
             SpawnWaveAfterPortalRoutine(
                 phase,
                 waveLabel,
-                additionalPrefab,
-                enemyCount,
-                additionalEnemyCount,
+                rangedPrefab,
+                dronePrefab,
+                meleePerDirection,
+                rangedPerDirection,
+                dronePerDirection,
                 spawnInterval,
                 healthMultiplier));
     }
@@ -547,20 +582,31 @@ public sealed class Stage2WaveController : MonoBehaviour
     private IEnumerator SpawnWaveAfterPortalRoutine(
         Stage2WavePhase phase,
         string waveLabel,
-        GameObject additionalPrefab,
-        int enemyCount,
-        int additionalEnemyCount,
+        GameObject rangedPrefab,
+        GameObject dronePrefab,
+        int meleePerDirection,
+        int rangedPerDirection,
+        int dronePerDirection,
         float spawnInterval,
         float healthMultiplier)
     {
-        int effectiveAdditionalEnemyCount =
-            additionalPrefab != null
-                ? Mathf.Max(0, additionalEnemyCount)
+        int safeMeleePerDirection = Mathf.Max(0, meleePerDirection);
+
+        int safeRangedPerDirection =
+            rangedPrefab != null
+                ? Mathf.Max(0, rangedPerDirection)
+                : 0;
+
+        int safeDronePerDirection =
+            dronePrefab != null
+                ? Mathf.Max(0, dronePerDirection)
                 : 0;
 
         int totalEnemyCount =
-            Mathf.Max(0, enemyCount) +
-            effectiveAdditionalEnemyCount;
+            DirectionCount *
+            (safeMeleePerDirection +
+             safeRangedPerDirection +
+             safeDronePerDirection);
 
         // EnemyPortalStageController가 이 이벤트를 받아
         // 해당 웨이브의 포탈을 활성화하거나 확장합니다.
@@ -594,11 +640,13 @@ public sealed class Stage2WaveController : MonoBehaviour
             spawnInterval.ToString("0.0") + "초",
             this);
 
-        // 현재 웨이브의 모든 몹이 생성될 때까지 기다립니다.
-        yield return enemySpawner.SpawnMixedGroup(
-            additionalPrefab,
-            enemyCount,
-            additionalEnemyCount,
+        // 현재 웨이브의 모든 몹이 방향(A~D)당 지정한 비율로 생성될 때까지 기다립니다.
+        yield return enemySpawner.SpawnDirectionalMixedGroup(
+            rangedPrefab,
+            dronePrefab,
+            safeMeleePerDirection,
+            safeRangedPerDirection,
+            safeDronePerDirection,
             spawnInterval,
             healthMultiplier);
 
@@ -771,8 +819,11 @@ public sealed class Stage2WaveController : MonoBehaviour
         portalAppearanceDelay =
             Mathf.Max(0f, portalAppearanceDelay);
 
-        wave1EnemyCount =
-            Mathf.Max(1, wave1EnemyCount);
+        wave1MeleePerDirection =
+            Mathf.Max(0, wave1MeleePerDirection);
+
+        wave1DronePerDirection =
+            Mathf.Max(0, wave1DronePerDirection);
 
         wave1SpawnInterval =
             Mathf.Max(0f, wave1SpawnInterval);
@@ -783,11 +834,14 @@ public sealed class Stage2WaveController : MonoBehaviour
         wave1ToWave2Delay =
             Mathf.Max(0f, wave1ToWave2Delay);
 
-        wave2EnemyCount =
-            Mathf.Max(1, wave2EnemyCount);
+        wave2MeleePerDirection =
+            Mathf.Max(0, wave2MeleePerDirection);
 
-        wave2DroneEnemyCount =
-            Mathf.Max(0, wave2DroneEnemyCount);
+        wave2RangedPerDirection =
+            Mathf.Max(0, wave2RangedPerDirection);
+
+        wave2DronePerDirection =
+            Mathf.Max(0, wave2DronePerDirection);
 
         wave2SpawnInterval =
             Mathf.Max(0f, wave2SpawnInterval);
@@ -798,11 +852,14 @@ public sealed class Stage2WaveController : MonoBehaviour
         wave2ToFinalDelay =
             Mathf.Max(0f, wave2ToFinalDelay);
 
-        finalWaveEnemyCount =
-            Mathf.Max(1, finalWaveEnemyCount);
+        finalMeleePerDirection =
+            Mathf.Max(0, finalMeleePerDirection);
 
-        finalWaveDroneEnemyCount =
-            Mathf.Max(0, finalWaveDroneEnemyCount);
+        finalRangedPerDirection =
+            Mathf.Max(0, finalRangedPerDirection);
+
+        finalDronePerDirection =
+            Mathf.Max(0, finalDronePerDirection);
 
         finalWaveSpawnInterval =
             Mathf.Max(0f, finalWaveSpawnInterval);

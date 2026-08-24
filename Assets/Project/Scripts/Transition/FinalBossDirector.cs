@@ -941,22 +941,51 @@ public sealed class FinalBossDirector : MonoBehaviour
             this);
     }
 
+    private static readonly RaycastHit[] GroundProjectionHitsBuffer =
+        new RaycastHit[16];
+
     private bool TryProjectToGround(
         Vector3 sourcePosition,
         out Vector3 groundedPosition)
     {
         Vector3 rayOrigin = sourcePosition + Vector3.up * 25f;
 
-        if (Physics.Raycast(
-                rayOrigin,
-                Vector3.down,
-                out RaycastHit hit,
-                60f,
-                Physics.DefaultRaycastLayers,
-                QueryTriggerInteraction.Ignore))
+        // 보스 모델은 매우 큰 스케일로 임포트되어 있어(FinalBossAttackController
+        // 눈알 배치 주석 참고), minionSpawnRadius가 작으면 아래로 쏜 레이가
+        // 진짜 바닥보다 먼저 보스 자신의 콜라이더 표면에 맞아 그 위에
+        // 소환되어 공중에 붕 떠 보이는 문제가 있었다. 보스 계층에 속한
+        // 히트는 건너뛰고 그 아래에 있는 진짜 바닥을 찾는다.
+        int hitCount = Physics.RaycastNonAlloc(
+            rayOrigin,
+            Vector3.down,
+            GroundProjectionHitsBuffer,
+            60f,
+            Physics.DefaultRaycastLayers,
+            QueryTriggerInteraction.Ignore);
+
+        if (hitCount > 0)
         {
-            groundedPosition = hit.point;
-            return true;
+            System.Array.Sort(
+                GroundProjectionHitsBuffer,
+                0,
+                hitCount,
+                Comparer<RaycastHit>.Create(
+                    (a, b) => a.distance.CompareTo(b.distance)));
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit hit = GroundProjectionHitsBuffer[i];
+
+                if (bossObject != null &&
+                    hit.collider != null &&
+                    hit.collider.transform.IsChildOf(bossObject.transform))
+                {
+                    continue;
+                }
+
+                groundedPosition = hit.point;
+                return true;
+            }
         }
 
         groundedPosition = sourcePosition;

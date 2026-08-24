@@ -243,6 +243,119 @@ namespace DreamGuardians
             }
         }
 
+        /// <summary>
+        /// 활성화된 각 방향(스폰 포인트)마다 근접/원거리/드론을
+        /// 정확히 지정한 마릿수만큼 생성합니다. 방향 수를 라운드로빈으로
+        /// 순회하면서 방향별로 남은 근접→원거리→드론 순으로 하나씩
+        /// 소진시켜, 모든 방향이 비슷한 타이밍에 끝나도록 합니다.
+        /// </summary>
+        public IEnumerator SpawnDirectionalMixedGroup(
+            GameObject rangedPrefab,
+            GameObject dronePrefab,
+            int meleePerDirection,
+            int rangedPerDirection,
+            int dronePerDirection,
+            float spawnInterval,
+            float healthMultiplier = 1f)
+        {
+            List<Transform> waveSpawnPoints =
+                GetActiveSpawnPointsSnapshot();
+
+            if (waveSpawnPoints.Count == 0)
+            {
+                Debug.LogWarning(
+                    "[DreamEnemySpawner] 방향별 스폰 시작 시 " +
+                    "활성화된 스폰 포인트가 없습니다.",
+                    this);
+                yield break;
+            }
+
+            int directionCount = waveSpawnPoints.Count;
+
+            int safeMelee = Mathf.Max(0, meleePerDirection);
+            int safeRanged =
+                rangedPrefab != null
+                    ? Mathf.Max(0, rangedPerDirection)
+                    : 0;
+            int safeDrone =
+                dronePrefab != null
+                    ? Mathf.Max(0, dronePerDirection)
+                    : 0;
+
+            int[] remainingMelee = new int[directionCount];
+            int[] remainingRanged = new int[directionCount];
+            int[] remainingDrone = new int[directionCount];
+
+            for (int d = 0; d < directionCount; d++)
+            {
+                remainingMelee[d] = safeMelee;
+                remainingRanged[d] = safeRanged;
+                remainingDrone[d] = safeDrone;
+            }
+
+            float safeInterval = Mathf.Max(0f, spawnInterval);
+            int totalToSpawn =
+                directionCount * (safeMelee + safeRanged + safeDrone);
+            int spawned = 0;
+
+            while (spawned < totalToSpawn)
+            {
+                for (int d = 0; d < directionCount; d++)
+                {
+                    GameObject prefabOverride;
+
+                    if (remainingMelee[d] > 0)
+                    {
+                        remainingMelee[d]--;
+                        prefabOverride = null;
+                    }
+                    else if (remainingRanged[d] > 0)
+                    {
+                        remainingRanged[d]--;
+                        prefabOverride = rangedPrefab;
+                    }
+                    else if (remainingDrone[d] > 0)
+                    {
+                        remainingDrone[d]--;
+                        prefabOverride = dronePrefab;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    Transform selectedSpawnPoint =
+                        waveSpawnPoints[d];
+
+                    if (selectedSpawnPoint != null &&
+                        !selectedSpawnPoint.gameObject.activeInHierarchy)
+                    {
+                        selectedSpawnPoint = GetNextSpawnPoint();
+                    }
+
+                    SpawnCombatEnemyAtPoint(
+                        selectedSpawnPoint,
+                        healthMultiplier,
+                        prefabOverride);
+
+                    spawned++;
+
+                    if (spawned < totalToSpawn)
+                    {
+                        if (safeInterval > 0f)
+                        {
+                            yield return new WaitForSeconds(
+                                safeInterval);
+                        }
+                        else
+                        {
+                            yield return null;
+                        }
+                    }
+                }
+            }
+        }
+
         private List<Transform> GetActiveSpawnPointsSnapshot()
         {
             spawnPoints.RemoveAll(point => point == null);

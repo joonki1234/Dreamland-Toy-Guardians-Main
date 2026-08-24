@@ -28204,20 +28204,24 @@ MonoBehaviour:
   enemySpawner: {fileID: 2125966794}
   core: {fileID: 2019763646}
   droneEnemyPrefab: {fileID: 409757499555815942, guid: fe26514e00927534089e35fff1bedd6e, type: 3}
+  rangedEnemyPrefab: {fileID: 4376583669907981605, guid: 16e7f714445272c47af28662cf414ae5, type: 3}
   stageStartDelay: 2
   portalAppearanceDelay: 1.6
-  wave1EnemyCount: 6
-  wave1SpawnInterval: 1.5
+  wave1MeleePerDirection: 3
+  wave1DronePerDirection: 2
+  wave1SpawnInterval: 0.45
   wave1HealthMultiplier: 1.5
   wave1ToWave2Delay: 15
-  wave2EnemyCount: 8
-  wave2DroneEnemyCount: 2
-  wave2SpawnInterval: 1.2
+  wave2MeleePerDirection: 4
+  wave2RangedPerDirection: 3
+  wave2DronePerDirection: 3
+  wave2SpawnInterval: 0.3
   wave2HealthMultiplier: 1.8
   wave2ToFinalDelay: 15
-  finalWaveEnemyCount: 10
-  finalWaveDroneEnemyCount: 4
-  finalWaveSpawnInterval: 1
+  finalMeleePerDirection: 6
+  finalRangedPerDirection: 4
+  finalDronePerDirection: 4
+  finalWaveSpawnInterval: 0.25
   finalWaveHealthMultiplier: 2.2
 --- !u!114 &1926243289
 MonoBehaviour:
