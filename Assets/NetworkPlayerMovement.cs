@@ -114,10 +114,41 @@ public class NetworkPlayerMovement : NetworkBehaviour
             _headTrackedPoseDriver = playerCamera.GetComponent<TrackedPoseDriver>();
         }
 
+        // 01_Player.prefab은 씬에 배치되지 않고 Fusion이 런타임에 에셋에서
+        // 바로 스폰하는 방식이라, playerBoundaryShield처럼 "다른 씬의 특정
+        // 오브젝트"를 가리키는 Inspector 참조는 프리팹을 독립적으로 열어서
+        // 저장하기만 해도 쉽게 끊어진다(실제로 한 번 끊어졌었다). 참조가
+        // 비어있으면 이름으로 다시 찾아서 자동 복구한다.
+        if (playerBoundaryShield == null)
+        {
+            GameObject shieldObject =
+                FindObjectByNameIncludingInactive("PlayerBoundaryShield");
+
+            if (shieldObject != null)
+            {
+                playerBoundaryShield = shieldObject.transform;
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[NetworkPlayerMovement] PlayerBoundaryShield를 " +
+                    "씬에서 찾지 못했습니다. 이동 범위 제한이 적용되지 않습니다.");
+            }
+        }
+
         if (playerBoundaryShield != null)
         {
             _boundarySphereCollider =
                 playerBoundaryShield.GetComponent<SphereCollider>();
+
+            // "범위를 그냥 뚫고 나간다"는 증상이 재발할 경우, 참조가
+            // 실제로 붙었는지와 반지름이 얼마로 계산됐는지 바로 확인할 수
+            // 있도록 남겨둔다.
+            Debug.Log(
+                "[NetworkPlayerMovement] Player Boundary Shield 연결됨: " +
+                playerBoundaryShield.name +
+                " / 콜라이더 존재: " + (_boundarySphereCollider != null) +
+                " / 계산된 월드 반지름: " + GetBoundaryWorldRadius());
         }
         else
         {
@@ -186,6 +217,12 @@ public class NetworkPlayerMovement : NetworkBehaviour
                     FindAnyObjectByType<ToyFriendController>(
                         FindObjectsInactive.Include);
                 toyFriend?.SetPlayerLookTarget(playerCamera.transform);
+
+                // FinalBossAttackController의 눈알도 같은 이유로 Camera.main에
+                // 의존하면 항상 fallback(코어 방향)만 보게 되어 부자연스럽게
+                // 배치된다. 보스가 아직 스폰되지 않았을 수도 있으므로
+                // 정적 필드로 넘겨 나중에 보스가 참조하게 한다.
+                FinalBossAttackController.SetLocalViewerCamera(playerCamera);
             }
         }
     }
