@@ -110,6 +110,14 @@ public sealed class EnemyPortalStageController : MonoBehaviour
     [SerializeField]
     private float roadToEnemyDelay = 0.5f;
 
+    [Tooltip(
+        "8인 협동용 4방향 동시 개방 시, Road_1~4를 완전히 동시(0초)가 " +
+        "아니라 아주 짧은 간격으로 살짝 캐스케이드 느낌만 주며 여는 " +
+        "간격입니다.")]
+    [Min(0f)]
+    [SerializeField]
+    private float allDirectionsRoadCascadeInterval = 0.18f;
+
 
     [Header("시작 설정")]
 
@@ -268,8 +276,114 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         stage1PreparationRoutine =
             StartCoroutine(
-                RunStage1Preparation(
-                    preparationStep));
+                preparationStep ==
+                    Stage1WaveController.AllDirectionsPreparationStep
+                    ? RunStage1PreparationAll()
+                    : RunStage1Preparation(
+                        preparationStep));
+    }
+
+
+    /// <summary>
+    /// 8인 협동 기준으로 Portal A~D + Road_1~4를 1차 공격 시작 전에
+    /// 한 번에(살짝 캐스케이드를 주며) 엽니다. 웨이브가 진행될 때마다
+    /// 방향을 하나씩 여는 예전 RunStage1Preparation()과 달리, 여기서는
+    /// 4방향을 전부 같은 흐름 안에서 처리합니다.
+    /// </summary>
+    private IEnumerator RunStage1PreparationAll()
+    {
+        Debug.Log(
+            "[PortalStage] Stage 1 4방향(Portal A~D + Road_1~4) " +
+            "동시 준비 시작.",
+            this);
+
+
+        /*
+         * 1. 포탈 A~D를 한 번에 활성화합니다.
+         * 지금은 웨이브가 진행되며 커지는 연출이 아니라 4개가 동시에
+         * 새로 열리는 것이므로, 전부 같은(작은) 크기로 통일합니다.
+         */
+        SetActivePortalCount(4);
+
+        portalA?.ApplySmallPortal();
+        portalB?.ApplySmallPortal();
+        portalC?.ApplySmallPortal();
+        portalD?.ApplySmallPortal();
+
+
+        /*
+         * 2. 포탈이 먼저 보이는 시간을 확보
+         */
+        if (portalToRoadDelay > 0f)
+        {
+            yield return new WaitForSeconds(
+                portalToRoadDelay);
+        }
+
+
+        /*
+         * 3. Road_1~4를 완전히 동시가 아니라 아주 짧은 간격으로
+         * 살짝 캐스케이드 느낌만 주며 엽니다.
+         */
+        RevealRoad1Once();
+
+        if (allDirectionsRoadCascadeInterval > 0f)
+        {
+            yield return new WaitForSeconds(
+                allDirectionsRoadCascadeInterval);
+        }
+
+        RevealRoad2Once();
+
+        if (allDirectionsRoadCascadeInterval > 0f)
+        {
+            yield return new WaitForSeconds(
+                allDirectionsRoadCascadeInterval);
+        }
+
+        RevealRoad3Once();
+
+        if (allDirectionsRoadCascadeInterval > 0f)
+        {
+            yield return new WaitForSeconds(
+                allDirectionsRoadCascadeInterval);
+        }
+
+        RevealRoad4Once();
+
+
+        /*
+         * 4. 길 연출이 충분히 완료될 때까지 대기
+         */
+        if (roadRevealWaitDuration > 0f)
+        {
+            yield return new WaitForSeconds(
+                roadRevealWaitDuration);
+        }
+
+
+        /*
+         * 5. 길이 완성된 화면을 잠깐 보여준 뒤 적 스폰을 허용
+         */
+        if (roadToEnemyDelay > 0f)
+        {
+            yield return new WaitForSeconds(
+                roadToEnemyDelay);
+        }
+
+
+        stage1WaveController?.
+            NotifyEnvironmentPreparationCompleted(
+                Stage1WaveController.AllDirectionsPreparationStep);
+
+
+        Debug.Log(
+            "[PortalStage] Stage 1 4방향 동시 준비 완료. " +
+            "이제 적 스폰을 시작할 수 있습니다.",
+            this);
+
+
+        stage1PreparationRoutine = null;
     }
 
 
@@ -789,5 +903,10 @@ public sealed class EnemyPortalStageController : MonoBehaviour
             Mathf.Max(
                 0f,
                 roadToEnemyDelay);
+
+        allDirectionsRoadCascadeInterval =
+            Mathf.Max(
+                0f,
+                allDirectionsRoadCascadeInterval);
     }
 }

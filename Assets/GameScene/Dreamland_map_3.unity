@@ -30240,28 +30240,28 @@ MonoBehaviour:
   rangedEnemyPrefab: {fileID: 4376583669907981605, guid: 16e7f714445272c47af28662cf414ae5, type: 3}
   groups:
   - label: "1\uCC28 \uACF5\uACA9"
-    enemyCount: 3
+    enemyCount: 12
     spawnInterval: 2.5
     healthMultiplier: 1
     preDelay: 2
     transitionDelay: 4
     minimumDuration: 0
   - label: "2\uCC28 \uACF5\uACA9"
-    enemyCount: 3
+    enemyCount: 12
     spawnInterval: 2.5
     healthMultiplier: 1.25
     preDelay: 2
     transitionDelay: 4
     minimumDuration: 0
   - label: "\uCD5C\uC885 \uACF5\uACA9"
-    enemyCount: 6
+    enemyCount: 24
     spawnInterval: 1.8
     healthMultiplier: 1.5
     preDelay: 3
     transitionDelay: 4
     minimumDuration: 0
-  secondWaveRangedEnemyCount: 3
-  finalWaveRangedEnemyCount: 4
+  secondWaveRangedEnemyCount: 12
+  finalWaveRangedEnemyCount: 16
   waveStartDelay: 3
   clearSequenceDuration: 3
   targetStageDurationSeconds: 240
