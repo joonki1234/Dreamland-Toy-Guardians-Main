@@ -22,7 +22,7 @@ public sealed class PlayerJobSkillController : MonoBehaviour
     [Min(0f)] [SerializeField] private float policeCooldown = 10f;
     [Min(0f)] [SerializeField] private float firefighterCooldown = 15f;
     [Min(0f)] [SerializeField] private float chefCooldown = 0f;
-    [Min(0f)] [SerializeField] private float builderCooldown = 8f;
+    [Min(0f)] [SerializeField] private float builderCooldown = 12f;
 
     [Header("직업별 스킬 구현")]
     [SerializeField] private PoliceSkill policeSkill = new PoliceSkill();
@@ -70,12 +70,20 @@ public sealed class PlayerJobSkillController : MonoBehaviour
     /// </summary>
     private void PollKeyboardTestInput()
     {
-        if (Keyboard.current == null || !Keyboard.current.pKey.wasPressedThisFrame)
+        if (Keyboard.current == null)
         {
             return;
         }
 
-        TryUseCurrentJobSkill();
+        if (Keyboard.current.pKey.wasPressedThisFrame)
+        {
+            TryUseCurrentJobSkill();
+        }
+
+        if (Keyboard.current.eKey.wasPressedThisFrame)
+        {
+            CancelBuilderSkill();
+        }
     }
 
     /// <summary>
@@ -91,7 +99,8 @@ public sealed class PlayerJobSkillController : MonoBehaviour
         PlayerJob job = jobController.CurrentJob;
         float now = Time.time;
 
-        if (now < GetReadyTime(job))
+        if (now < GetReadyTime(job) ||
+            (job == PlayerJob.Builder && builderSkill.IsActive))
         {
             return false;
         }
@@ -100,6 +109,33 @@ public sealed class PlayerJobSkillController : MonoBehaviour
         GetSkill(job).Execute(context);
         SetReadyTime(job, now + GetCooldown(job));
         return true;
+    }
+
+    /// <summary>XR 입력과 분리된 건축가 긴급 철거 전용 진입점입니다.</summary>
+    public bool TryActivateBuilderSkill()
+    {
+        if (jobController == null || jobController.CurrentJob != PlayerJob.Builder)
+        {
+            return false;
+        }
+
+        return TryUseCurrentJobSkill();
+    }
+
+    /// <summary>진행 중인 긴급 철거의 망치와 Swing VFX를 안전하게 정리합니다.</summary>
+    public void CancelBuilderSkill()
+    {
+        builderSkill?.Cancel();
+    }
+
+    private void OnDisable()
+    {
+        CancelBuilderSkill();
+    }
+
+    private void OnDestroy()
+    {
+        CancelBuilderSkill();
     }
 
     private bool CanUseLocalInput()

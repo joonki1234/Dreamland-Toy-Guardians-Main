@@ -15832,6 +15832,104 @@ MonoBehaviour:
     landingSoundVolume: 1
     explosionSound: {fileID: 8300000, guid: 457ec8ecacd74fc397248e555d7ee5f7, type: 3}
     explosionSoundVolume: 1
+  builderSkill:
+    animatedHammerPrefab: {fileID: 100000, guid: a890938d72bf42d4ad133e8cb0917580, type: 3}
+    hammerAnimationClip: {fileID: -623603649343465320, guid: b4725ca5b4327254699522e21d12b348, type: 3}
+    animatedHammerMaterial: {fileID: 2100000, guid: 1ac280d2e7d331d43bb2ef80d99cd65e, type: 2}
+    hammerSpawnOffset: {x: -1.4, y: 2.6, z: 0.2}
+    hammerTargetVisualSize: 5.5
+    preparationDuration: 0.2
+    swingVfxEndOffset: {x: 0, y: 0.08, z: 2.8}
+    hammerAnchorOffset: {x: -1.5, y: -0.9, z: 1.5}
+    hammerAnchorRotation: {x: 0, y: -80, z: 0}
+    hammerImpactNormalizedTime: 0.85
+    swingArcHeight: 0.75
+    swingTrailVfx: {fileID: 1664297955, guid: 4fb7673fa1cb7e34ea16f350b1e1fba9, type: 3}
+    swingTrailScale: {x: 3, y: 3, z: 3}
+    swingTrailOffset: {x: 0, y: 0, z: 0}
+    swingTrailRotationOffset: {x: 0, y: 0, z: 90}
+    vfxMaterialOverrides:
+    - sourceMaterialName: Slash
+      replacementMaterial: {fileID: 2100000, guid: b8d00e4046af4d369c9059542a91fb3e, type: 2}
+    - sourceMaterialName: Slash World
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c101, type: 2}
+    - sourceMaterialName: Flying Particles
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c102, type: 2}
+    - sourceMaterialName: Flying var Vertex
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c103, type: 2}
+    - sourceMaterialName: Impact Mat
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c104, type: 2}
+    - sourceMaterialName: Impact Mat 1
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c105, type: 2}
+    - sourceMaterialName: Crack Decal
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c106, type: 2}
+    - sourceMaterialName: Smoke
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c107, type: 2}
+    - sourceMaterialName: Stone
+      replacementMaterial: {fileID: 2100000, guid: d4a6f0c27e214ef2a3e7cfce6ef09b51, type: 2}
+    - sourceMaterialName: Var 1
+      replacementMaterial: {fileID: 2100000, guid: a1f1c8a4071b45bca38e68b3f519c108, type: 2}
+    - sourceMaterialName: Impact
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c201, type: 2}
+    - sourceMaterialName: Impact 1
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c202, type: 2}
+    - sourceMaterialName: Flash
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c203, type: 2}
+    - sourceMaterialName: Spark
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c204, type: 2}
+    - sourceMaterialName: Spark 2
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c205, type: 2}
+    - sourceMaterialName: Shockwave
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c206, type: 2}
+    - sourceMaterialName: Shockwave 1
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c207, type: 2}
+    - sourceMaterialName: Shockwave 2
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c208, type: 2}
+    - sourceMaterialName: Shockwave 3
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c209, type: 2}
+    - sourceMaterialName: Shockwave 5
+      replacementMaterial: {fileID: 2100000, guid: b2f2c8a4071b45bca38e68b3f519c210, type: 2}
+    - sourceMaterialName: <Missing>
+      replacementMaterial: {fileID: 2100000, guid: c3f3c8a4071b45bca38e68b3f519c301, type: 2}
+    secondarySwingVfx: {fileID: 5545173171955001552, guid: 7ac879c2caac1ca41b6c438e77d8b25d, type: 3}
+    secondarySwingScale: {x: 2.3, y: 2.3, z: 2.3}
+    secondarySwingRotationOffset: {x: 0, y: 8, z: -8}
+    secondarySwingDelay: 0.08
+    swingParticleVfx: {fileID: 0}
+    swingParticleOffset: {x: 0, y: 0, z: 0}
+    hammerSpawnVfx: {fileID: 637968014551906757, guid: 057aa477789506a44bd206e9c5acad19, type: 3}
+    hammerSpawnVfxScale: {x: 0.7, y: 0.7, z: 0.7}
+    hammerSpawnVfxLifetime: 0.25
+    demolitionImpactPrefab: {fileID: 100000, guid: 9c95c3152e764b3099955e9af77e56dc, type: 3}
+    debrisMeshes:
+    - {fileID: 3887683042572766240, guid: b923f557708903c4e96a3db6625d8447, type: 3}
+    - {fileID: 4300000, guid: 911c60db4ab65fd41956f1d71e9d7ded, type: 3}
+    - {fileID: 4300000, guid: 4146d9eaa2e4ea14fa539de11eaa8d66, type: 3}
+    debrisMaterial: {fileID: 2100000, guid: d4a6f0c27e214ef2a3e7cfce6ef09b51, type: 2}
+    dustVfx: {fileID: 8230022441722461589, guid: 41494896fc96c9748b81d3356632794e, type: 3}
+    dustVfxScale: {x: 0.18, y: 0.18, z: 0.18}
+    groundLayerMask:
+      serializedVersion: 2
+      m_Bits: 256
+    groundRayStartHeight: 4
+    groundRayDistance: 12
+    monsterLayerMask:
+      serializedVersion: 2
+      m_Bits: 128
+    impactRadius: 5.5
+    directHitRadius: 2
+    directDamage: 90
+    shockwaveDamage: 60
+    stunDuration: 0.8
+    knockbackForce: 4.5
+    knockbackDuration: 0.3
+    hammerImpactSound: {fileID: 8300000, guid: 86b2e046fb5b5f14594d2d65da1d5935, type: 3}
+    hammerImpactVolume: 0.35
+    boomImpactSound: {fileID: 8300000, guid: 6ab50ec821923f64e89191e1d7caea1c, type: 3}
+    boomImpactVolume: 1
+    boomImpactDelay: 0.02
+    audioMinDistance: 3
+    audioMaxDistance: 30
 --- !u!1 &3167499152967314610
 GameObject:
   m_ObjectHideFlags: 0

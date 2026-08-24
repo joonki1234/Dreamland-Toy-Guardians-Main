@@ -37,6 +37,23 @@ public sealed class DreamRoadRevealController : MonoBehaviour
     [SerializeField]
     private Transform road4;
 
+    [Header("Extra Road Visuals")]
+    [Tooltip("Road_1(남쪽) 단계와 함께 표시할 DreamRoad 직속 외곽 조각입니다.")]
+    [SerializeField]
+    private Transform[] extraRoadObjectsForRoad1;
+
+    [Tooltip("Road_2(서쪽) 단계와 함께 표시할 DreamRoad 직속 외곽 조각입니다.")]
+    [SerializeField]
+    private Transform[] extraRoadObjectsForRoad2;
+
+    [Tooltip("Road_3(북쪽) 단계와 함께 표시할 DreamRoad 직속 외곽 조각입니다.")]
+    [SerializeField]
+    private Transform[] extraRoadObjectsForRoad3;
+
+    [Tooltip("Road_4(동쪽) 단계와 함께 표시할 DreamRoad 직속 외곽 조각입니다.")]
+    [SerializeField]
+    private Transform[] extraRoadObjectsForRoad4;
+
     [Header("Reveal Animation")]
 
     [Tooltip("벽돌이 원래 위치보다 얼마나 아래에서 시작할지 설정합니다.")]
@@ -99,6 +116,10 @@ public sealed class DreamRoadRevealController : MonoBehaviour
         SetRoadActive(road2, false);
         SetRoadActive(road3, false);
         SetRoadActive(road4, false);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad1, false);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad2, false);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad3, false);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad4, false);
 
         Debug.Log(
             "[DreamRoadReveal] 모든 꿈나라 길을 숨겼습니다.",
@@ -119,6 +140,10 @@ public sealed class DreamRoadRevealController : MonoBehaviour
         ShowRoadImmediately(road2);
         ShowRoadImmediately(road3);
         ShowRoadImmediately(road4);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad1, true);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad2, true);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad3, true);
+        SetExtraRoadObjectsActive(extraRoadObjectsForRoad4, true);
 
         Debug.Log(
             "[DreamRoadReveal] 모든 꿈나라 길을 즉시 표시했습니다.",
@@ -210,6 +235,7 @@ public sealed class DreamRoadRevealController : MonoBehaviour
         }
 
         roadRoot.gameObject.SetActive(true);
+        SetExtraRoadObjectsActive(GetExtraRoadObjects(roadRoot), true);
 
         /*
          * Road_0처럼 부모 오브젝트 자체가 벽돌이고
@@ -397,6 +423,29 @@ public sealed class DreamRoadRevealController : MonoBehaviour
         }
 
         roadRoot.gameObject.SetActive(active);
+    }
+
+    private Transform[] GetExtraRoadObjects(Transform roadRoot)
+    {
+        if (roadRoot == road1) return extraRoadObjectsForRoad1;
+        if (roadRoot == road2) return extraRoadObjectsForRoad2;
+        if (roadRoot == road3) return extraRoadObjectsForRoad3;
+        if (roadRoot == road4) return extraRoadObjectsForRoad4;
+        return null;
+    }
+
+    private static void SetExtraRoadObjectsActive(
+        Transform[] roadObjects,
+        bool active)
+    {
+        if (roadObjects == null) return;
+
+        for (int i = 0; i < roadObjects.Length; i++)
+        {
+            Transform roadObject = roadObjects[i];
+            if (roadObject != null)
+                roadObject.gameObject.SetActive(active);
+        }
     }
 
     private void RestartRoadRoutine(

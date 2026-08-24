@@ -16079,6 +16079,30 @@ MonoBehaviour:
   road2: {fileID: 1422403288}
   road3: {fileID: 263974144}
   road4: {fileID: 587282643}
+  extraRoadObjectsForRoad1:
+  - {fileID: 1825333114}
+  - {fileID: 387397731}
+  - {fileID: 91356213}
+  - {fileID: 708035103}
+  - {fileID: 836444094}
+  - {fileID: 71695140}
+  - {fileID: 1726282046}
+  extraRoadObjectsForRoad2:
+  - {fileID: 86488207}
+  - {fileID: 1142800567}
+  - {fileID: 776377917}
+  - {fileID: 768743808}
+  - {fileID: 1804641456}
+  extraRoadObjectsForRoad3:
+  - {fileID: 1344704979}
+  - {fileID: 1482380639}
+  - {fileID: 935300496}
+  - {fileID: 1981917137}
+  - {fileID: 1254391366}
+  extraRoadObjectsForRoad4:
+  - {fileID: 1062892731}
+  - {fileID: 1630265635}
+  - {fileID: 1034241809}
   startYOffset: 0
   startScaleMultiplier: 0.5
   overshootScaleMultiplier: 1.08
