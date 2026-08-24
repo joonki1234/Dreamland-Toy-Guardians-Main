@@ -369,7 +369,7 @@ Shader "/Vefects/SH_Vefects_Extra_Grid_01"
 					o.dynamicLightmapUV.xy = v.texcoord2.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
 				#endif
 
-				OUTPUT_SH4( vertexInput.positionWS, normalInput.normalWS.xyz, GetWorldSpaceNormalizeViewDir( vertexInput.positionWS ), o.lightmapUVOrVertexSH.xyz );
+				OUTPUT_SH4( vertexInput.positionWS, normalInput.normalWS.xyz, GetWorldSpaceNormalizeViewDir( vertexInput.positionWS ), o.lightmapUVOrVertexSH.xyz, 0 );
 
 				#if defined(ENABLE_TERRAIN_PERPIXEL_NORMAL)
 					o.lightmapUVOrVertexSH.zw = v.texcoord.xy;
@@ -2460,7 +2460,7 @@ Shader "/Vefects/SH_Vefects_Extra_Grid_01"
 					o.dynamicLightmapUV.xy = v.texcoord2.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
 				#endif
 
-				OUTPUT_SH4( vertexInput.positionWS, normalInput.normalWS.xyz, GetWorldSpaceNormalizeViewDir( vertexInput.positionWS ), o.lightmapUVOrVertexSH.xyz );
+				OUTPUT_SH4( vertexInput.positionWS, normalInput.normalWS.xyz, GetWorldSpaceNormalizeViewDir( vertexInput.positionWS ), o.lightmapUVOrVertexSH.xyz, 0 );
 
 				#if defined(ENABLE_TERRAIN_PERPIXEL_NORMAL)
 					o.lightmapUVOrVertexSH.zw = v.texcoord.xy;
