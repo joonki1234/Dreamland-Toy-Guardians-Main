@@ -26,7 +26,19 @@ public class MapMusicController : MonoBehaviour
     [SerializeField, Min(0.1f)]
     private float crossfadeDuration = 1.5f;
 
+    [Header("ToyFriend Dialogue Duck")]
+    [SerializeField, Range(0f, 1f)]
+    private float dialogueDuckRatio = 0.55f;
+
+    [SerializeField, Min(0.05f)]
+    private float dialogueDuckFadeDuration = 0.3f;
+
     private Coroutine _crossfadeRoutine;
+    private Coroutine _duckRoutine;
+    private bool _dialogueDucked;
+
+    private float TargetMusicVolume =>
+        musicVolume * (_dialogueDucked ? dialogueDuckRatio : 1f);
 
     private void Awake()
     {
@@ -66,9 +78,78 @@ public class MapMusicController : MonoBehaviour
         PlayClip(battleBgm);
     }
 
+    public void BeginToyFriendDialogueDuck()
+    {
+        SetDialogueDucked(true);
+    }
+
+    public void EndToyFriendDialogueDuck()
+    {
+        SetDialogueDucked(false);
+    }
+
+    private void SetDialogueDucked(bool ducked)
+    {
+        if (musicSource == null || !isActiveAndEnabled)
+        {
+            return;
+        }
+
+        _dialogueDucked = ducked;
+
+        if (_duckRoutine != null)
+        {
+            StopCoroutine(_duckRoutine);
+            _duckRoutine = null;
+        }
+
+        // 크로스페이드가 진행 중이면 그 루틴이 매 프레임 TargetMusicVolume을
+        // 참조하므로 별도 볼륨 루틴과 경쟁시키지 않습니다.
+        if (_crossfadeRoutine != null)
+        {
+            return;
+        }
+
+        _duckRoutine = StartCoroutine(FadeVolumeRoutine(TargetMusicVolume));
+    }
+
+    private IEnumerator FadeVolumeRoutine(float targetVolume)
+    {
+        if (musicSource == null)
+        {
+            _duckRoutine = null;
+            yield break;
+        }
+
+        float startVolume = musicSource.volume;
+        float elapsed = 0f;
+
+        while (elapsed < dialogueDuckFadeDuration)
+        {
+            if (musicSource == null)
+            {
+                _duckRoutine = null;
+                yield break;
+            }
+
+            elapsed += Time.deltaTime;
+            musicSource.volume = Mathf.Lerp(
+                startVolume,
+                targetVolume,
+                Mathf.Clamp01(elapsed / dialogueDuckFadeDuration));
+            yield return null;
+        }
+
+        if (musicSource != null)
+        {
+            musicSource.volume = targetVolume;
+        }
+        _duckRoutine = null;
+    }
+
     private void PlayClip(AudioClip clip)
     {
-        if (clip == null || musicSource.clip == clip)
+        if (clip == null || musicSource == null || musicSource.clip == clip)
         {
             return;
         }
@@ -87,11 +168,23 @@ public class MapMusicController : MonoBehaviour
         float startVolume = musicSource.volume;
         float t = 0f;
 
-        while (t < half && musicSource.isPlaying)
+        while (t < half && musicSource != null && musicSource.isPlaying)
         {
+            if (musicSource == null)
+            {
+                _crossfadeRoutine = null;
+                yield break;
+            }
+
             t += Time.deltaTime;
             musicSource.volume = Mathf.Lerp(startVolume, 0f, t / half);
             yield return null;
+        }
+
+        if (musicSource == null)
+        {
+            _crossfadeRoutine = null;
+            yield break;
         }
 
         musicSource.clip = newClip;
@@ -102,12 +195,38 @@ public class MapMusicController : MonoBehaviour
 
         while (t < half)
         {
+            if (musicSource == null)
+            {
+                _crossfadeRoutine = null;
+                yield break;
+            }
+
             t += Time.deltaTime;
-            musicSource.volume = Mathf.Lerp(0f, musicVolume, t / half);
+            musicSource.volume = Mathf.Lerp(0f, TargetMusicVolume, t / half);
             yield return null;
         }
 
-        musicSource.volume = musicVolume;
+        if (musicSource != null)
+        {
+            musicSource.volume = TargetMusicVolume;
+        }
         _crossfadeRoutine = null;
+    }
+
+    private void OnDisable()
+    {
+        if (_crossfadeRoutine != null)
+        {
+            StopCoroutine(_crossfadeRoutine);
+            _crossfadeRoutine = null;
+        }
+
+        if (_duckRoutine != null)
+        {
+            StopCoroutine(_duckRoutine);
+            _duckRoutine = null;
+        }
+
+        _dialogueDucked = false;
     }
 }

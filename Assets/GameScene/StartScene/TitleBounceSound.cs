@@ -23,7 +23,7 @@ public class TitleBounceSound : MonoBehaviour
 
     [Header("효과음 볼륨")]
     [SerializeField, Range(0f, 1f)]
-    private float volume = 0.7f;
+    private float volume = 0.6f;
 
 
     // 첫 번째 큰 튕김

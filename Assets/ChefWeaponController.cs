@@ -35,7 +35,7 @@ public class ChefWeaponController : MonoBehaviour
     public AudioClip panSwingSfx;
 
     [Range(0f, 1f)]
-    public float panSwingVolume = 0.5f;
+    public float panSwingVolume = 0.35f;
 
     private static AudioClip cachedPanSwingSfx;
     private const string PanSwingSfxResourcePath = "SFX/Chef/pan_swing";

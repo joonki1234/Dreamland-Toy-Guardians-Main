@@ -361,7 +361,7 @@ MonoBehaviour:
   fadeOutDuration: 1
   lobbyBGM: {fileID: 1483866124}
   bgmFadeInDuration: 5
-  lobbyBGMVolume: 0.15
+  lobbyBGMVolume: 0.28
   useAutomaticTestTransition: 0
   introDuration: 2
   loadingDotInterval: 0.35
@@ -666,7 +666,7 @@ MonoBehaviour:
   robotVoiceDuration: 1.4
   playerStatusUI: {fileID: 0}
   maximumPlayerCount: 8
-  readyCountdownSeconds: 30
+  readyCountdownSeconds: 5
   normalButtonColor: {r: 0.92156863, g: 0.92156863, b: 0.92156863, a: 1}
   selectedButtonColor: {r: 0.6666667, g: 0.6666667, b: 0.6666667, a: 1}
   highlightedButtonColor: {r: 0.98039216, g: 0.98039216, b: 0.98039216, a: 1}
@@ -2638,7 +2638,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 5080907bca63fc64b86080a2f57d599e, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 1
+  m_Volume: 0.48
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -2903,7 +2903,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 96700ab963c1c0c49b1d35c2b889ea28, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 1
+  m_Volume: 0.48
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -3470,7 +3470,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 445b3ab9bd9364a9995225a282e5c21e, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.2
+  m_Volume: 0.28
   m_Pitch: 1
   Loop: 1
   Mute: 0
@@ -3986,9 +3986,9 @@ RectTransform:
   - {fileID: 1474834135}
   m_Father: {fileID: 6839596181442651345}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -170}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 0}
+  m_AnchoredPosition: {x: 0, y: 100}
   m_SizeDelta: {x: 760, y: 170}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1740548042
@@ -4153,9 +4153,9 @@ RectTransform:
   - {fileID: 1730771586}
   m_Father: {fileID: 6839596181442651345}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -400}
+  m_AnchorMin: {x: 0.5, y: 0}
+  m_AnchorMax: {x: 0.5, y: 0}
+  m_AnchoredPosition: {x: 0, y: 100}
   m_SizeDelta: {x: 760, y: 170}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1837864562
@@ -4496,7 +4496,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: f10e7ff812627164fa39911459400577, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.7
+  m_Volume: 0.43
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -4796,6 +4796,7 @@ MonoBehaviour:
   targetCamera: {fileID: 0}
   localOffset: {x: 0, y: -0.15, z: 1}
   matchCameraRotation: 1
+  useScreenSpaceOverlay: 1
 --- !u!1 &1026847927404610461
 GameObject:
   m_ObjectHideFlags: 0
@@ -4830,14 +4831,14 @@ MonoBehaviour:
   m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 1920, y: 1080}
+  m_ReferenceResolution: {x: 1600, y: 1000}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0.5
+  m_MatchWidthOrHeight: 0.58
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 1
+  m_PresetInfoIsWorld: 0
 --- !u!223 &2258728697626565719
 Canvas:
   m_ObjectHideFlags: 0
@@ -4847,7 +4848,7 @@ Canvas:
   m_GameObject: {fileID: 1026847927404610461}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 2
+  m_RenderMode: 0
   m_Camera: {fileID: 0}
   m_PlaneDistance: 100
   m_PixelPerfect: 0
@@ -4871,7 +4872,7 @@ RectTransform:
   m_GameObject: {fileID: 1026847927404610461}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.0015, y: 0.0015, z: 0.0015}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1837864561}
@@ -4881,7 +4882,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1600, y: 900}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1001 &8277321562065072766
 PrefabInstance:
@@ -4988,7 +4989,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 0.85
+  m_Volume: 1
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -5039,11 +5040,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5843551df73840e497005fcfb37e0253, type: 3}
   m_Name:
   m_EditorClassIdentifier:
+  voiceClips:
+  - {fileID: 8300000, guid: ca91581f6a1017b499b2ea677f9e8659, type: 3}
+  - {fileID: 8300000, guid: 0ef90a5b217c9fa4b8bca1898a064bd6, type: 3}
+  - {fileID: 8300000, guid: 6e3242aa26749d6438d5b92e0ba39909, type: 3}
+  - {fileID: 8300000, guid: c040180201eb1484b90c374d10aaa292, type: 3}
+  - {fileID: 8300000, guid: 44f91dba3b2f11a40820346964bef208, type: 3}
   voiceName: robot
   syllableInterval: 0.08
-  pitchRange: {x: 0.92, y: 1.08}
-  volume: 0.85
-  spatialBlend: 0.15
+  pitchRange: {x: 1.5, y: 1.9}
+  volume: 0.5
+  spatialBlend: 0
+  characterStep: 2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -63,7 +63,7 @@ public class GunController : MonoBehaviour
     public AudioClip gunShotSfx;
 
     [Range(0f, 1f)]
-    public float gunShotVolume = 0.5f;
+    public float gunShotVolume = 0.35f;
 
     private static AudioClip cachedGunShotSfx;
     private const string GunShotSfxResourcePath = "SFX/Police/gun_shot";

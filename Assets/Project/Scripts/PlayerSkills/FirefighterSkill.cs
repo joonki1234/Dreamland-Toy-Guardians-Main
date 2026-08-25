@@ -45,13 +45,13 @@ public sealed class FirefighterSkill : IJobSkill
     [Header("소방차 사운드")]
     [Tooltip("차량이 이동하는 동안 반복 재생할 사이렌")]
     [SerializeField] private AudioClip sirenSound;
-    [Range(0f, 1f)] [SerializeField] private float sirenVolume = 0.8f;
+    [Range(0f, 1f)] [SerializeField] private float sirenVolume = 0.22f;
     [Tooltip("차량이 등장할 때 한 번 재생할 효과음")]
     [SerializeField] private AudioClip spawnSound;
-    [Range(0f, 1f)] [SerializeField] private float spawnSoundVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float spawnSoundVolume = 0.45f;
     [Tooltip("차량이 적과 처음 충돌할 때 재생할 효과음")]
     [SerializeField] private AudioClip impactSound;
-    [Range(0f, 1f)] [SerializeField] private float impactVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float impactVolume = 0.48f;
     [Tooltip("여러 적을 연속으로 타격할 때 충돌음이 겹치지 않도록 하는 최소 재생 간격")]
     [Min(0f)] [SerializeField] private float impactSoundMinInterval = 0.1f;
     [Min(0f)] [SerializeField] private float audioMinDistance = 3f;

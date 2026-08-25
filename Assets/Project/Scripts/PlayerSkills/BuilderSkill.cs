@@ -82,9 +82,9 @@ public sealed class BuilderSkill : IJobSkill
     [FormerlySerializedAs("impactSound")]
     [SerializeField] private AudioClip hammerImpactSound;
     [FormerlySerializedAs("impactVolume")]
-    [Range(0f, 1f)] [SerializeField] private float hammerImpactVolume = 0.8f;
+    [Range(0f, 1f)] [SerializeField] private float hammerImpactVolume = 0.42f;
     [SerializeField] private AudioClip boomImpactSound;
-    [Range(0f, 1f)] [SerializeField] private float boomImpactVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float boomImpactVolume = 0.5f;
     [Range(0f, 0.1f)] [SerializeField] private float boomImpactDelay = 0.02f;
     [Min(0f)] [SerializeField] private float audioMinDistance = 3f;
     [Min(0.01f)] [SerializeField] private float audioMaxDistance = 30f;

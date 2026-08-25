@@ -42,13 +42,13 @@ public sealed class PoliceSkill : IJobSkill
     [Header("전기 효과음")]
     [Tooltip("집중포화 사격 시작 순간 한 번 재생할 짧은 전기 파열음")]
     [SerializeField] private AudioClip electricCrackSound;
-    [Range(0f, 1f)] [SerializeField] private float electricCrackVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float electricCrackVolume = 0.45f;
     [Tooltip("집중포화 사격 시작 순간 한 번 재생할 전기 폭발/충격음")]
     [SerializeField] private AudioClip electricImpactSound;
-    [Range(0f, 1f)] [SerializeField] private float electricImpactVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float electricImpactVolume = 0.48f;
     [Tooltip("집중포화 사격 중 반복 재생할 전기/방전 효과음")]
     [SerializeField] private AudioClip electricFireSound;
-    [Range(0f, 1f)] [SerializeField] private float electricFireVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float electricFireVolume = 0.22f;
     [Min(0f)] [SerializeField] private float electricSoundMinDistance = 7f;
     [Min(0.01f)] [SerializeField] private float electricSoundMaxDistance = 25f;
 

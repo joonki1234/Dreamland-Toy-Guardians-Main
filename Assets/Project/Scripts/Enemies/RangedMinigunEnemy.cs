@@ -51,7 +51,7 @@ namespace DreamGuardians
         private AudioClip attackSfx;
 
         [SerializeField, Range(0f, 1f)]
-        private float attackSfxVolume = 0.5f;
+        private float attackSfxVolume = 0.35f;
 
         private static AudioClip cachedAttackSfx;
         private const string AttackSfxResourcePath = "SFX/Enemy/attack";

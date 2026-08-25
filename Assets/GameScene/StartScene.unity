@@ -1109,7 +1109,7 @@ MonoBehaviour:
   bounceSound2: {fileID: 8300000, guid: 17fe35ce980ef4d26b6aa57295f97cb5, type: 3}
   bounceSound3: {fileID: 8300000, guid: 8c287f25bbea84c0588789c62f6fb47d, type: 3}
   bounceSound4: {fileID: 8300000, guid: cfce0cea076109f478783201b2a9f57f, type: 3}
-  volume: 0.7
+  volume: 0.6
 --- !u!224 &747303383 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 6753389703612864384, guid: 63a35115bfe690c49b677ff5217d629f, type: 3}
@@ -1482,7 +1482,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 818ceeca65489e14ab6864f21ac80fd5, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.7
+  m_Volume: 0.48
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -1958,7 +1958,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: e2d25b0f6f3dc4c44b6abcab973e5afb, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.5
+  m_Volume: 0.33
   m_Pitch: 1
   Loop: 1
   Mute: 0

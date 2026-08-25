@@ -230,15 +230,26 @@ namespace DreamGuardians
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1600f, 1000f);
-            scaler.matchWidthOrHeight = 0.58f;
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
 
             RectTransform root = canvasObject.GetComponent<RectTransform>();
+            GameObject safeRootObject = new GameObject(
+                "CoreTopHudSafeArea",
+                typeof(RectTransform));
+            safeRootObject.transform.SetParent(root, false);
+            RectTransform safeRoot = safeRootObject.GetComponent<RectTransform>();
+            safeRoot.anchorMin = Vector2.zero;
+            safeRoot.anchorMax = Vector2.one;
+            safeRoot.pivot = new Vector2(0.5f, 0.5f);
+            safeRoot.offsetMin = Vector2.zero;
+            safeRoot.offsetMax = Vector2.zero;
+            safeRoot.localScale = Vector3.one;
 
             // 로봇 대화창/로비와 같은 유리 패널을 실제로 보이는 배경으로 사용합니다
             // (예전에는 이 패널이 투명한 레이아웃 껍데기였고 실제로 보이는 건 아래 바뿐이었습니다).
             panel = CreatePanel(
                 "CoreStatusPanel",
-                root,
+                safeRoot,
                 glassPanel != null ? glassPanel : DreamlandUiSkin.SciFiWindow,
                 new Vector2(0.5f, 1f),
                 new Vector2(560f, 118f),

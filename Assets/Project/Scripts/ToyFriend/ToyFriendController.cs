@@ -117,6 +117,8 @@ namespace DreamGuardians
         private Text speechBubbleText;
         private Text speechBubbleSpeakerText;
         private MissionBannerUI missionUI;
+        private MapMusicController mapMusicController;
+        private bool dialogueDuckRequested;
         private bool storyFocusRequested;
         private Vector3 visualBaseLocalPosition;
         private Quaternion visualBaseLocalRotation;
@@ -355,6 +357,7 @@ namespace DreamGuardians
             }
 
             missionUI ??= Object.FindAnyObjectByType<MissionBannerUI>();
+            mapMusicController ??= Object.FindAnyObjectByType<MapMusicController>();
             if (missionUI != null)
             {
                 missionUI.HideTransientMessages();
@@ -368,6 +371,12 @@ namespace DreamGuardians
                     Mathf.Max(0.2f, duration),
                     celebratory,
                     voiceClip));
+
+            if (mapMusicController != null)
+            {
+                mapMusicController.BeginToyFriendDialogueDuck();
+                dialogueDuckRequested = true;
+            }
         }
 
         public void StopSpeaking()
@@ -396,6 +405,15 @@ namespace DreamGuardians
             {
                 missionUI?.EndToyFriendStoryFocus();
                 storyFocusRequested = false;
+            }
+
+            if (dialogueDuckRequested)
+            {
+                if (mapMusicController != null)
+                {
+                    mapMusicController.EndToyFriendDialogueDuck();
+                }
+                dialogueDuckRequested = false;
             }
         }
 
@@ -622,9 +640,7 @@ namespace DreamGuardians
             }
             else if (animaleseVoice != null)
             {
-                // 정해진 대사 음원이 없으면, 대사가 떠 있는 동안 동물의숲 캐릭터처럼
-                // 알파벳/숫자 음절을 무작위로 빠르게 중얼거려준다.
-                animaleseVoice.PlayBabbleForDuration(duration);
+                animaleseVoice.PlayForText(message, 0.055f);
             }
 
             onSpeechStarted?.Invoke();
@@ -676,7 +692,10 @@ namespace DreamGuardians
                 voiceSource.Stop();
             }
 
-            animaleseVoice?.StopBabble();
+            if (animaleseVoice != null)
+            {
+                animaleseVoice.StopBabble();
+            }
 
             if (storyFocusRequested)
             {
@@ -684,8 +703,27 @@ namespace DreamGuardians
                 storyFocusRequested = false;
             }
 
+            if (dialogueDuckRequested)
+            {
+                if (mapMusicController != null)
+                {
+                    mapMusicController.EndToyFriendDialogueDuck();
+                }
+                dialogueDuckRequested = false;
+            }
+
             onSpeechFinished?.Invoke();
             speakingRoutine = null;
+        }
+
+        private void OnDisable()
+        {
+            StopCurrentRoutine();
+            StopSpeaking();
+            if (animaleseVoice != null)
+            {
+                animaleseVoice.StopBabble();
+            }
         }
 
         private void EnsureSpeechBubble()

@@ -37,7 +37,7 @@ public class FireHoseController : MonoBehaviour
         sfxAudioSource.playOnAwake = false;
         sfxAudioSource.loop = true;
         sfxAudioSource.spatialBlend = 1f;
-        sfxAudioSource.volume = 0.4f;
+        sfxAudioSource.volume = 0.22f;
 
         if (sfxAudioSource.clip == null)
         {

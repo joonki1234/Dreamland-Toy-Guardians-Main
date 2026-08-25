@@ -73,7 +73,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
     private float footstepInterval = 0.45f;
 
     [SerializeField, Range(0f, 1f)]
-    private float footstepVolume = 0.35f;
+    private float footstepVolume = 0.2f;
 
 
     private CharacterController _cc;

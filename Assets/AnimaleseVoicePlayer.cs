@@ -12,6 +12,10 @@ using UnityEngine;
 [RequireComponent(typeof(AudioSource))]
 public class AnimaleseVoicePlayer : MonoBehaviour
 {
+    [Tooltip("비워두면 voiceName의 Resources 폴더를 사용합니다. Lobby ToyFriend와 통일할 때는 Lobby의 클립을 직접 연결합니다.")]
+    [SerializeField]
+    private AudioClip[] voiceClips;
+
     [Tooltip("Assets/Audio/Resources/Voice/Animalese/ 아래 폴더 이름")]
     [SerializeField]
     private string voiceName = "robot";
@@ -37,6 +41,9 @@ public class AnimaleseVoicePlayer : MonoBehaviour
     private AudioClip[] _clips;
     private Coroutine _routine;
 
+    [SerializeField, Min(1)]
+    private int characterStep = 2;
+
     private void Awake()
     {
         _audioSource = GetComponent<AudioSource>();
@@ -52,7 +59,9 @@ public class AnimaleseVoicePlayer : MonoBehaviour
 
     private void LoadClips()
     {
-        _clips = Resources.LoadAll<AudioClip>("Voice/Animalese/" + voiceName);
+        _clips = voiceClips != null && voiceClips.Length > 0
+            ? voiceClips
+            : Resources.LoadAll<AudioClip>("Voice/Animalese/" + voiceName);
 
         if (_clips == null || _clips.Length == 0)
         {
@@ -75,6 +84,19 @@ public class AnimaleseVoicePlayer : MonoBehaviour
         _routine = StartCoroutine(BabbleRoutine(duration));
     }
 
+    /// <summary>LobbyContactController와 같은 방식으로 유효 문자 두 글자마다 한 음절을 재생합니다.</summary>
+    public void PlayForText(string text, float characterInterval)
+    {
+        StopBabble();
+
+        if (_clips == null || _clips.Length == 0 || string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        _routine = StartCoroutine(TextRoutine(text, characterInterval));
+    }
+
     public void StopBabble()
     {
         if (_routine != null)
@@ -83,7 +105,7 @@ public class AnimaleseVoicePlayer : MonoBehaviour
             _routine = null;
         }
 
-        if (_audioSource.isPlaying)
+        if (_audioSource != null && _audioSource.isPlaying)
         {
             _audioSource.Stop();
         }
@@ -102,6 +124,12 @@ public class AnimaleseVoicePlayer : MonoBehaviour
 
         while (elapsed < duration)
         {
+            if (_audioSource == null)
+            {
+                _routine = null;
+                yield break;
+            }
+
             AudioClip clip = _clips[Random.Range(0, _clips.Length)];
 
             _audioSource.pitch = Random.Range(pitchRange.x, pitchRange.y);
@@ -114,5 +142,79 @@ public class AnimaleseVoicePlayer : MonoBehaviour
         }
 
         _routine = null;
+    }
+
+    private IEnumerator TextRoutine(string text, float characterInterval)
+    {
+        int spokenCharacterCount = 0;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            char character = text[i];
+
+            if (!char.IsWhiteSpace(character) &&
+                character != ',' && character != '.' &&
+                character != '!' && character != '?' && character != '…')
+            {
+                spokenCharacterCount++;
+
+                if (spokenCharacterCount % Mathf.Max(1, characterStep) == 0)
+                {
+                    PlaySyllable();
+                }
+            }
+
+            yield return new WaitForSeconds(Mathf.Max(0.001f, characterInterval));
+
+            if (character == ',')
+            {
+                yield return new WaitForSeconds(0.14f);
+            }
+            else if (character == '.' || character == '!' || character == '?')
+            {
+                yield return new WaitForSeconds(0.25f);
+            }
+        }
+
+        _routine = null;
+    }
+
+    private void PlaySyllable()
+    {
+        if (_audioSource == null || _clips == null || _clips.Length == 0)
+        {
+            return;
+        }
+
+        AudioClip clip = null;
+        int startIndex = Random.Range(0, _clips.Length);
+
+        for (int i = 0; i < _clips.Length; i++)
+        {
+            AudioClip candidate = _clips[(startIndex + i) % _clips.Length];
+            if (candidate != null)
+            {
+                clip = candidate;
+                break;
+            }
+        }
+
+        if (clip == null)
+        {
+            return;
+        }
+
+        _audioSource.pitch = Random.Range(
+            Mathf.Min(pitchRange.x, pitchRange.y),
+            Mathf.Max(pitchRange.x, pitchRange.y));
+        // LobbyContactController의 AudioSource(volume 1) + PlayOneShot(volume 0.5)와
+        // 최종 게인이 같도록 source volume은 1로 두고 volumeScale만 적용합니다.
+        _audioSource.volume = 1f;
+        _audioSource.PlayOneShot(clip, volume);
+    }
+
+    private void OnDisable()
+    {
+        StopBabble();
     }
 }

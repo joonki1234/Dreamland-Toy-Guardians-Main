@@ -5,6 +5,8 @@ using UnityEngine;
 
 public class LobbyContactController : MonoBehaviour
 {
+    public static bool IsJobDialoguePhase { get; private set; }
+
     [Header("로비 UI 연결")]
     [SerializeField]
     private GameObject contactDialoguePanel;
@@ -91,9 +93,22 @@ public class LobbyContactController : MonoBehaviour
     private Coroutine bgmRestoreRoutine;
     private bool hasStarted;
     private Action onDialogueAppeared;
+    private ToyFriendDialogueHUD sharedDialogueHud;
 
     private void Awake()
     {
+        IsJobDialoguePhase = false;
+        sharedDialogueHud = ToyFriendDialogueHUD.GetOrCreate();
+        if (sharedDialogueHud != null)
+        {
+            contactMessageText = sharedDialogueHud.DialogueText;
+        }
+
+        if (dialogueVoiceAudioSource != null)
+        {
+            dialogueVoiceAudioSource.playOnAwake = false;
+        }
+
         dialogueLines = new[]
         {
             "드디어 연결됐어!",
@@ -137,6 +152,9 @@ public class LobbyContactController : MonoBehaviour
             jobDescriptionPanel.SetActive(false);
         }
 
+        IsJobDialoguePhase = false;
+        sharedDialogueHud?.Hide();
+
         if (jobSelectPanel != null)
         {
             jobSelectPanel.SetActive(false);
@@ -176,7 +194,7 @@ public class LobbyContactController : MonoBehaviour
             {
                 contactAudioSource.Play();
 
-                while (contactAudioSource.isPlaying)
+                while (contactAudioSource != null && contactAudioSource.isPlaying)
                 {
                     yield return null;
                 }
@@ -203,10 +221,12 @@ public class LobbyContactController : MonoBehaviour
             yield return new WaitForSeconds(postContactDelay);
         }
 
-        if (contactDialoguePanel != null)
+        if (sharedDialogueHud == null && contactDialoguePanel != null)
         {
             contactDialoguePanel.SetActive(true);
         }
+
+        sharedDialogueHud?.Show(string.Empty);
 
         onDialogueAppeared?.Invoke();
         onDialogueAppeared = null;
@@ -226,15 +246,23 @@ public class LobbyContactController : MonoBehaviour
             contactDialoguePanel.SetActive(false);
         }
 
+        sharedDialogueHud?.Hide();
+
         if (jobSelectPanel != null)
         {
             jobSelectPanel.SetActive(true);
         }
 
-        if (jobDescriptionPanel != null)
+        // 기존 구조에서 JobDescriptionPanel이 활성화되던 바로 이 시점부터만
+        // LobbySelectionController가 공통 DialogueText를 갱신할 수 있습니다.
+        IsJobDialoguePhase = true;
+
+        if (sharedDialogueHud == null && jobDescriptionPanel != null)
         {
             jobDescriptionPanel.SetActive(true);
         }
+
+        sharedDialogueHud?.Show(contactMessageText != null ? contactMessageText.text : string.Empty);
 
         if (jobSelectOpenAudioSource != null)
         {
@@ -249,10 +277,22 @@ public class LobbyContactController : MonoBehaviour
     {
         if (contactAudioSource != null)
         {
-            while (contactAudioSource.isPlaying)
+            while (contactAudioSource != null && contactAudioSource.isPlaying)
             {
                 yield return null;
+
+                if (contactAudioSource == null)
+                {
+                    bgmRestoreRoutine = null;
+                    yield break;
+                }
             }
+        }
+
+        if (lobbyBGM == null)
+        {
+            bgmRestoreRoutine = null;
+            yield break;
         }
 
         yield return FadeBGMVolume(
@@ -388,6 +428,11 @@ public class LobbyContactController : MonoBehaviour
         float startVolume,
         float targetVolume)
     {
+        if (lobbyBGM == null)
+        {
+            yield break;
+        }
+
         if (bgmFadeDuration <= 0f)
         {
             lobbyBGM.volume = targetVolume;
@@ -398,6 +443,11 @@ public class LobbyContactController : MonoBehaviour
 
         while (elapsed < bgmFadeDuration)
         {
+            if (lobbyBGM == null)
+            {
+                yield break;
+            }
+
             elapsed += Time.deltaTime;
             lobbyBGM.volume = Mathf.Lerp(
                 startVolume,
@@ -408,11 +458,22 @@ public class LobbyContactController : MonoBehaviour
             yield return null;
         }
 
+        if (lobbyBGM == null)
+        {
+            yield break;
+        }
+
         lobbyBGM.volume = targetVolume;
     }
 
     private void OnDisable()
     {
+        IsJobDialoguePhase = false;
+        if (dialogueVoiceAudioSource != null)
+        {
+            dialogueVoiceAudioSource.Stop();
+        }
+
         if (contactRoutine != null)
         {
             StopCoroutine(contactRoutine);

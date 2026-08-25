@@ -68,7 +68,7 @@ namespace DreamGuardians
         private AudioClip headbuttAttackSfx;
 
         [SerializeField, Range(0f, 1f)]
-        private float headbuttAttackSfxVolume = 0.5f;
+        private float headbuttAttackSfxVolume = 0.35f;
 
         private static AudioClip cachedHeadbuttAttackSfx;
         private const string HeadbuttAttackSfxResourcePath = "SFX/Enemy/attack_melee";

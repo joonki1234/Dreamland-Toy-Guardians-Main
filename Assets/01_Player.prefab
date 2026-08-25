@@ -182,7 +182,7 @@ AudioListener:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 538180537429002746}
-  m_Enabled: 1
+  m_Enabled: 0
 --- !u!114 &317787550852479964
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15534,7 +15534,7 @@ MonoBehaviour:
   throwForce: 50
   builderCooldown: 0.3
   dirtThrowSfx: {fileID: 0}
-  dirtThrowVolume: 0.5
+  dirtThrowVolume: 0.35
   dirtShardCount: 6
   horizontalSpreadAngle: 12
   verticalSpreadAngle: 5
@@ -15692,7 +15692,7 @@ MonoBehaviour:
   playerCamera: {fileID: 1580302067779740869}
   audioListener: {fileID: 3348426691839170231}
   footstepInterval: 0.45
-  footstepVolume: 0.35
+  footstepVolume: 0.2
 --- !u!114 &6807834408968592922
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15761,11 +15761,11 @@ MonoBehaviour:
     lightningRefreshInterval: 0.08
     lightningBeamWidth: 0.18
     electricCrackSound: {fileID: 8300000, guid: 847a3069b5d3f5d43ad02e84ee55f851, type: 3}
-    electricCrackVolume: 1
+    electricCrackVolume: 0.45
     electricImpactSound: {fileID: 8300000, guid: 1dabd037812bed242babbe28c8d4679d, type: 3}
-    electricImpactVolume: 1
+    electricImpactVolume: 0.48
     electricFireSound: {fileID: 8300000, guid: f1cb5d83282f2904a85f73111d068616, type: 3}
-    electricFireVolume: 1
+    electricFireVolume: 0.22
     electricSoundMinDistance: 7
     electricSoundMaxDistance: 25
   firefighterSkill:
@@ -15789,11 +15789,11 @@ MonoBehaviour:
       m_Bits: 128
     truckDamage: 50
     sirenSound: {fileID: 8300000, guid: 74c46c75481843709fc64f3c3f8d8e77, type: 3}
-    sirenVolume: 0.8
+    sirenVolume: 0.22
     spawnSound: {fileID: 8300000, guid: e90356b5de6545bc96af89538e22911c, type: 3}
-    spawnSoundVolume: 1
+    spawnSoundVolume: 0.45
     impactSound: {fileID: 8300000, guid: 08e7f7c112ca4a7bb368ac19c74035aa, type: 3}
-    impactVolume: 1
+    impactVolume: 0.48
     impactSoundMinInterval: 0.1
     audioMinDistance: 3
     audioMaxDistance: 30
@@ -15822,16 +15822,16 @@ MonoBehaviour:
       serializedVersion: 2
       m_Bits: 128
     fallSound: {fileID: 8300000, guid: 415881cda1d44d6e8e5c69e3ffc8c2ff, type: 3}
-    fallSoundVolume: 0.8
+    fallSoundVolume: 0.22
     fallPitchMin: 0.9
     fallPitchMax: 1.15
     audioMinDistance: 3
     audioMaxDistance: 30
     audioDopplerLevel: 0.1
     landingSound: {fileID: 0}
-    landingSoundVolume: 1
+    landingSoundVolume: 0.42
     explosionSound: {fileID: 8300000, guid: 457ec8ecacd74fc397248e555d7ee5f7, type: 3}
-    explosionSoundVolume: 1
+    explosionSoundVolume: 0.5
   builderSkill:
     animatedHammerPrefab: {fileID: 100000, guid: a890938d72bf42d4ad133e8cb0917580, type: 3}
     hammerAnimationClip: {fileID: -623603649343465320, guid: b4725ca5b4327254699522e21d12b348, type: 3}
@@ -15924,9 +15924,9 @@ MonoBehaviour:
     knockbackForce: 4.5
     knockbackDuration: 0.3
     hammerImpactSound: {fileID: 8300000, guid: 86b2e046fb5b5f14594d2d65da1d5935, type: 3}
-    hammerImpactVolume: 0.35
+    hammerImpactVolume: 0.42
     boomImpactSound: {fileID: 8300000, guid: 6ab50ec821923f64e89191e1d7caea1c, type: 3}
-    boomImpactVolume: 1
+    boomImpactVolume: 0.5
     boomImpactDelay: 0.02
     audioMinDistance: 3
     audioMaxDistance: 30
@@ -17084,7 +17084,7 @@ MonoBehaviour:
   muzzleFlashLight: {fileID: 8603577484441096663}
   flashDuration: 0.05
   gunShotSfx: {fileID: 0}
-  gunShotVolume: 0.5
+  gunShotVolume: 0.35
 --- !u!4 &1787123878137854913 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 975f39bd024bb824990302eff7e92d8f, type: 3}

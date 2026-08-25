@@ -91,7 +91,7 @@ public class LobbySelectionController : MonoBehaviour
     [Header("전원 준비 완료 후 카운트다운")]
     [Tooltip("모든 플레이어가 준비를 마치면 이 시간(초) 후 자동으로 맵으로 이동합니다.")]
     [SerializeField, Min(1f)]
-    private float readyCountdownSeconds = 30f;
+    private float readyCountdownSeconds = 5f;
 
     [Header("직업 버튼 색상")]
     [Tooltip("아직 선택되지 않은 직업 버튼의 기본 색상입니다.")]
@@ -122,9 +122,17 @@ public class LobbySelectionController : MonoBehaviour
     private bool isCountdownActive;
     private float countdownRemaining;
     private Sprite defaultPortraitSprite;
+    private ToyFriendDialogueHUD sharedDialogueHud;
 
     private void Awake()
     {
+        sharedDialogueHud = ToyFriendDialogueHUD.GetOrCreate();
+        if (sharedDialogueHud != null)
+        {
+            jobDescriptionText = sharedDialogueHud.DialogueText;
+            toyfriendPortrait = sharedDialogueHud.Portrait;
+        }
+
         if (toyfriendPortrait != null)
         {
             defaultPortraitSprite =
@@ -315,6 +323,13 @@ public class LobbySelectionController : MonoBehaviour
                 $"선택한 직업: {(hasJob ? GetJobName(job) : "없음")}";
         }
 
+        // 공통 HUD 이전에는 JobDescriptionPanel이 비활성인 동안 별도 Text가
+        // 배경 설명에 영향을 줄 수 없었습니다. 같은 진행 경계를 그대로 복원합니다.
+        if (!LobbyContactController.IsJobDialoguePhase)
+        {
+            return;
+        }
+
         // 새로 추가한 Toyfriend 말풍선 설명
         if (jobDescriptionText != null)
         {
@@ -338,10 +353,11 @@ public class LobbySelectionController : MonoBehaviour
             // Update()에서 매 프레임 호출되므로, 문구가 실제로 바뀌었을 때만
             // 중얼거림 보이스를 재생한다 (매 프레임 재생되는 것을 방지).
             if (robotVoice != null &&
+                jobDescriptionText.gameObject.activeInHierarchy &&
                 description != lastSpokenDescription)
             {
                 lastSpokenDescription = description;
-                robotVoice.PlayBabbleForDuration(robotVoiceDuration);
+                robotVoice.PlayForText(description, 0.055f);
             }
         }
 
@@ -604,6 +620,7 @@ public class LobbySelectionController : MonoBehaviour
         )
         {
             isCountdownActive = false;
+            countdownRemaining = readyCountdownSeconds;
         }
 
         if (!isCountdownActive)
@@ -618,7 +635,7 @@ public class LobbySelectionController : MonoBehaviour
         {
             int secondsLeft =
                 Mathf.Max(
-                    0,
+                    1,
                     Mathf.CeilToInt(
                         countdownRemaining
                     )
@@ -741,6 +758,11 @@ public class LobbySelectionController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (robotVoice != null)
+        {
+            robotVoice.StopBabble();
+        }
+
         if (policeButton != null)
         {
             policeButton.onClick.RemoveAllListeners();

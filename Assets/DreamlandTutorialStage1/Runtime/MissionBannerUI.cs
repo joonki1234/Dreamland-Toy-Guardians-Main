@@ -44,6 +44,7 @@ namespace DreamGuardians
         [SerializeField] private Sprite waveGlassPanel;
 
         private Canvas canvas;
+        private Canvas topHudCanvas;
         private static Font runtimeFont;
 
         private GameObject bannerPanel;
@@ -813,18 +814,19 @@ namespace DreamGuardians
 
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            // 녹화 영상처럼 4:3에 가까운 Game View와 16:9 HMD 출력 모두에서
-            // HUD가 지나치게 작아지지 않도록 조금 더 세로 친화적인 기준을 사용합니다.
             scaler.referenceResolution = new Vector2(1600f, 1000f);
+            // ToyFriendComms를 포함한 기존 비상단 HUD의 화면 크기/위치를 보존합니다.
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.58f;
 
             ApplyCamera();
             RectTransform root = canvasObject.GetComponent<RectTransform>();
+            RectTransform topHudRoot = CreateTopHudRoot();
 
             BuildBanner(root);
-            BuildMissionPanel(root);
-            BuildCombatPanel(root);
-            BuildWaveCountdownPanel(root);
+            BuildMissionPanel(topHudRoot);
+            BuildCombatPanel(topHudRoot);
+            BuildWaveCountdownPanel(topHudRoot);
             BuildRolePanel(root);
             BuildBossPanel(root);
             BuildGuidePanel(root);
@@ -834,6 +836,45 @@ namespace DreamGuardians
             {
                 rolePanel.SetActive(false);
             }
+        }
+
+        private RectTransform CreateTopHudRoot()
+        {
+            GameObject canvasObject = new GameObject(
+                "DreamlandResponsiveTopHUD",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler));
+            canvasObject.transform.SetParent(transform, false);
+
+            topHudCanvas = canvasObject.GetComponent<Canvas>();
+            topHudCanvas.renderMode = RenderMode.ScreenSpaceCamera;
+            topHudCanvas.worldCamera = canvas != null ? canvas.worldCamera : uiCamera;
+            topHudCanvas.planeDistance = canvas != null ? canvas.planeDistance : 1f;
+            topHudCanvas.sortingOrder = 1001;
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1600f, 1000f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+
+            RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+            return CreateStretchRoot("TopHudSafeArea", canvasRect);
+        }
+
+        private static RectTransform CreateStretchRoot(string objectName, RectTransform parent)
+        {
+            GameObject rootObject = new GameObject(objectName, typeof(RectTransform));
+            rootObject.transform.SetParent(parent, false);
+
+            RectTransform rect = rootObject.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.localScale = Vector3.one;
+            return rect;
         }
 
         private void BuildBanner(RectTransform root)
@@ -1348,6 +1389,11 @@ namespace DreamGuardians
 
             canvas.worldCamera = uiCamera;
             canvas.planeDistance = 1.2f;
+            if (topHudCanvas != null)
+            {
+                topHudCanvas.worldCamera = uiCamera;
+                topHudCanvas.planeDistance = 1.2f;
+            }
         }
 
         private static GameObject CreatePanel(

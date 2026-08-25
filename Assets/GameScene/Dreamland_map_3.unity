@@ -30499,6 +30499,8 @@ MonoBehaviour:
   battleBgm: {fileID: 0}
   musicVolume: 0.25
   crossfadeDuration: 1.5
+  dialogueDuckRatio: 0.55
+  dialogueDuckFadeDuration: 0.3
 --- !u!82 &3954893561723225639
 AudioSource:
   m_ObjectHideFlags: 0
@@ -30804,11 +30806,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5843551df73840e497005fcfb37e0253, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  voiceClips:
+  - {fileID: 8300000, guid: ca91581f6a1017b499b2ea677f9e8659, type: 3}
+  - {fileID: 8300000, guid: 0ef90a5b217c9fa4b8bca1898a064bd6, type: 3}
+  - {fileID: 8300000, guid: 6e3242aa26749d6438d5b92e0ba39909, type: 3}
+  - {fileID: 8300000, guid: c040180201eb1484b90c374d10aaa292, type: 3}
+  - {fileID: 8300000, guid: 44f91dba3b2f11a40820346964bef208, type: 3}
   voiceName: robot
   syllableInterval: 0.08
-  pitchRange: {x: 0.92, y: 1.08}
-  volume: 0.85
-  spatialBlend: 0.15
+  pitchRange: {x: 1.5, y: 1.9}
+  volume: 0.5
+  spatialBlend: 0
+  characterStep: 2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

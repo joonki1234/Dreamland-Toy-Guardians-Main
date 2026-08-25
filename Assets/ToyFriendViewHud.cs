@@ -25,9 +25,13 @@ public class ToyFriendViewHud : MonoBehaviour
     [SerializeField]
     private TMP_Text messageText;
 
+    private ToyFriendDialogueHUD sharedDialogueHud;
+
     private void Awake()
     {
         Instance = this;
+
+        sharedDialogueHud = ToyFriendDialogueHUD.GetOrCreate();
 
         if (bubbleRoot != null)
         {
@@ -45,6 +49,12 @@ public class ToyFriendViewHud : MonoBehaviour
 
     public void ShowMessage(string message)
     {
+        if (sharedDialogueHud != null)
+        {
+            sharedDialogueHud.Show(message);
+            return;
+        }
+
         if (messageText != null)
         {
             messageText.text = message ?? string.Empty;
@@ -58,6 +68,12 @@ public class ToyFriendViewHud : MonoBehaviour
 
     public void Hide()
     {
+        if (sharedDialogueHud != null)
+        {
+            sharedDialogueHud.Hide();
+            return;
+        }
+
         if (bubbleRoot != null)
         {
             bubbleRoot.SetActive(false);

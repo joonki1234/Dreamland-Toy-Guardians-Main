@@ -63,7 +63,7 @@ public sealed class ChefSkill : IJobSkill
 
     [Header("낙하 사운드")]
     [SerializeField] private AudioClip fallSound;
-    [Range(0f, 1f)] [SerializeField] private float fallSoundVolume = 0.8f;
+    [Range(0f, 1f)] [SerializeField] private float fallSoundVolume = 0.22f;
     [Range(0.01f, 3f)] [SerializeField] private float fallPitchMin = 0.9f;
     [Range(0.01f, 3f)] [SerializeField] private float fallPitchMax = 1.15f;
     [FormerlySerializedAs("fallAudioMinDistance")]
@@ -75,11 +75,11 @@ public sealed class ChefSkill : IJobSkill
     [Header("착탄 사운드")]
     [FormerlySerializedAs("impactSound")]
     [SerializeField] private AudioClip landingSound;
-    [Range(0f, 1f)] [SerializeField] private float landingSoundVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float landingSoundVolume = 0.42f;
 
     [Header("폭발 사운드")]
     [SerializeField] private AudioClip explosionSound;
-    [Range(0f, 1f)] [SerializeField] private float explosionSoundVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float explosionSoundVolume = 0.5f;
 
     public void Execute(JobSkillContext context)
     {

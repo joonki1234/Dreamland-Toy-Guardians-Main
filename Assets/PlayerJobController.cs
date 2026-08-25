@@ -53,7 +53,7 @@ public class PlayerJobController : NetworkBehaviour
     public AudioClip dirtThrowSfx;
 
     [Range(0f, 1f)]
-    public float dirtThrowVolume = 0.5f;
+    public float dirtThrowVolume = 0.35f;
 
     private static AudioClip cachedDirtThrowSfx;
     private const string DirtThrowSfxResourcePath = "SFX/Builder/dirt_throw";

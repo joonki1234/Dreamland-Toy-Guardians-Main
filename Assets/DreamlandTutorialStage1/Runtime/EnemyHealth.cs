@@ -13,7 +13,7 @@ namespace DreamGuardians
 
         // 몬스터 사망 시 재생할 효과음. 비워두면 Resources/SFX/Enemy/death를 자동으로 불러온다.
         [SerializeField] private AudioClip deathSfx;
-        [SerializeField, Range(0f, 1f)] private float deathSfxVolume = 0.7f;
+        [SerializeField, Range(0f, 1f)] private float deathSfxVolume = 0.45f;
         private static AudioClip cachedDeathSfx;
         private const string DeathSfxResourcePath = "SFX/Enemy/death";
 

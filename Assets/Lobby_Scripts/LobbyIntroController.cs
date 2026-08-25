@@ -361,6 +361,12 @@ public class LobbyIntroController : MonoBehaviour
 
     private IEnumerator FadeInBGMRoutine()
     {
+        if (lobbyBGM == null)
+        {
+            bgmFadeRoutine = null;
+            yield break;
+        }
+
         // 처음에는 무음
         lobbyBGM.volume = 0f;
 
@@ -376,6 +382,12 @@ public class LobbyIntroController : MonoBehaviour
 
         while (elapsed < bgmFadeInDuration)
         {
+            if (lobbyBGM == null)
+            {
+                bgmFadeRoutine = null;
+                yield break;
+            }
+
             elapsed += Time.deltaTime;
 
             lobbyBGM.volume =
@@ -388,6 +400,11 @@ public class LobbyIntroController : MonoBehaviour
             yield return null;
         }
 
+        if (lobbyBGM == null)
+        {
+            bgmFadeRoutine = null;
+            yield break;
+        }
 
         // 마지막 값 정확하게 맞추기
         lobbyBGM.volume =
