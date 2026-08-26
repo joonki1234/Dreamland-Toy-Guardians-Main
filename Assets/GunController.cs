@@ -26,6 +26,9 @@ public class GunController : MonoBehaviour
     [Tooltip("총알 한 발의 피해량")]
     public float bulletDamage = 10f;
 
+    [Tooltip("연속 발사 사이의 최소 간격")]
+    public float fireInterval = 0.25f;
+
     [Tooltip("총알이 자동으로 사라지는 시간")]
     public float bulletLifetime = 3f;
 
@@ -70,6 +73,7 @@ public class GunController : MonoBehaviour
 
 
     private Coroutine flashCoroutine;
+    private float nextFireTime;
 
     private static int nextPoliceShotId =
         500000;
@@ -104,6 +108,11 @@ public class GunController : MonoBehaviour
 
     private void Shoot()
     {
+        if (Time.time < nextFireTime)
+        {
+            return;
+        }
+
         if (bulletPrefab == null)
         {
             Debug.LogWarning(
@@ -178,6 +187,8 @@ public class GunController : MonoBehaviour
             bulletDamage,
             nextPoliceShotId++
         );
+
+        nextFireTime = Time.time + fireInterval;
 
         IgnorePlayerCollision(bullet);
 
@@ -368,6 +379,9 @@ public class GunController : MonoBehaviour
 
         bulletDamage =
             Mathf.Max(0f, bulletDamage);
+
+        fireInterval =
+            Mathf.Max(0.02f, fireInterval);
 
         bulletLifetime =
             Mathf.Max(0.1f, bulletLifetime);

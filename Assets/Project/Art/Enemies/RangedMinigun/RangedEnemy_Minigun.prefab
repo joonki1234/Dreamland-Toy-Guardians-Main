@@ -92,7 +92,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.RangedMinigunEnemy
   attackRange: 7
   moveSpeed: 0.32
-  coreDamage: 1
+  coreDamage: 4.5
   attackInterval: 1
   firstShotDelay: 0.2
   bulletSpeed: 16

@@ -2,6 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEngine.InputSystem;
+#endif
 
 namespace DreamGuardians
 {
@@ -149,6 +152,8 @@ namespace DreamGuardians
         private bool allWaveSpawnsCompleted;
         private bool combatCompleted;
         private bool failed;
+        private bool isWaveCombatActive;
+        private bool isSkippingCurrentWave;
 
         /// <summary>
         /// 4방향(Portal A~D + Road_1~4)을 한 번에 여는 준비 단계 값입니다.
@@ -240,6 +245,18 @@ namespace DreamGuardians
                 ResetRuntimeState();
             }
         }
+
+
+#if UNITY_EDITOR
+        private void Update()
+        {
+            if (Keyboard.current != null &&
+                Keyboard.current.f8Key.wasPressedThisFrame)
+            {
+                TrySkipCurrentWaveForTest();
+            }
+        }
+#endif
 
 
         public void Configure(
@@ -501,6 +518,7 @@ namespace DreamGuardians
                  * 마지막인 적 스폰을 여기에서 시작합니다.
                  */
                 runningSpawnRoutineCount++;
+                isWaveCombatActive = true;
                 Debug.Log(
                     $"[Dreamland] Stage 1 {group.label} 스폰 시작. " +
                     $"포탈과 길 준비 완료 후 " +
@@ -526,6 +544,9 @@ namespace DreamGuardians
                  * 해당 공격이 종료되고 다음 단계로 넘어갑니다.
                  */
                 yield return WaitForWaveClear(index);
+
+                isWaveCombatActive = false;
+                isSkippingCurrentWave = false;
 
 
                 if (failed)
@@ -891,6 +912,25 @@ namespace DreamGuardians
         }
 
 
+        private void TrySkipCurrentWaveForTest()
+        {
+            if (waveRoutine == null || failed || combatCompleted ||
+                !isWaveCombatActive || isSkippingCurrentWave || spawner == null)
+            {
+                return;
+            }
+
+            isSkippingCurrentWave = true;
+            spawner.CancelCurrentSpawnRoutinesForTest();
+            spawner.DespawnAllEnemiesImmediately();
+
+            Debug.Log(
+                "[Dreamland][TEST] F8: 현재 Stage 1 공세의 " +
+                "추가 스폰과 전투만 즉시 완료합니다.",
+                this);
+        }
+
+
         /// <summary>
         /// SpawnWaveGroup()이 적을 하나씩 순차 생성하는 동안(간격 때문에
         /// 수십 초 걸릴 수 있음) "전장 악몽" 표시를 계속 갱신한다.
@@ -1241,6 +1281,8 @@ namespace DreamGuardians
             allWaveSpawnsCompleted = false;
             combatCompleted = false;
             failed = false;
+            isWaveCombatActive = false;
+            isSkippingCurrentWave = false;
 
             waitingPreparationStep = -1;
             preparationCompleted = false;

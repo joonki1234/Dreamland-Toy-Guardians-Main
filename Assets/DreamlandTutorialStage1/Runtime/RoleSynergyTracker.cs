@@ -11,27 +11,15 @@ namespace DreamGuardians
         private float triggerWindow = 3f;
 
         [SerializeField, Min(0f)]
-        private float cooldown = 5f;
+        private float cooldown = 2.5f;
 
 
         [Header("경찰 + 소방관")]
         [SerializeField, Min(0f)]
-        private float emergencyBonusDamage = 20f;
+        private float emergencyBonusDamage = 30f;
 
         [SerializeField, Min(0f)]
-        private float emergencyStunDuration = 2f;
-
-
-        [Header("요리사 + 건축가")]
-        [SerializeField, Min(0f)]
-        private float chefBuilderBonusDamage = 15f;
-
-        [SerializeField, Min(1f)]
-        private float chefBuilderDamageMultiplier = 1.25f;
-
-        [SerializeField, Min(0f)]
-        private float chefBuilderDuration = 4f;
-
+        private float emergencyStunDuration = 1f;
 
         private readonly Dictionary<PlayerRole, float> lastHitTimes =
             new Dictionary<PlayerRole, float>();
@@ -39,25 +27,15 @@ namespace DreamGuardians
         private readonly Dictionary<SynergyKind, float> lastTriggerTimes =
             new Dictionary<SynergyKind, float>();
 
-        [Header("Chef + Architect (Prototype - 상세 효과 추후 확정)")]
-        [SerializeField, Min(0f)] private float starlightBonusDamage = 15f;
-        [SerializeField, Min(1f)] private float starlightDamageMultiplier = 1.25f;
-        [SerializeField, Min(0f)] private float starlightDuration = 4f;
-
         private EnemyHealth owner;
         private EnemyCoreMover mover;
 
-        private float vulnerableUntil;
-
 
         /// <summary>
-        /// 요리사 + 건축가 시너지가 발동한 동안
-        /// 해당 적이 추가로 받는 피해 배율이다.
+        /// 현재 적 피격 기반 시너지는 받는 피해 배율을 변경하지 않는다.
+        /// Chef + Builder 공식 시너지는 MudSplatSynergy가 처리한다.
         /// </summary>
-        public float CurrentDamageMultiplier =>
-            Time.time < vulnerableUntil
-                ? Mathf.Max(1f, chefBuilderDamageMultiplier)
-                : 1f;
+        public float CurrentDamageMultiplier => 1f;
 
 
         private void Awake()
@@ -88,28 +66,14 @@ namespace DreamGuardians
                     SynergyKind.EmergencySuppression,
                     PlayerRole.Police,
                     PlayerRole.Firefighter,
-                    emergencyBonusDamage,
+                    GetAdjustedBonusDamage(emergencyBonusDamage),
                     now),
 
                 PlayerRole.Firefighter => TryTrigger(
                     SynergyKind.EmergencySuppression,
                     PlayerRole.Police,
                     PlayerRole.Firefighter,
-                    emergencyBonusDamage,
-                    now),
-
-                PlayerRole.Chef => TryTrigger(
-                    SynergyKind.ChefArchitectCombo,
-                    PlayerRole.Chef,
-                    PlayerRole.Architect,
-                    chefBuilderBonusDamage,
-                    now),
-
-                PlayerRole.Architect => TryTrigger(
-                    SynergyKind.ChefArchitectCombo,
-                    PlayerRole.Chef,
-                    PlayerRole.Architect,
-                    chefBuilderBonusDamage,
+                    GetAdjustedBonusDamage(emergencyBonusDamage),
                     now),
 
                 _ => SynergyResult.None
@@ -179,14 +143,20 @@ namespace DreamGuardians
                     mover ??= GetComponent<EnemyCoreMover>();
 
                     mover?.ApplyStun(
-                        emergencyStunDuration
+                        emergencyStunDuration * (IsBoss() ? 0.35f : 1f)
                     );
                     break;
-
-                case SynergyKind.ChefArchitectCombo:
-                    vulnerableUntil = Mathf.Max(vulnerableUntil, Time.time + starlightDuration);
-                    break;
             }
+        }
+
+        private float GetAdjustedBonusDamage(float bonusDamage)
+        {
+            return bonusDamage * (IsBoss() ? 0.45f : 1f);
+        }
+
+        private bool IsBoss()
+        {
+            return GetComponent<FinalBossAttackController>() != null;
         }
 
 
@@ -202,15 +172,6 @@ namespace DreamGuardians
                 cooldown
             );
 
-            chefBuilderDamageMultiplier = Mathf.Max(
-                1f,
-                chefBuilderDamageMultiplier
-            );
-
-            chefBuilderDuration = Mathf.Max(
-                0f,
-                chefBuilderDuration
-            );
         }
     }
 }

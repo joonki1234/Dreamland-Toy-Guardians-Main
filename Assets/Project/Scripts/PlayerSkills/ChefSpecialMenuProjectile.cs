@@ -367,8 +367,16 @@ public sealed class ChefSpecialMenuProjectile : MonoBehaviour
             }
 
             int shotId = nextShotId++;
+            Vector3 horizontalOffset = enemy.transform.position - targetPoint;
+            horizontalOffset.y = 0f;
+            float distanceRatio = Mathf.Clamp01(
+                horizontalOffset.magnitude / explosionRadius);
+            float radialDamage = explosionDamage * Mathf.Lerp(
+                1f,
+                0.5f,
+                distanceRatio);
             DamageInfo damageInfo = new DamageInfo(
-                explosionDamage,
+                radialDamage,
                 "CHEF_SPECIAL_MENU_SKILL",
                 PlayerRole.Chef,
                 shotId,

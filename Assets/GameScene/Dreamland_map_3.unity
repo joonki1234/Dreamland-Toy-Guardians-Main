@@ -28373,8 +28373,8 @@ MonoBehaviour:
   bossFocusTreeHideRadius: 20
   bossSpawnShakeDuration: 0.58
   bossSpawnShakeStrength: 0.085
-  bossMaxHealth: 500
-  bossCoreDamage: 20
+  bossMaxHealth: 7600
+  bossCoreDamage: 21
   bossAttackInterval: 2.5
   firstAttackDelay: 4
   rangedEnemyPrefab: {fileID: 4376583669907981605, guid: 16e7f714445272c47af28662cf414ae5, type: 3}
@@ -30314,7 +30314,7 @@ MonoBehaviour:
   moveSpeed: 0.35
   attackRingRadius: 4.2
   attackSlotSpreadAngle: 12
-  coreDamage: 1
+  coreDamage: 6
   attackInterval: 1.5
   useFloorRift: 1
   enemyGroundOffset: 0.8

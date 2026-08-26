@@ -59,6 +59,9 @@ public sealed class ToyFriendDialogueHUD : MonoBehaviour
     {
         if (dialogueText != null)
         {
+            // The lobby intro types into this shared TMP object by changing
+            // maxVisibleCharacters. Static messages must clear that leftover limit.
+            dialogueText.maxVisibleCharacters = int.MaxValue;
             dialogueText.text = message ?? string.Empty;
         }
 

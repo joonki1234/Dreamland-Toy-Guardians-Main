@@ -316,7 +316,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 94863e93a7d152a4e885096eb717de05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MudSplatSynergy
-  activationDelay: 0.4
+  lureStartDelay: 0.1
+  lureRadius: 5
+  lureDuration: 2
   explosionRadius: 2
   explosionDamage: 30
   explosionEffectPrefab: {fileID: 4994997792314849709, guid: 3dd50886582244645be87adb42aa8528, type: 3}

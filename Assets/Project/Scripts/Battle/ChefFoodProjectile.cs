@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using DreamGuardians;
 
@@ -10,7 +11,9 @@ using DreamGuardians;
 public class ChefFoodProjectile : MonoBehaviour
 {
     [Header("공격 설정")]
-    [SerializeField] private float damage = 10f;
+    [SerializeField] private float damage = 14f;
+    [SerializeField, Min(0f)] private float splashDamage = 7f;
+    [SerializeField, Min(0.01f)] private float splashRadius = 2.5f;
 
     private bool hasHit;
     private static int nextShotId = 200000;
@@ -45,6 +48,8 @@ public class ChefFoodProjectile : MonoBehaviour
 
         bool damageApplied = enemy.TakeDamage(damageInfo);
 
+        ApplySplashDamage(enemy, collision.GetContact(0).point);
+
         if (damageApplied)
         {
             Debug.Log(
@@ -56,8 +61,40 @@ public class ChefFoodProjectile : MonoBehaviour
         Destroy(gameObject);
     }
 
+    private void ApplySplashDamage(EnemyHealth directTarget, Vector3 hitPoint)
+    {
+        Collider[] hits = Physics.OverlapSphere(
+            hitPoint, splashRadius, ~0, QueryTriggerInteraction.Collide);
+        HashSet<EnemyHealth> damagedEnemies = new HashSet<EnemyHealth>
+        {
+            directTarget
+        };
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            EnemyHealth splashTarget = hits[i] != null
+                ? hits[i].GetComponentInParent<EnemyHealth>()
+                : null;
+            if (splashTarget == null || splashTarget.IsDead ||
+                !damagedEnemies.Add(splashTarget))
+            {
+                continue;
+            }
+
+            splashTarget.TakeDamage(new DamageInfo(
+                splashDamage,
+                "CHEF_FOOD_SPLASH",
+                PlayerRole.Chef,
+                nextShotId++,
+                hitPoint,
+                true));
+        }
+    }
+
     private void OnValidate()
     {
         damage = Mathf.Max(0f, damage);
+        splashDamage = Mathf.Max(0f, splashDamage);
+        splashRadius = Mathf.Max(0.01f, splashRadius);
     }
 }

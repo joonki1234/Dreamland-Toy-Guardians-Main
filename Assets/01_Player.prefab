@@ -10334,8 +10334,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2c9b97dc06a0a15469bf58a1a062109f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WaterParticleHit
-  damagePerTick: 1
+  damagePerTick: 3.4
   hitInterval: 0.1
+  maximumSustainedMultiplier: 1.4
+  sustainedRampDuration: 1.75
 --- !u!1 &2667569886590468155
 GameObject:
   m_ObjectHideFlags: 0
@@ -15540,9 +15542,9 @@ MonoBehaviour:
   verticalSpreadAngle: 5
   shardUpwardForce: 3
   shardScaleMultiplierRange: {x: 0.75, y: 1.05}
-  firstShardDamage: 8
-  additionalShardDamage: 2
-  maxShotDamagePerEnemy: 18
+  firstShardDamage: 6
+  additionalShardDamage: 1.8
+  maxShotDamagePerEnemy: 15
   xrActivateAction: {fileID: 0}
 --- !u!95 &6790173718373879798
 Animator:
@@ -15733,10 +15735,10 @@ MonoBehaviour:
   jobController: {fileID: 4808250408771500888}
   skillOrigin: {fileID: 1194774703862181001}
   skillDirection: {fileID: 1194774703862181001}
-  policeCooldown: 0
-  firefighterCooldown: 0
-  chefCooldown: 0
-  builderCooldown: 0
+  policeCooldown: 17
+  firefighterCooldown: 19
+  chefCooldown: 11
+  builderCooldown: 15
   policeSkill:
     maxTargetDistance: 30
     targetMask:
@@ -15744,7 +15746,7 @@ MonoBehaviour:
       m_Bits: 4294967295
     attackRadius: 4
     damageTickCount: 6
-    damagePerTick: 5
+    damagePerTick: 18
     enemyMask:
       serializedVersion: 2
       m_Bits: 4294967295
@@ -15787,7 +15789,7 @@ MonoBehaviour:
     monsterLayerMask:
       serializedVersion: 2
       m_Bits: 128
-    truckDamage: 50
+    truckDamage: 90
     sirenSound: {fileID: 8300000, guid: 74c46c75481843709fc64f3c3f8d8e77, type: 3}
     sirenVolume: 0.22
     spawnSound: {fileID: 8300000, guid: e90356b5de6545bc96af89538e22911c, type: 3}
@@ -15809,7 +15811,7 @@ MonoBehaviour:
     maxFallSpeed: 45
     explosionDelay: 0.5
     explosionRadius: 5
-    explosionDamage: 60
+    explosionDamage: 110
     explosionVfxPrefab: {fileID: 358637981425055526, guid: 8eb503696b886e04faff8fc0f480d473, type: 3}
     explosionVfxScale: 2
     explosionVfxHeightOffset: 0.15
@@ -15918,8 +15920,8 @@ MonoBehaviour:
       m_Bits: 128
     impactRadius: 5.5
     directHitRadius: 2
-    directDamage: 90
-    shockwaveDamage: 60
+    directDamage: 130
+    shockwaveDamage: 65
     stunDuration: 0.8
     knockbackForce: 4.5
     knockbackDuration: 0.3
@@ -17074,6 +17076,7 @@ MonoBehaviour:
   firePoint: {fileID: 1767355408522460021}
   bulletSpeed: 20
   bulletDamage: 10
+  fireInterval: 0.25
   bulletLifetime: 3
   playerCamera: {fileID: 1580302067779740869}
   aimDistance: 50

@@ -2,6 +2,9 @@ using System;
 using System.Collections;
 using DreamGuardians;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEngine.InputSystem;
+#endif
 
 /// <summary>
 /// Stage 2의 전투 웨이브만 담당합니다.
@@ -173,6 +176,10 @@ public sealed class Stage2WaveController : MonoBehaviour
     private bool allWaveSpawnsCompleted;
     private bool combatCompleted;
     private bool failed;
+    private bool isWaveCombatActive;
+    private bool isSkippingCurrentWave;
+    private int waveSequence;
+    private int skipThroughWaveSequence;
 
 
     public bool IsRunning => stageRoutine != null;
@@ -261,6 +268,18 @@ public sealed class Stage2WaveController : MonoBehaviour
         UnsubscribeEvents();
         StopStage2Internal();
     }
+
+
+#if UNITY_EDITOR
+    private void Update()
+    {
+        if (Keyboard.current != null &&
+            Keyboard.current.f8Key.wasPressedThisFrame)
+        {
+            TrySkipCurrentWaveForTest();
+        }
+    }
+#endif
 
 
     /// <summary>
@@ -416,6 +435,10 @@ public sealed class Stage2WaveController : MonoBehaviour
         allWaveSpawnsCompleted = false;
         combatCompleted = false;
         failed = false;
+        isWaveCombatActive = false;
+        isSkippingCurrentWave = false;
+        waveSequence = 0;
+        skipThroughWaveSequence = 0;
 
         stageRoutine =
             StartCoroutine(RunStage2Routine());
@@ -519,6 +542,8 @@ public sealed class Stage2WaveController : MonoBehaviour
         }
 
         allWaveSpawnsCompleted = true;
+        isWaveCombatActive = false;
+        isSkippingCurrentWave = false;
 
         Debug.Log(
             "[Stage2Wave] Stage 2의 모든 웨이브 스폰이 " +
@@ -559,6 +584,8 @@ public sealed class Stage2WaveController : MonoBehaviour
     {
         gameFlowController?.NotifyStage2WaveStarted(phase);
 
+        int sequence = ++waveSequence;
+        isWaveCombatActive = true;
         runningSpawnRoutineCount++;
 
         StartCoroutine(
@@ -571,7 +598,8 @@ public sealed class Stage2WaveController : MonoBehaviour
                 rangedPerDirection,
                 dronePerDirection,
                 spawnInterval,
-                healthMultiplier));
+                healthMultiplier,
+                sequence));
     }
 
 
@@ -588,7 +616,8 @@ public sealed class Stage2WaveController : MonoBehaviour
         int rangedPerDirection,
         int dronePerDirection,
         float spawnInterval,
-        float healthMultiplier)
+        float healthMultiplier,
+        int sequence)
     {
         int safeMeleePerDirection = Mathf.Max(0, meleePerDirection);
 
@@ -641,14 +670,17 @@ public sealed class Stage2WaveController : MonoBehaviour
             this);
 
         // 현재 웨이브의 모든 몹이 방향(A~D)당 지정한 비율로 생성될 때까지 기다립니다.
-        yield return enemySpawner.SpawnDirectionalMixedGroup(
-            rangedPrefab,
-            dronePrefab,
-            safeMeleePerDirection,
-            safeRangedPerDirection,
-            safeDronePerDirection,
-            spawnInterval,
-            healthMultiplier);
+        if (sequence > skipThroughWaveSequence)
+        {
+            yield return enemySpawner.SpawnDirectionalMixedGroup(
+                rangedPrefab,
+                dronePrefab,
+                safeMeleePerDirection,
+                safeRangedPerDirection,
+                safeDronePerDirection,
+                spawnInterval,
+                healthMultiplier);
+        }
 
         runningSpawnRoutineCount =
             Mathf.Max(
@@ -673,16 +705,21 @@ public sealed class Stage2WaveController : MonoBehaviour
         float duration,
         string nextWaveLabel)
     {
+        int waitingWaveSequence = waveSequence;
         float elapsed = 0f;
         float safeDuration =
             Mathf.Max(0f, duration);
 
         while (!failed &&
+               waitingWaveSequence > skipThroughWaveSequence &&
                elapsed < safeDuration)
         {
             elapsed += Time.deltaTime;
             yield return null;
         }
+
+        isWaveCombatActive = false;
+        isSkippingCurrentWave = false;
 
         if (!failed)
         {
@@ -694,6 +731,26 @@ public sealed class Stage2WaveController : MonoBehaviour
                 "마리",
                 this);
         }
+    }
+
+
+    private void TrySkipCurrentWaveForTest()
+    {
+        if (stageRoutine == null || failed || combatCompleted ||
+            !isWaveCombatActive || isSkippingCurrentWave || enemySpawner == null)
+        {
+            return;
+        }
+
+        isSkippingCurrentWave = true;
+        skipThroughWaveSequence = Mathf.Max(skipThroughWaveSequence, waveSequence);
+        enemySpawner.CancelCurrentSpawnRoutinesForTest();
+        enemySpawner.DespawnAllEnemiesImmediately();
+
+        Debug.Log(
+            "[Stage2Wave][TEST] F8: 현재 Stage 2 공세의 " +
+            "추가 스폰과 전투만 즉시 완료합니다.",
+            this);
     }
 
 
@@ -791,6 +848,8 @@ public sealed class Stage2WaveController : MonoBehaviour
         stageRoutine = null;
         runningSpawnRoutineCount = 0;
         allWaveSpawnsCompleted = false;
+        isWaveCombatActive = false;
+        isSkippingCurrentWave = false;
     }
 
     public void AbortAndResetForTest()
@@ -801,6 +860,10 @@ public sealed class Stage2WaveController : MonoBehaviour
         allWaveSpawnsCompleted = false;
         combatCompleted = false;
         failed = false;
+        isWaveCombatActive = false;
+        isSkippingCurrentWave = false;
+        waveSequence = 0;
+        skipThroughWaveSequence = 0;
     }
 
 

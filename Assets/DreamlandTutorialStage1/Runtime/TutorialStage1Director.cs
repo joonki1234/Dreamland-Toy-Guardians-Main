@@ -94,7 +94,7 @@ namespace DreamGuardians
         private Coroutine postShootingStoryRoutine;
 
         private bool emergencySuppressionCompleted;
-        private bool starlightBlueprintCompleted;
+        private bool chefBuilderSynergyCompleted;
         private bool stage1CompletionEventRaised;
 
 
@@ -834,7 +834,7 @@ namespace DreamGuardians
 
 
                 if (emergencySuppressionCompleted &&
-                    starlightBlueprintCompleted)
+                    chefBuilderSynergyCompleted)
                 {
                     EnablePurificationPhase();
                 }
@@ -890,15 +890,14 @@ namespace DreamGuardians
         private void HandleSynergyTriggered(
             SynergyEventData data)
         {
-            if (data.Enemy != tutorialEnemy)
-            {
-                return;
-            }
-
-
             if (data.Kind ==
                 SynergyKind.EmergencySuppression)
             {
+                if (data.Enemy != tutorialEnemy)
+                {
+                    return;
+                }
+
                 emergencySuppressionCompleted =
                     true;
             }
@@ -906,7 +905,7 @@ namespace DreamGuardians
                 data.Kind ==
                 SynergyKind.ChefArchitectCombo)
             {
-                starlightBlueprintCompleted =
+                chefBuilderSynergyCompleted =
                     true;
             }
 
@@ -922,7 +921,7 @@ namespace DreamGuardians
 
 
             if (emergencySuppressionCompleted &&
-                starlightBlueprintCompleted)
+                chefBuilderSynergyCompleted)
             {
                 EnablePurificationPhase();
             }
@@ -1269,7 +1268,7 @@ namespace DreamGuardians
             hitCountsByPlayer.Clear();
 
             emergencySuppressionCompleted = false;
-            starlightBlueprintCompleted = false;
+            chefBuilderSynergyCompleted = false;
             stage1CompletionEventRaised = false;
 
             // 안내 도중 스킵했을 수도 있으니 코어 체력은 확실히 다시 보이게 합니다.
@@ -1322,7 +1321,7 @@ namespace DreamGuardians
             hitCountsByPlayer.Clear();
 
             emergencySuppressionCompleted = false;
-            starlightBlueprintCompleted = false;
+            chefBuilderSynergyCompleted = false;
             stage1CompletionEventRaised = false;
             RoleSynergyProgression.Unlock();
 
@@ -1426,7 +1425,7 @@ namespace DreamGuardians
 
 
             string second =
-                starlightBlueprintCompleted
+                chefBuilderSynergyCompleted
                     ? "완료"
                     : "대기";
 

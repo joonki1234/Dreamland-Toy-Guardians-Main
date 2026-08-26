@@ -95,6 +95,8 @@ public class MudSplatSynergy : MonoBehaviour
 
         synergyActivated = true;
 
+        RaiseOfficialSynergyEvent();
+
         Debug.Log(
             "요리사 + 건축가 시너지: 미끼 함정 준비!"
         );
@@ -104,6 +106,21 @@ public class MudSplatSynergy : MonoBehaviour
 
         StartCoroutine(
             ActivateSynergyRoutine()
+        );
+    }
+
+
+    private void RaiseOfficialSynergyEvent()
+    {
+        SynergyResult result = new SynergyResult(
+            SynergyKind.ChefArchitectCombo,
+            0f,
+            PlayerRole.Chef,
+            PlayerRole.Architect
+        );
+
+        DreamGameEvents.RaiseSynergyTriggered(
+            new SynergyEventData(null, result)
         );
     }
 

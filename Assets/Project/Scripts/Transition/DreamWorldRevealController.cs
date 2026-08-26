@@ -38,11 +38,11 @@ public sealed class DreamWorldRevealController : MonoBehaviour
     [SerializeField]
     private Transform part2;
 
-    [Tooltip("왼쪽 아래 체스 마을 Part_3")]
+    [Tooltip("쿠키와 겨울 장식 구역 Part_3")]
     [SerializeField]
     private Transform part3;
 
-    [Tooltip("오른쪽 아래 눈 마을 Part_4")]
+    [Tooltip("체스판과 흰색 체스말 구역 Part_4")]
     [SerializeField]
     private Transform part4;
 
@@ -132,6 +132,14 @@ public sealed class DreamWorldRevealController : MonoBehaviour
     private readonly HashSet<Transform>
         revealedGroups =
             new HashSet<Transform>();
+
+    private readonly HashSet<Transform>
+        revealingGroups =
+            new HashSet<Transform>();
+
+    private readonly Dictionary<Transform, Coroutine>
+        groupRevealRoutines =
+            new Dictionary<Transform, Coroutine>();
 
     private Coroutine sequenceRoutine;
 
@@ -346,14 +354,14 @@ public sealed class DreamWorldRevealController : MonoBehaviour
     }
 
 
-    [ContextMenu("테스트 - Part 3 체스 마을 등장")]
+    [ContextMenu("테스트 - Part 3 쿠키/겨울 장식 구역 등장")]
     public void RevealPart3()
     {
         StartSingleGroupReveal(part3);
     }
 
 
-    [ContextMenu("테스트 - Part 4 눈 마을 등장")]
+    [ContextMenu("테스트 - Part 4 체스 구역 등장")]
     public void RevealPart4()
     {
         StartSingleGroupReveal(part4);
@@ -508,8 +516,20 @@ public sealed class DreamWorldRevealController : MonoBehaviour
             return;
         }
 
-        RestartSequence(
-            RevealGroupRoutine(groupRoot));
+        if (revealingGroups.Contains(groupRoot))
+        {
+            Debug.Log(
+                $"[DreamWorldReveal] {groupRoot.name}은 이미 등장 중입니다.",
+                this);
+
+            return;
+        }
+
+        Coroutine routine =
+            StartCoroutine(
+                RevealGroupRoutine(groupRoot));
+
+        groupRevealRoutines[groupRoot] = routine;
     }
 
 
@@ -649,7 +669,8 @@ public sealed class DreamWorldRevealController : MonoBehaviour
             yield break;
         }
 
-        if (revealedGroups.Contains(groupRoot))
+        if (revealedGroups.Contains(groupRoot) ||
+            revealingGroups.Contains(groupRoot))
         {
             yield break;
         }
@@ -663,6 +684,8 @@ public sealed class DreamWorldRevealController : MonoBehaviour
         {
             yield break;
         }
+
+        revealingGroups.Add(groupRoot);
 
         /*
          * 크기가 작은 오브젝트부터 큰 오브젝트 순서로 정렬합니다.
@@ -706,6 +729,8 @@ public sealed class DreamWorldRevealController : MonoBehaviour
         }
 
         revealedGroups.Add(groupRoot);
+        revealingGroups.Remove(groupRoot);
+        groupRevealRoutines.Remove(groupRoot);
 
         Debug.Log(
             $"[DreamWorldReveal] {groupRoot.name} 등장 완료. " +
@@ -1149,6 +1174,8 @@ public sealed class DreamWorldRevealController : MonoBehaviour
         StopAllCoroutines();
 
         sequenceRoutine = null;
+        groupRevealRoutines.Clear();
+        revealingGroups.Clear();
     }
 
 

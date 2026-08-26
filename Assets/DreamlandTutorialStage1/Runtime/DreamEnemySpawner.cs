@@ -37,6 +37,7 @@ namespace DreamGuardians
 
         private int nextSpawnPointIndex;
         private int spawnedCombatEnemyCount;
+        private int spawnCancellationVersion;
 
         public int ActiveEnemyCount => activeEnemies.Count;
         public GameObject EnemyPrefab => enemyPrefab;
@@ -117,6 +118,8 @@ namespace DreamGuardians
             float spawnInterval,
             float healthMultiplier = 1f)
         {
+            int cancellationVersion = spawnCancellationVersion;
+
             int safePrimaryCount =
                 Mathf.Max(0, primaryEnemyCount);
 
@@ -171,6 +174,11 @@ namespace DreamGuardians
 
             for (int i = 0; i < safeCount; i++)
             {
+                if (cancellationVersion != spawnCancellationVersion)
+                {
+                    yield break;
+                }
+
                 additionalAccumulator +=
                     safeAdditionalCount;
 
@@ -233,8 +241,9 @@ namespace DreamGuardians
                 if (safeInterval > 0f &&
                     i < safeCount - 1)
                 {
-                    yield return new WaitForSeconds(
-                        safeInterval);
+                    yield return WaitForSpawnInterval(
+                        safeInterval,
+                        cancellationVersion);
                 }
                 else
                 {
@@ -258,6 +267,8 @@ namespace DreamGuardians
             float spawnInterval,
             float healthMultiplier = 1f)
         {
+            int cancellationVersion = spawnCancellationVersion;
+
             List<Transform> waveSpawnPoints =
                 GetActiveSpawnPointsSnapshot();
 
@@ -302,6 +313,11 @@ namespace DreamGuardians
             {
                 for (int d = 0; d < directionCount; d++)
                 {
+                    if (cancellationVersion != spawnCancellationVersion)
+                    {
+                        yield break;
+                    }
+
                     GameObject prefabOverride;
 
                     if (remainingMelee[d] > 0)
@@ -344,8 +360,9 @@ namespace DreamGuardians
                     {
                         if (safeInterval > 0f)
                         {
-                            yield return new WaitForSeconds(
-                                safeInterval);
+                            yield return WaitForSpawnInterval(
+                                safeInterval,
+                                cancellationVersion);
                         }
                         else
                         {
@@ -556,6 +573,31 @@ namespace DreamGuardians
                 "[DreamEnemySpawner] 테스트 진행을 위해 " +
                 "활성 적을 모두 즉시 제거했습니다.",
                 this);
+        }
+
+
+        private IEnumerator WaitForSpawnInterval(
+            float duration,
+            int cancellationVersion)
+        {
+            float elapsed = 0f;
+
+            while (elapsed < duration &&
+                   cancellationVersion == spawnCancellationVersion)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+
+        /// <summary>
+        /// 현재 실행 중인 웨이브 스폰 열거만 종료시킨다.
+        /// 이후 시작되는 새 웨이브는 새 버전을 사용하므로 영향을 받지 않는다.
+        /// </summary>
+        public void CancelCurrentSpawnRoutinesForTest()
+        {
+            spawnCancellationVersion++;
         }
 
         private EnemyHealth SpawnEnemy(

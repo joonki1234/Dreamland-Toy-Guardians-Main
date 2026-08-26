@@ -16,11 +16,17 @@ public sealed class WaterParticleHit : MonoBehaviour
 
     [Tooltip("한 번의 피해 판정마다 적용할 피해량")]
     [SerializeField, Min(0f)]
-    private float damagePerTick = 1f;
+    private float damagePerTick = 3.4f;
 
     [Tooltip("같은 몬스터에게 피해를 다시 줄 때까지의 시간")]
     [SerializeField, Min(0.02f)]
     private float hitInterval = 0.1f;
+
+    [SerializeField, Range(1f, 1.4f)]
+    private float maximumSustainedMultiplier = 1.4f;
+
+    [SerializeField, Min(0.1f)]
+    private float sustainedRampDuration = 1.75f;
 
 
     private ParticleSystem waterParticle;
@@ -29,6 +35,9 @@ public sealed class WaterParticleHit : MonoBehaviour
         new List<ParticleCollisionEvent>();
 
     private readonly Dictionary<EnemyHealth, float> nextHitTimes =
+        new Dictionary<EnemyHealth, float>();
+
+    private readonly Dictionary<EnemyHealth, float> sustainedHitStartTimes =
         new Dictionary<EnemyHealth, float>();
 
     private static int nextShotId = 400000;
@@ -81,14 +90,28 @@ public sealed class WaterParticleHit : MonoBehaviour
             return;
         }
 
+        if (!sustainedHitStartTimes.TryGetValue(enemy, out float sustainedStart) ||
+            currentTime - nextAllowedHitTime > hitInterval * 1.5f)
+        {
+            sustainedStart = currentTime;
+            sustainedHitStartTimes[enemy] = currentTime;
+        }
+
         nextHitTimes[enemy] =
             currentTime + hitInterval;
+
+        float sustainedProgress = Mathf.Clamp01(
+            (currentTime - sustainedStart) / sustainedRampDuration);
+        float appliedDamage = damagePerTick * Mathf.Lerp(
+            1f,
+            maximumSustainedMultiplier,
+            sustainedProgress);
 
         Vector3 hitPoint =
             collisionEvents[0].intersection;
 
         DamageInfo damageInfo = new DamageInfo(
-            damagePerTick,
+            appliedDamage,
             "FIREFIGHTER_WATER_PARTICLE",
             PlayerRole.Firefighter,
             nextShotId++,
@@ -103,7 +126,7 @@ public sealed class WaterParticleHit : MonoBehaviour
         {
             Debug.Log(
                 $"소방관 물 실제 충돌 피해: " +
-                $"{enemy.gameObject.name} / {damagePerTick}"
+                $"{enemy.gameObject.name} / {appliedDamage}"
             );
         }
 
@@ -128,5 +151,11 @@ public sealed class WaterParticleHit : MonoBehaviour
 
         hitInterval =
             Mathf.Max(0.02f, hitInterval);
+
+        maximumSustainedMultiplier =
+            Mathf.Clamp(maximumSustainedMultiplier, 1f, 1.4f);
+
+        sustainedRampDuration =
+            Mathf.Max(0.1f, sustainedRampDuration);
     }
 }
