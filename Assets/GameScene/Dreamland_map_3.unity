@@ -30320,6 +30320,13 @@ MonoBehaviour:
   enemyGroundOffset: 0.8
   riseDepth: 0.9
   riseDuration: 1.25
+  emergencySuppressionSfx: {fileID: 8300000, guid: f1cb5d83282f2904a85f73111d068616, type: 3}
+  emergencySuppressionSfxVolume: 0.65
+  synergyAudioMinDistance: 3
+  synergyAudioMaxDistance: 30
+  synergyAudioDopplerLevel: 0
+  enableTestDamageBoost: 1
+  testDamageMultiplier: 5
   targetCore: {fileID: 2019763646}
   spawnPoints:
   - {fileID: 139371555}

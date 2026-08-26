@@ -54,6 +54,32 @@ public class MudSplatSynergy : MonoBehaviour
     private float explosionEffectHeight = 0.05f;
 
 
+    [Header("시너지 효과음")]
+
+    [Tooltip("음식이 장판에 닿아 시너지가 활성화될 때 재생할 소리")]
+    [SerializeField]
+    private AudioClip activationSound;
+
+    [SerializeField, Range(0f, 1f)]
+    private float activationSoundVolume = 0.5f;
+
+    [Tooltip("유인이 끝나고 실제 폭발할 때 재생할 소리")]
+    [SerializeField]
+    private AudioClip explosionSound;
+
+    [SerializeField, Range(0f, 1f)]
+    private float explosionSoundVolume = 0.65f;
+
+    [SerializeField, Min(0.01f)]
+    private float audioMinDistance = 3f;
+
+    [SerializeField, Min(0.01f)]
+    private float audioMaxDistance = 30f;
+
+    [SerializeField, Range(0f, 1f)]
+    private float audioDopplerLevel;
+
+
     [Header("넉백 설정")]
 
     [SerializeField]
@@ -94,6 +120,16 @@ public class MudSplatSynergy : MonoBehaviour
         }
 
         synergyActivated = true;
+
+        SpatialAudioOneShot.Play(
+            activationSound,
+            transform.position,
+            activationSoundVolume,
+            audioMinDistance,
+            audioMaxDistance,
+            audioDopplerLevel,
+            "ChefBuilderSynergy_ActivationAudio"
+        );
 
         RaiseOfficialSynergyEvent();
 
@@ -147,6 +183,15 @@ public class MudSplatSynergy : MonoBehaviour
         );
 
         CreateExplosionEffect();
+        SpatialAudioOneShot.Play(
+            explosionSound,
+            transform.position,
+            explosionSoundVolume,
+            audioMinDistance,
+            audioMaxDistance,
+            audioDopplerLevel,
+            "ChefBuilderSynergy_ExplosionAudio"
+        );
         Explode();
 
         Debug.Log(
@@ -375,6 +420,12 @@ public class MudSplatSynergy : MonoBehaviour
 
         explosionEffectLifetime =
             Mathf.Max(0.1f, explosionEffectLifetime);
+
+        audioMinDistance =
+            Mathf.Max(0.01f, audioMinDistance);
+
+        audioMaxDistance =
+            Mathf.Max(audioMinDistance, audioMaxDistance);
 
         knockbackDistance =
             Mathf.Max(0f, knockbackDistance);

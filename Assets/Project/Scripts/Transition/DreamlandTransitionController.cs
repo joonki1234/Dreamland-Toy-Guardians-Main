@@ -506,6 +506,7 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
     private void BeginEnemyAbsorption()
     {
+        Debug.Log("[F8] EnemyAbsorption started", this);
         StopTransitionRoutine();
 
         absorptionEventRaised = false;
@@ -646,6 +647,7 @@ public sealed class DreamlandTransitionController : MonoBehaviour
 
     private void BeginFullVRTransition()
     {
+        Debug.Log("[F8] FullVRTransition started", this);
         StopTransitionRoutine();
 
         fullVREventRaised = false;

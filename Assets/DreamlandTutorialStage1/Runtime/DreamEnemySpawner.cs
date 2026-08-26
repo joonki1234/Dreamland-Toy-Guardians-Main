@@ -26,6 +26,19 @@ namespace DreamGuardians
         [SerializeField, Min(0f)] private float riseDepth = 0.9f;
         [SerializeField, Min(0.05f)] private float riseDuration = 1.25f;
 
+        [Header("Police + Firefighter Synergy Audio")]
+        [SerializeField] private AudioClip emergencySuppressionSfx;
+        [SerializeField, Range(0f, 1f)] private float emergencySuppressionSfxVolume = 0.65f;
+        [SerializeField, Min(0.01f)] private float synergyAudioMinDistance = 3f;
+        [SerializeField, Min(0.01f)] private float synergyAudioMaxDistance = 30f;
+        [SerializeField, Range(0f, 1f)] private float synergyAudioDopplerLevel;
+
+        [Header("Editor Test Damage")]
+        [Tooltip("Unity Editor Play Mode에서만 플레이어의 적 대상 피해를 강화합니다.")]
+        [SerializeField] private bool enableTestDamageBoost = true;
+        [Tooltip("1이면 원래 밸런스이며, 실제 빌드에서는 이 값과 무관하게 항상 1배입니다.")]
+        [SerializeField, Min(1f)] private float testDamageMultiplier = 5f;
+
         [Header("Scene References")]
         [SerializeField] private CoreState targetCore;
         [SerializeField]
@@ -46,6 +59,23 @@ namespace DreamGuardians
 
         public event Action<EnemyHealth> EnemySpawned;
         public event Action AllEnemiesCleared;
+
+
+        private void Awake()
+        {
+            ApplyEditorTestDamageSettings();
+        }
+
+
+        private void ApplyEditorTestDamageSettings()
+        {
+#if UNITY_EDITOR
+            EnemyHealth.ConfigureEditorTestDamage(
+                enableTestDamageBoost,
+                testDamageMultiplier
+            );
+#endif
+        }
 
         public void Configure(
             GameObject prefab,
@@ -544,6 +574,11 @@ namespace DreamGuardians
         {
             if (activeEnemies.Count == 0)
             {
+                Debug.Log(
+                    "[F8] DespawnAllEnemiesImmediately" +
+                    " / activeEnemies.Count = 0" +
+                    " / ActiveEnemyCount = " + ActiveEnemyCount,
+                    this);
                 return;
             }
 
@@ -568,6 +603,12 @@ namespace DreamGuardians
             {
                 AllEnemiesCleared?.Invoke();
             }
+
+            Debug.Log(
+                "[F8] DespawnAllEnemiesImmediately" +
+                " / activeEnemies.Count = " + activeEnemies.Count +
+                " / ActiveEnemyCount = " + ActiveEnemyCount,
+                this);
 
             Debug.Log(
                 "[DreamEnemySpawner] 테스트 진행을 위해 " +
@@ -666,8 +707,17 @@ namespace DreamGuardians
                 GetOrAdd<EnemyHealth>(
                     enemyObject);
 
-            GetOrAdd<RoleSynergyTracker>(
-                enemyObject);
+            RoleSynergyTracker synergyTracker =
+                GetOrAdd<RoleSynergyTracker>(
+                    enemyObject);
+
+            synergyTracker.ConfigureAudio(
+                emergencySuppressionSfx,
+                emergencySuppressionSfxVolume,
+                synergyAudioMinDistance,
+                synergyAudioMaxDistance,
+                synergyAudioDopplerLevel
+            );
 
             GetOrAdd<EnemyWorldHealthBar>(
                 enemyObject);
@@ -1118,6 +1168,23 @@ namespace DreamGuardians
 
         private void OnValidate()
         {
+            testDamageMultiplier =
+                Mathf.Max(1f, testDamageMultiplier);
+
+            if (Application.isPlaying)
+            {
+                ApplyEditorTestDamageSettings();
+            }
+
+            synergyAudioMinDistance =
+                Mathf.Max(0.01f, synergyAudioMinDistance);
+
+            synergyAudioMaxDistance =
+                Mathf.Max(
+                    synergyAudioMinDistance,
+                    synergyAudioMaxDistance
+                );
+
             baseEnemyHealth =
                 Mathf.Max(1f, baseEnemyHealth);
 

@@ -276,6 +276,7 @@ public sealed class Stage2WaveController : MonoBehaviour
         if (Keyboard.current != null &&
             Keyboard.current.f8Key.wasPressedThisFrame)
         {
+            Debug.Log("[F8] Input detected", this);
             TrySkipCurrentWaveForTest();
         }
     }
@@ -546,6 +547,12 @@ public sealed class Stage2WaveController : MonoBehaviour
         isSkippingCurrentWave = false;
 
         Debug.Log(
+            "[F8] allWaveSpawnsCompleted = " + allWaveSpawnsCompleted +
+            " / runningSpawnRoutineCount = " + runningSpawnRoutineCount +
+            " / ActiveEnemyCount = " + enemySpawner.ActiveEnemyCount,
+            this);
+
+        Debug.Log(
             "[Stage2Wave] Stage 2의 모든 웨이브 스폰이 " +
             "완료됐습니다. 남은 적이 정화될 때까지 기다립니다.",
             this);
@@ -564,6 +571,7 @@ public sealed class Stage2WaveController : MonoBehaviour
             yield break;
         }
 
+        Debug.Log("[F8] About to call CompleteCombat", this);
         CompleteCombat(stageStartedAt);
     }
 
@@ -688,6 +696,12 @@ public sealed class Stage2WaveController : MonoBehaviour
                 runningSpawnRoutineCount - 1);
 
         Debug.Log(
+            "[F8] Spawn routine ended / phase = " + phase +
+            " / waveSequence = " + sequence +
+            " / runningSpawnRoutineCount = " + runningSpawnRoutineCount,
+            this);
+
+        Debug.Log(
             "[Stage2Wave] " + waveLabel +
             "의 모든 적 생성 완료. 진행 중인 스폰 코루틴: " +
             runningSpawnRoutineCount,
@@ -736,16 +750,48 @@ public sealed class Stage2WaveController : MonoBehaviour
 
     private void TrySkipCurrentWaveForTest()
     {
+        Debug.Log(
+            "[F8] TrySkipCurrentWaveForTest entered" +
+            " / waveSequence = " + waveSequence +
+            " / isWaveCombatActive = " + isWaveCombatActive +
+            " / isSkippingCurrentWave = " + isSkippingCurrentWave +
+            " / combatCompleted = " + combatCompleted +
+            " / allWaveSpawnsCompleted = " + allWaveSpawnsCompleted +
+            " / runningSpawnRoutineCount = " + runningSpawnRoutineCount +
+            " / ActiveEnemyCount = " +
+            (enemySpawner != null ? enemySpawner.ActiveEnemyCount : -1),
+            this);
+
+        bool canSkipFinalCleanup =
+            allWaveSpawnsCompleted &&
+            enemySpawner != null &&
+            enemySpawner.ActiveEnemyCount > 0;
+
         if (stageRoutine == null || failed || combatCompleted ||
-            !isWaveCombatActive || isSkippingCurrentWave || enemySpawner == null)
+            (!isWaveCombatActive && !canSkipFinalCleanup) ||
+            isSkippingCurrentWave || enemySpawner == null)
         {
+            Debug.Log(
+                "[F8] Skip rejected" +
+                " / finalCleanup = " + canSkipFinalCleanup,
+                this);
             return;
         }
 
         isSkippingCurrentWave = true;
         skipThroughWaveSequence = Mathf.Max(skipThroughWaveSequence, waveSequence);
+
+        Debug.Log("[F8] Cancel spawn requested", this);
         enemySpawner.CancelCurrentSpawnRoutinesForTest();
+
+        Debug.Log("[F8] DespawnAllEnemiesImmediately", this);
         enemySpawner.DespawnAllEnemiesImmediately();
+
+        Debug.Log(
+            "[F8] ActiveEnemyCount = " + enemySpawner.ActiveEnemyCount +
+            " / runningSpawnRoutineCount = " + runningSpawnRoutineCount +
+            " / allWaveSpawnsCompleted = " + allWaveSpawnsCompleted,
+            this);
 
         Debug.Log(
             "[Stage2Wave][TEST] F8: 현재 Stage 2 공세의 " +
@@ -760,6 +806,14 @@ public sealed class Stage2WaveController : MonoBehaviour
     /// </summary>
     private void CompleteCombat(float stageStartedAt)
     {
+        Debug.Log(
+            "[F8] CompleteCombat called" +
+            " / runningSpawnRoutineCount = " + runningSpawnRoutineCount +
+            " / allWaveSpawnsCompleted = " + allWaveSpawnsCompleted +
+            " / ActiveEnemyCount = " +
+            (enemySpawner != null ? enemySpawner.ActiveEnemyCount : -1),
+            this);
+
         if (failed || combatCompleted)
         {
             return;
@@ -798,6 +852,7 @@ public sealed class Stage2WaveController : MonoBehaviour
             "초. CombatCompleted 이벤트를 발생시킵니다.",
             this);
 
+        Debug.Log("[F8] CombatCompleted invoked", this);
         CombatCompleted?.Invoke();
     }
 

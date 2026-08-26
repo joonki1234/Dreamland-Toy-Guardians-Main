@@ -21,6 +21,12 @@ namespace DreamGuardians
         [SerializeField, Min(0f)]
         private float emergencyStunDuration = 1f;
 
+        private AudioClip emergencySuppressionSfx;
+        private float emergencySuppressionSfxVolume = 0.65f;
+        private float synergyAudioMinDistance = 3f;
+        private float synergyAudioMaxDistance = 30f;
+        private float synergyAudioDopplerLevel;
+
         private readonly Dictionary<PlayerRole, float> lastHitTimes =
             new Dictionary<PlayerRole, float>();
 
@@ -42,6 +48,24 @@ namespace DreamGuardians
         {
             owner = GetComponent<EnemyHealth>();
             mover = GetComponent<EnemyCoreMover>();
+        }
+
+
+        public void ConfigureAudio(
+            AudioClip clip,
+            float volume,
+            float minDistance,
+            float maxDistance,
+            float dopplerLevel)
+        {
+            emergencySuppressionSfx = clip;
+            emergencySuppressionSfxVolume = Mathf.Clamp01(volume);
+            synergyAudioMinDistance = Mathf.Max(0.01f, minDistance);
+            synergyAudioMaxDistance = Mathf.Max(
+                synergyAudioMinDistance,
+                maxDistance
+            );
+            synergyAudioDopplerLevel = Mathf.Clamp01(dopplerLevel);
         }
 
 
@@ -85,6 +109,19 @@ namespace DreamGuardians
             }
 
             ApplyEffect(result.Kind);
+
+            if (result.Kind == SynergyKind.EmergencySuppression)
+            {
+                SpatialAudioOneShot.Play(
+                    emergencySuppressionSfx,
+                    transform.position,
+                    emergencySuppressionSfxVolume,
+                    synergyAudioMinDistance,
+                    synergyAudioMaxDistance,
+                    synergyAudioDopplerLevel,
+                    "EmergencySuppression_Audio"
+                );
+            }
 
             DreamGameEvents.RaiseSynergyTriggered(
                 new SynergyEventData(owner, result)
@@ -172,6 +209,42 @@ namespace DreamGuardians
                 cooldown
             );
 
+        }
+    }
+
+
+    internal static class SpatialAudioOneShot
+    {
+        public static void Play(
+            AudioClip clip,
+            Vector3 position,
+            float volume,
+            float minDistance,
+            float maxDistance,
+            float dopplerLevel,
+            string objectName)
+        {
+            if (clip == null)
+            {
+                return;
+            }
+
+            GameObject audioObject = new GameObject(objectName);
+            audioObject.transform.position = position;
+
+            AudioSource source = audioObject.AddComponent<AudioSource>();
+            source.clip = clip;
+            source.volume = Mathf.Clamp01(volume);
+            source.playOnAwake = false;
+            source.loop = false;
+            source.spatialBlend = 1f;
+            source.rolloffMode = AudioRolloffMode.Logarithmic;
+            source.minDistance = Mathf.Max(0.01f, minDistance);
+            source.maxDistance = Mathf.Max(source.minDistance, maxDistance);
+            source.dopplerLevel = Mathf.Clamp01(dopplerLevel);
+            source.Play();
+
+            Object.Destroy(audioObject, clip.length + 0.1f);
         }
     }
 }

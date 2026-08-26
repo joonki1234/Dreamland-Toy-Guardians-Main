@@ -91,7 +91,7 @@ MonoBehaviour:
   arrivalTolerance: 0.35
   hoverAmplitude: 0.12
   hoverFrequency: 2
-  coreDamage: 4.5
+  coreDamage: 0.1
   attackInterval: 1
   muzzle: {fileID: 0}
   beamColor: {r: 0.2, g: 0.95, b: 1, a: 1}

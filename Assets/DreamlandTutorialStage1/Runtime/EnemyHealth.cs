@@ -22,6 +22,11 @@ namespace DreamGuardians
         private RoleSynergyTracker synergyTracker;
         private float currentHealth;
 
+#if UNITY_EDITOR
+        private static bool editorTestDamageBoostEnabled;
+        private static float editorTestDamageMultiplier = 1f;
+#endif
+
         public float MaxHealth => maxHealth;
         public float CurrentHealth => currentHealth;
         public float NormalizedHealth => maxHealth <= 0f ? 0f : currentHealth / maxHealth;
@@ -31,6 +36,24 @@ namespace DreamGuardians
         public event Action<EnemyHealth, float, float> HealthChanged;
         public event Action<EnemyHealth, DamageInfo> HitRegistered;
         public event Action<EnemyHealth, DamageInfo> Died;
+
+#if UNITY_EDITOR
+        [RuntimeInitializeOnLoadMethod(
+            RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEditorTestDamageSettings()
+        {
+            editorTestDamageBoostEnabled = false;
+            editorTestDamageMultiplier = 1f;
+        }
+
+        internal static void ConfigureEditorTestDamage(
+            bool enabled,
+            float multiplier)
+        {
+            editorTestDamageBoostEnabled = enabled;
+            editorTestDamageMultiplier = Mathf.Max(1f, multiplier);
+        }
+#endif
 
         private void Awake()
         {
@@ -92,6 +115,14 @@ namespace DreamGuardians
 
             float multiplier = synergyTracker != null ? synergyTracker.CurrentDamageMultiplier : 1f;
             float totalDamage = Mathf.Max(0f, info.amount * multiplier + synergyResult.BonusDamage);
+
+#if UNITY_EDITOR
+            if (editorTestDamageBoostEnabled &&
+                info.role != PlayerRole.None)
+            {
+                totalDamage *= editorTestDamageMultiplier;
+            }
+#endif
 
             if (totalDamage <= 0f)
             {

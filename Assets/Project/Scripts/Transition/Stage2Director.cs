@@ -369,6 +369,11 @@ public sealed class Stage2Director : MonoBehaviour
 
     private void HandleCombatCompleted()
     {
+        Debug.Log(
+            "[F8] Stage2Director HandleCombatCompleted received" +
+            " / currentState = " + currentState,
+            this);
+
         if (currentState != Stage2DirectorState.Running)
         {
             return;
@@ -461,6 +466,7 @@ public sealed class Stage2Director : MonoBehaviour
             "Stage2Completed 이벤트를 발생시킵니다.",
             this);
 
+        Debug.Log("[F8] Stage2Completed invoked", this);
         Stage2Completed?.Invoke();
     }
 

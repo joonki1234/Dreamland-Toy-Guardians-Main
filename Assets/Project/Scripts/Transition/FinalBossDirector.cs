@@ -385,6 +385,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     {
         if (newState == DreamlandGameFlowController.GameFlowState.BossBattle)
         {
+            Debug.Log("[F8] BossBattle started", this);
             BeginBossBattle();
             return;
         }

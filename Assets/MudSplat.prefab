@@ -325,6 +325,13 @@ MonoBehaviour:
   explosionEffectScale: 0.7
   explosionEffectLifetime: 3
   explosionEffectHeight: 0.05
+  activationSound: {fileID: 8300000, guid: 5080907bca63fc64b86080a2f57d599e, type: 3}
+  activationSoundVolume: 0.5
+  explosionSound: {fileID: 8300000, guid: 6ab50ec821923f64e89191e1d7caea1c, type: 3}
+  explosionSoundVolume: 0.65
+  audioMinDistance: 3
+  audioMaxDistance: 30
+  audioDopplerLevel: 0
   knockbackDistance: 0.7
   knockbackDuration: 0.15
   stunDuration: 0.15

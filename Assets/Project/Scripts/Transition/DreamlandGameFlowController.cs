@@ -330,6 +330,11 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
 
     private void HandleStage2Completed()
     {
+        Debug.Log(
+            "[F8] DreamlandGameFlowController " +
+            "HandleStage2Completed received / currentState = " + currentState,
+            this);
+
         if (stage2CompletionHandled ||
             stage2FailureHandled)
         {

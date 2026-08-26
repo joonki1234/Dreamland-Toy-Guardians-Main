@@ -120,28 +120,12 @@ namespace DreamGuardians
 
 
         /// <summary>
-        /// 현재 하늘에서 분홍 하늘로 천천히 전환합니다.
+        /// 현재 하늘에서 분홍 하늘로 즉시 전환합니다.
         /// 완전 꿈나라 전환 시 사용합니다.
         /// </summary>
         public void TransitionToPinkSky()
         {
-            if (pinkSkyMaterial == null)
-            {
-                Debug.LogWarning(
-                    "[DreamSkyTransition] " +
-                    "분홍 하늘 머티리얼이 연결되지 않았습니다.",
-                    this);
-
-                return;
-            }
-
-            StopCurrentTransition();
-
-            transitionRoutine =
-                StartCoroutine(
-                    TransitionRoutine(
-                        pinkSkyMaterial,
-                        transitionDuration));
+            ApplyPinkSkyImmediately();
         }
 
 
