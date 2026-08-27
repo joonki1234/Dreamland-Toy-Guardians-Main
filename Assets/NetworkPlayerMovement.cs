@@ -90,6 +90,15 @@ public class NetworkPlayerMovement : NetworkBehaviour
     private float _stageMinZ;
     private float _stageMaxZ;
 
+    // PlayerBoundaryShield는 "06_PORTAL_EFFECTS" 오브젝트의 자식인데, 이 부모는
+    // Stage 2 적 흡수 연출 중 스케일이 계속 펄스되고, 보스전으로 넘어가면
+    // SetActive(false)로 꺼지기까지 한다. 경계 반지름을 매 프레임 그 오브젝트의
+    // lossyScale에서 실시간으로 다시 계산하면 이동 범위가 연출에 따라 같이
+    // 흔들리므로, 스폰 시점에 한 번만 계산해서 고정값으로 캐싱해 둔다.
+    private bool _hasCachedBoundary;
+    private Vector3 _cachedBoundaryCenter;
+    private float _cachedBoundaryRadius;
+
 
     public override void Spawned()
     {
@@ -144,11 +153,15 @@ public class NetworkPlayerMovement : NetworkBehaviour
             // "범위를 그냥 뚫고 나간다"는 증상이 재발할 경우, 참조가
             // 실제로 붙었는지와 반지름이 얼마로 계산됐는지 바로 확인할 수
             // 있도록 남겨둔다.
+            _cachedBoundaryCenter = playerBoundaryShield.position;
+            _cachedBoundaryRadius = GetBoundaryWorldRadius();
+            _hasCachedBoundary = true;
+
             Debug.Log(
                 "[NetworkPlayerMovement] Player Boundary Shield 연결됨: " +
                 playerBoundaryShield.name +
                 " / 콜라이더 존재: " + (_boundarySphereCollider != null) +
-                " / 계산된 월드 반지름: " + GetBoundaryWorldRadius());
+                " / 계산된 월드 반지름(고정값으로 캐싱됨): " + _cachedBoundaryRadius);
         }
         else
         {
@@ -381,11 +394,10 @@ public class NetworkPlayerMovement : NetworkBehaviour
         Vector3 position = transform.position;
         bool changed = false;
 
-        if (playerBoundaryShield != null)
+        if (_hasCachedBoundary)
         {
-            Vector3 boundaryCenter = playerBoundaryShield.position;
-            float boundaryRadius = GetBoundaryWorldRadius();
-            float allowedRadius = Mathf.Max(0f, boundaryRadius - boundaryPadding);
+            Vector3 boundaryCenter = _cachedBoundaryCenter;
+            float allowedRadius = Mathf.Max(0f, _cachedBoundaryRadius - boundaryPadding);
 
             Vector2 centerXZ = new Vector2(boundaryCenter.x, boundaryCenter.z);
             Vector2 posXZ = new Vector2(position.x, position.z);

@@ -136,31 +136,29 @@ public sealed class FinalBossDirector : MonoBehaviour
     private float firstAttackDelay = 4f;
 
     [Header("Boss Minion Spawning")]
-    [Tooltip("Stage 1에서 사용하던 미니건 원거리 적")]
-    [SerializeField]
-    private GameObject rangedEnemyPrefab;
-
-    [Tooltip("Stage 2에서 사용하던 Waspy 비행 적")]
+    [Tooltip("Stage 2에서 사용하던 Waspy 비행 적. 보스전에서는 이 드론만 소환합니다.")]
     [SerializeField]
     private GameObject droneEnemyPrefab;
 
+    [Tooltip("드론이 한 번에 몇 마리씩 무리 지어 등장할지")]
+    [SerializeField, Min(1)]
+    private int droneBurstCount = 6;
+
+    [Tooltip("드론 무리가 등장하는 간격(초)")]
     [SerializeField, Min(0.5f)]
-    private float minionSpawnInterval = 3.5f;
+    private float droneBurstInterval = 10f;
 
     [SerializeField, Min(0f)]
     private float firstMinionSpawnDelay = 3.0f;
 
     [SerializeField, Min(1)]
-    private int maxActiveMinions = 10;
+    private int maxActiveMinions = 24;
 
     [SerializeField, Min(0.1f)]
     private float minionHealthMultiplier = 1.15f;
 
     [SerializeField, Min(0.5f)]
     private float minionSpawnRadius = 7.5f;
-
-    [SerializeField, Min(0f)]
-    private float minionGroundHeight = 0.8f;
 
     [SerializeField, Min(0f)]
     private float droneSpawnHeight = 2.5f;
@@ -674,8 +672,53 @@ public sealed class FinalBossDirector : MonoBehaviour
         // 등장/스토리 연출 중에는 피격되지 않도록 막습니다.
         bossHealth.Configure(bossMaxHealth, false);
         EnsureBossHitbox();
+        IgnorePlayerCollisionsWithBoss();
         bossAttack.PrepareCorruptedVisuals(core);
         SubscribeBossHealth();
+    }
+
+    /// <summary>
+    /// EnsureBossHitbox()가 각 렌더러에 붙인 히트박스는 무기 판정을 위해
+    /// isTrigger = false(솔리드)를 유지해야 한다. 하지만 보스는 킨매틱
+    /// Rigidbody라서 페이즈 전환 때 코어 쪽으로 움직이면 그 솔리드 콜라이더가
+    /// 근처 플레이어의 CharacterController를 물리적으로 밀어내(PhysX push-out),
+    /// "조작이 안 먹히고 미끄러지듯 이동한다"는 증상을 만든다. 콜라이더 자체를
+    /// 트리거로 바꾸면 무기 판정이 깨질 수 있으므로, 대신 보스 히트박스와
+    /// 플레이어 CharacterController 사이의 물리 충돌만 콕 집어 꺼서 판정은
+    /// 그대로 두고 밀려나는 것만 막는다.
+    /// </summary>
+    private void IgnorePlayerCollisionsWithBoss()
+    {
+        if (bossObject == null)
+        {
+            return;
+        }
+
+        Collider[] bossColliders =
+            bossObject.GetComponentsInChildren<Collider>(true);
+
+        CharacterController[] playerControllers =
+            FindObjectsByType<CharacterController>(
+                FindObjectsSortMode.None);
+
+        foreach (Collider bossCollider in bossColliders)
+        {
+            if (bossCollider == null || bossCollider.isTrigger)
+            {
+                continue;
+            }
+
+            foreach (CharacterController playerController in playerControllers)
+            {
+                if (playerController != null)
+                {
+                    Physics.IgnoreCollision(
+                        bossCollider,
+                        playerController,
+                        true);
+                }
+            }
+        }
     }
 
     private IEnumerator BossRevealRoutine()
@@ -838,26 +881,18 @@ public sealed class FinalBossDirector : MonoBehaviour
 
             // 보스가 직접 생성한 적만 제한합니다. 이전 웨이브에 남은 적 때문에
             // 보스 소환이 멈추는 현상을 방지합니다.
-            int activeCount = bossSpawnedEnemies.Count;
-
-            if (activeCount < maxActiveMinions)
+            for (int i = 0; i < droneBurstCount; i++)
             {
+                if (bossSpawnedEnemies.Count >= maxActiveMinions)
+                {
+                    break;
+                }
+
                 SpawnNextBossMinion();
             }
 
-            float healthRatio = bossHealth.MaxHealth > 0f
-                ? bossHealth.CurrentHealth / bossHealth.MaxHealth
-                : 0f;
-
-            float phaseSpeedMultiplier =
-                healthRatio > 2f / 3f
-                    ? 1f
-                    : healthRatio > 1f / 3f
-                        ? 0.86f
-                        : 0.72f;
-
             yield return new WaitForSeconds(
-                Mathf.Max(0.5f, minionSpawnInterval * phaseSpeedMultiplier));
+                Mathf.Max(0.5f, droneBurstInterval));
         }
 
         minionRoutine = null;
@@ -865,25 +900,15 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private void SpawnNextBossMinion()
     {
-        if (enemySpawner == null || bossObject == null)
+        if (enemySpawner == null ||
+            bossObject == null ||
+            droneEnemyPrefab == null)
         {
             return;
         }
 
-        int typeIndex = minionSpawnIndex % 3;
-        GameObject prefabOverride = null;
-        string typeLabel = "MELEE";
-
-        if (typeIndex == 1 && rangedEnemyPrefab != null)
-        {
-            prefabOverride = rangedEnemyPrefab;
-            typeLabel = "RANGED";
-        }
-        else if (typeIndex == 2 && droneEnemyPrefab != null)
-        {
-            prefabOverride = droneEnemyPrefab;
-            typeLabel = "DRONE";
-        }
+        GameObject prefabOverride = droneEnemyPrefab;
+        const string typeLabel = "DRONE";
 
         float angle = minionSpawnIndex * 137.5f * Mathf.Deg2Rad;
         Vector3 radial =
@@ -898,14 +923,7 @@ public sealed class FinalBossDirector : MonoBehaviour
             projectedGround = groundedPosition;
         }
 
-        if (typeLabel == "DRONE")
-        {
-            spawnPosition = projectedGround + Vector3.up * droneSpawnHeight;
-        }
-        else
-        {
-            spawnPosition = projectedGround + Vector3.up * minionGroundHeight;
-        }
+        spawnPosition = projectedGround + Vector3.up * droneSpawnHeight;
 
         Vector3 faceDirection =
             core != null
@@ -1992,12 +2010,12 @@ public sealed class FinalBossDirector : MonoBehaviour
         bossCoreDamage = Mathf.Max(0f, bossCoreDamage);
         bossAttackInterval = Mathf.Max(0.1f, bossAttackInterval);
         firstAttackDelay = Mathf.Max(0f, firstAttackDelay);
-        minionSpawnInterval = Mathf.Max(0.5f, minionSpawnInterval);
+        droneBurstCount = Mathf.Max(1, droneBurstCount);
+        droneBurstInterval = Mathf.Max(0.5f, droneBurstInterval);
         firstMinionSpawnDelay = Mathf.Max(0f, firstMinionSpawnDelay);
         maxActiveMinions = Mathf.Max(1, maxActiveMinions);
         minionHealthMultiplier = Mathf.Max(0.1f, minionHealthMultiplier);
         minionSpawnRadius = Mathf.Max(0.5f, minionSpawnRadius);
-        minionGroundHeight = Mathf.Max(0f, minionGroundHeight);
         droneSpawnHeight = Mathf.Max(0f, droneSpawnHeight);
         introDuration = Mathf.Max(0f, introDuration);
         bossStoryLineDuration = Mathf.Max(0.1f, bossStoryLineDuration);

@@ -168,6 +168,14 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private Material eyeMaterial;
     private Light eyeLight;
 
+    // 오라의 실제 크기/위치. auraRadius/auraHeightOffset은 인스펙터 기본값(작은 상자
+    // 기준)일 뿐이고, 보스 모델은 매우 큰 스케일로 임포트되어 있어(눈알 배치 주석 참고)
+    // 그 값을 그대로 쓰면 오라가 거대한 몸체 안에 파묻혀 거의 안 보인다. CreateCorruptionAura()에서
+    // 실제 렌더러 바운드를 기준으로 다시 계산해 채운다.
+    private float auraRuntimeHeightOffset;
+    private float auraRuntimeRadius;
+    private float auraRuntimeSizeScale = 1f;
+
     // Camera.main은 이 프로젝트 어디에도 MainCamera 태그가 없어 항상 null입니다.
     // NetworkPlayerMovement.Spawned()에서 로컬 플레이어의 카메라를 직접 넘겨받아
     // 눈이 실제 보는 사람을 향하도록 합니다.
@@ -1232,9 +1240,27 @@ public sealed class FinalBossAttackController : MonoBehaviour
             return;
         }
 
+        // 보스 모델의 실제 렌더러 바운드를 기준으로 오라 크기/높이를 다시 계산합니다.
+        // 인스펙터 기본값(auraRadius=1.05, auraHeightOffset=0.9)은 작은 상자 기준이라
+        // "매우 큰 스케일로 임포트된" 실제 보스 모델에 그대로 쓰면 오라가 몸체 안에
+        // 파묻혀 거의 안 보입니다.
+        Bounds bounds = CalculateBossVisualBounds();
+        float boundsHorizontalExtent =
+            Mathf.Max(bounds.extents.x, bounds.extents.z);
+
+        auraRuntimeRadius =
+            Mathf.Max(auraRadius, boundsHorizontalExtent * 0.9f);
+        auraRuntimeHeightOffset =
+            Mathf.Max(
+                auraHeightOffset,
+                (bounds.center.y - transform.position.y) +
+                bounds.extents.y * 0.35f);
+        auraRuntimeSizeScale =
+            Mathf.Max(1f, auraRuntimeRadius / Mathf.Max(0.01f, auraRadius));
+
         auraObject = new GameObject("FinalBoss_CorruptionAura");
         auraObject.transform.position =
-            transform.position + Vector3.up * auraHeightOffset;
+            transform.position + Vector3.up * auraRuntimeHeightOffset;
 
         auraParticles = auraObject.AddComponent<ParticleSystem>();
         auraParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -1246,27 +1272,33 @@ public sealed class FinalBossAttackController : MonoBehaviour
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.maxParticles = 180;
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.18f, 0.65f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.18f, 0.58f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(
+            0.18f * auraRuntimeSizeScale,
+            0.65f * auraRuntimeSizeScale);
+        main.startSize = new ParticleSystem.MinMaxCurve(
+            0.18f * auraRuntimeSizeScale,
+            0.58f * auraRuntimeSizeScale);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
         main.startColor = new ParticleSystem.MinMaxGradient(
             new Color(0.01f, 0.005f, 0.015f, 0.58f),
             new Color(0.18f, 0.01f, 0.24f, 0.42f));
 
         ParticleSystem.EmissionModule emission = auraParticles.emission;
-        emission.rateOverTime = auraEmissionRate;
+        emission.rateOverTime = auraEmissionRate * auraRuntimeSizeScale;
 
         ParticleSystem.ShapeModule shape = auraParticles.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = auraRadius;
+        shape.radius = auraRuntimeRadius;
         shape.radiusThickness = 1f;
 
         ParticleSystem.VelocityOverLifetimeModule velocity =
             auraParticles.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.World;
-        velocity.y = new ParticleSystem.MinMaxCurve(0.65f, 1.45f);
+        velocity.y = new ParticleSystem.MinMaxCurve(
+            0.65f * auraRuntimeSizeScale,
+            1.45f * auraRuntimeSizeScale);
         velocity.x = new ParticleSystem.MinMaxCurve(-0.18f, 0.18f);
         velocity.z = new ParticleSystem.MinMaxCurve(-0.18f, 0.18f);
 
@@ -1377,7 +1409,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
 
         auraObject.transform.position =
-            transform.position + Vector3.up * auraHeightOffset;
+            transform.position + Vector3.up * auraRuntimeHeightOffset;
     }
 
     private void StopOwnedRoutines()
