@@ -708,10 +708,17 @@ public class PlayerJobController : NetworkBehaviour
     /// 기준점(RightHandGripReference)의 자식으로 옮겨서, 캐릭터 손에
     /// 실제로 고정된 것처럼 보이게 한다.
     ///
-    /// SetParent(..., worldPositionStays: true)를 써서 옮기는 순간의
-    /// 월드 위치/회전은 그대로 유지한 채 부모만 바꾼다 - 그래야 오프셋
-    /// 값을 새로 추측해서 넣지 않아도 눈에 보이는 위치가 갑자기
-    /// 튀지 않는다.
+    /// 처음에는 worldPositionStays: true로 "옮기는 순간의 월드 위치를
+    /// 그대로 유지"하도록 했는데, 이게 오히려 문제였다: 이 메서드는
+    /// Spawned() 시점에 호출되는데, 그때는 아직 Animation Rigging(IK)이
+    /// 한 번도 평가되지 않아 Rig_IK 하위 오브젝트들이 실제 애니메이션
+    /// 자세가 아닌 임시 상태에 있을 수 있다. 그 순간의(잘못된) 월드
+    /// 위치를 기준으로 오프셋을 "고정"해버리니, 캐릭터가 움직이거나
+    /// 회전할 때마다 그 오차가 점점 벌어져 보였다("이동할수록 멀어짐").
+    ///
+    /// RightHandGripReference는 애초에 "무기가 손에 있을 때의 위치"로
+    /// 미리 만들어 둔 기준점이므로, 오프셋을 보존할 게 아니라 그냥
+    /// 로컬 원점(0,0,0)에 딱 맞춰 붙이는 게 맞다.
     /// </summary>
     private void AttachWeaponToHandGrip(GameObject weapon)
     {
@@ -732,7 +739,10 @@ public class PlayerJobController : NetworkBehaviour
             return;
         }
 
-        weapon.transform.SetParent(gripAnchor, true);
+        weapon.transform.SetParent(gripAnchor, false);
+        weapon.transform.localPosition = Vector3.zero;
+        weapon.transform.localRotation = Quaternion.identity;
+        weapon.transform.localScale = Vector3.one;
     }
 
 
