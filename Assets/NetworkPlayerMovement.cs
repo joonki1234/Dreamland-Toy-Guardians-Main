@@ -80,6 +80,15 @@ public class NetworkPlayerMovement : NetworkBehaviour
     private SphereCollider _boundarySphereCollider;
     private TrackedPoseDriver _headTrackedPoseDriver;
     private float _verticalRotation;
+
+    // Update()에서 프레임마다 읽은 마우스 좌우 회전량을 여기 모아뒀다가,
+    // FixedUpdateNetwork()(네트워크 시뮬레이션 틱)에서 한 번에 몸통에
+    // 적용한다. 예전에는 transform.Rotate()를 Update()에서 직접
+    // 호출했는데, NetworkTransform은 시뮬레이션 틱 시점의 상태를
+    // 동기화하기 때문에 그 사이에 생긴 변화가 다른 클라이언트에게
+    // 안정적으로 전달되지 않았다(그래서 상대방 화면에서는 내가 시점을
+    // 돌려도 몸이 계속 같은 방향만 보고 있었다).
+    private float _pendingYawDelta;
     private AudioSource _footstepAudioSource;
     private AudioClip[] _footstepClips;
     private float _footstepTimer;
@@ -177,7 +186,14 @@ public class NetworkPlayerMovement : NetworkBehaviour
 
         if (playerCamera != null)
         {
-            playerCamera.gameObject.SetActive(isMine);
+            // 예전에는 카메라 오브젝트 자체를 SetActive(isMine)로 껐다.
+            // 문제는 직업별 무기(Weapon_Police 등)가 전부 이 카메라의
+            // 자식으로 붙어 있다는 점이다 - 오브젝트를 통째로 끄면
+            // 그 밑의 무기까지 같이 비활성화되어, 다른 플레이어 화면에서
+            // 내 무기가 아예 안 보이게 된다. 실제로 꺼야 하는 건
+            // "렌더링(Camera 컴포넌트)"뿐이므로, 컴포넌트만 비활성화해
+            // 오브젝트(와 그 자식 무기)는 계속 활성 상태로 둔다.
+            playerCamera.enabled = isMine;
         }
         else
         {
@@ -266,6 +282,15 @@ public class NetworkPlayerMovement : NetworkBehaviour
         // 실제 이동을 시뮬레이션한다. 그렇지 않으면 다른 클라이언트가 대신
         // 위치를 계산해 버려 캐릭터가 겹치거나 튄다.
         if (!Object.HasStateAuthority) return;
+
+        // Update()에서 모아둔 마우스 좌우 회전을 시뮬레이션 틱 안에서
+        // 적용한다 - 이래야 NetworkTransform이 이 값을 안정적으로
+        // 캡처해서 다른 클라이언트에게 동기화한다.
+        if (_pendingYawDelta != 0f)
+        {
+            transform.Rotate(Vector3.up * _pendingYawDelta);
+            _pendingYawDelta = 0f;
+        }
 
         Vector2 input = ReadMovementInput();
 
@@ -375,8 +400,9 @@ public class NetworkPlayerMovement : NetworkBehaviour
         // Update()가 먼저 호출될 수 있다 - 안전하게 무시한다.
         if (Object == null) return;
 
-        // 카메라 회전은 네트워크 동기화가 필요 없는 순수 로컬 연출이므로
-        // FixedUpdateNetwork가 아닌 일반 Update에서 즉시 처리한다.
+        // 마우스 입력은 내 클라이언트에서만 읽는다. 좌우 회전량은 아래에서
+        // 모아뒀다가 FixedUpdateNetwork()에서 실제로 적용하고(동기화 필요),
+        // 카메라 상하 회전은 로컬 전용이라 여기서 바로 적용한다.
         if (!Object.HasInputAuthority) return;
 
         // XR 헤드셋(TrackedPoseDriver)이 이미 카메라 회전을 담당하고 있다면
@@ -388,8 +414,9 @@ public class NetworkPlayerMovement : NetworkBehaviour
         Vector2 mouseDelta =
             Mouse.current.delta.ReadValue() * mouseSensitivity;
 
-        // 플레이어 몸통 좌우 회전 (NetworkTransform이 이 회전값을 동기화한다)
-        transform.Rotate(Vector3.up * mouseDelta.x);
+        // 플레이어 몸통 좌우 회전은 여기서 바로 적용하지 않고 모아뒀다가
+        // FixedUpdateNetwork()에서 적용한다(위 _pendingYawDelta 설명 참고).
+        _pendingYawDelta += mouseDelta.x;
 
         // 카메라 상하 회전 (로컬 전용, 동기화 불필요)
         _verticalRotation -= mouseDelta.y;
