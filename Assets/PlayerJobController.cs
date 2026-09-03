@@ -648,7 +648,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponPolice != null)
                 {
                     weaponPolice.SetActive(true);
-                    AttachWeaponToHandGrip(weaponPolice);
+                    AttachWeaponForViewer(weaponPolice);
                 }
 
                 break;
@@ -662,7 +662,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponFirefighter != null)
                 {
                     weaponFirefighter.SetActive(true);
-                    AttachWeaponToHandGrip(weaponFirefighter);
+                    AttachWeaponForViewer(weaponFirefighter);
                 }
 
                 break;
@@ -676,7 +676,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponChef != null)
                 {
                     weaponChef.SetActive(true);
-                    AttachWeaponToHandGrip(weaponChef);
+                    AttachWeaponForViewer(weaponChef);
                 }
 
                 break;
@@ -690,7 +690,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponBuilder != null)
                 {
                     weaponBuilder.SetActive(true);
-                    AttachWeaponToHandGrip(weaponBuilder);
+                    AttachWeaponForViewer(weaponBuilder);
                 }
 
                 break;
@@ -703,27 +703,37 @@ public class PlayerJobController : NetworkBehaviour
 
 
     /// <summary>
-    /// 무기는 원래 카메라의 자식으로 붙어 있어서, 카메라(=시점)가
-    /// 움직이는 대로 따로 흔들렸다. 리깅에 이미 만들어져 있는 손 위치
-    /// 기준점(RightHandGripReference)의 자식으로 옮겨서, 캐릭터 손에
-    /// 실제로 고정된 것처럼 보이게 한다.
+    /// 무기를 누구 시점에서 보고 있는지에 따라 다르게 붙인다.
     ///
-    /// 처음에는 worldPositionStays: true로 "옮기는 순간의 월드 위치를
-    /// 그대로 유지"하도록 했는데, 이게 오히려 문제였다: 이 메서드는
-    /// Spawned() 시점에 호출되는데, 그때는 아직 Animation Rigging(IK)이
-    /// 한 번도 평가되지 않아 Rig_IK 하위 오브젝트들이 실제 애니메이션
-    /// 자세가 아닌 임시 상태에 있을 수 있다. 그 순간의(잘못된) 월드
-    /// 위치를 기준으로 오프셋을 "고정"해버리니, 캐릭터가 움직이거나
-    /// 회전할 때마다 그 오차가 점점 벌어져 보였다("이동할수록 멀어짐").
+    /// - 내 캐릭터(HasInputAuthority)의 1인칭 시점: 무기를 원래대로
+    ///   카메라의 자식 상태로 둔다(프리팹에 이미 그렇게 배치돼 있음).
+    ///   이 위치는 처음부터 "1인칭 시점에서 자연스럽게 보이도록" 사람이
+    ///   손으로 맞춰놓은 값이라 안정적이다.
     ///
-    /// RightHandGripReference는 애초에 "무기가 손에 있을 때의 위치"로
-    /// 미리 만들어 둔 기준점이므로, 오프셋을 보존할 게 아니라 그냥
-    /// 로컬 원점(0,0,0)에 딱 맞춰 붙이는 게 맞다.
+    ///   RightHandGripReference(=Rig_IK 하위의 IK 기준점)로 옮겨봤지만,
+    ///   그 기준점의 실제 월드 위치/회전은 Animation Rigging(IK)이
+    ///   컨트롤러 타깃을 기준으로 매 프레임 재계산하는 값이다. 지금
+    ///   PC/데스크톱 테스트 환경에서는 그 컨트롤러 타깃이 VR 컨트롤러
+    ///   기준으로 설계돼 있어 제대로 초기화되지 않고, 그 결과 무기가
+    ///   허공에 이상한 방향으로 떠 보이는 문제가 생겼다. 로컬 1인칭
+    ///   시점에서는 이 IK 의존성을 아예 피하는 게 안전하다.
+    ///
+    /// - 다른 플레이어가 보는 시점(proxy): RightHandGripReference에
+    ///   붙인다. 다른 사람 캐릭터는 VRHandTargetFollower가 IK 바인딩
+    ///   자체를 하지 않도록 이미 막아뒀기 때문에(차렷 자세 고정), 이
+    ///   기준점은 프리팹에 미리 만들어둔 정적인 "손 위치"에 가만히
+    ///   있는다 - 그래서 여기서는 안전하게 손에 쥔 것처럼 보인다.
     /// </summary>
-    private void AttachWeaponToHandGrip(GameObject weapon)
+    private void AttachWeaponForViewer(GameObject weapon)
     {
-        if (weapon == null)
+        if (weapon == null || Object == null)
         {
+            return;
+        }
+
+        if (Object.HasInputAuthority)
+        {
+            // 내 1인칭 시점: 프리팹 원래 상태(카메라 자식)를 그대로 둔다.
             return;
         }
 
