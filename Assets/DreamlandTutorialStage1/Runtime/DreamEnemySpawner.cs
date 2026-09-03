@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Fusion;
 using UnityEngine;
 
 namespace DreamGuardians
@@ -8,6 +9,23 @@ namespace DreamGuardians
     [DisallowMultipleComponent]
     public sealed class DreamEnemySpawner : MonoBehaviour
     {
+        // 협동 플레이 동기화: 몬스터는 이제 Runner.Spawn()으로 생성되는
+        // 진짜 네트워크 오브젝트다(전에는 Instantiate로 각 클라이언트가
+        // 따로 만들어서 서로에게 보이지 않았다). Shared Mode에서는
+        // "방장(마스터 클라이언트)" 한 명만 실제로 스폰하고, 나머지
+        // 클라이언트는 그 결과를 그대로 받아서 보게 된다 - 그래야
+        // 인원수만큼 몬스터가 중복 생성되지 않는다.
+        private NetworkRunner cachedRunner;
+
+        private NetworkRunner GetRunner()
+        {
+            if (cachedRunner == null)
+            {
+                cachedRunner = FindAnyObjectByType<NetworkRunner>();
+            }
+
+            return cachedRunner;
+        }
         [Header("Enemy")]
         [SerializeField] private GameObject enemyPrefab;
         [SerializeField, Min(1f)] private float baseEnemyHealth = 100f;
@@ -649,36 +667,83 @@ namespace DreamGuardians
             Transform spawnPoint,
             GameObject prefabOverride)
         {
-            GameObject enemyObject;
             GameObject selectedPrefab =
                 prefabOverride != null
                     ? prefabOverride
                     : enemyPrefab;
 
-            if (selectedPrefab != null)
+            if (selectedPrefab == null)
             {
-                enemyObject =
-                    Instantiate(
-                        selectedPrefab,
-                        position,
-                        rotation);
-            }
-            else
-            {
-                enemyObject =
+                // 프리팹이 아예 연결되지 않은 개발용 디버그 상황.
+                // 네트워크 오브젝트로 만들 방법이 없으므로(에셋이 없음)
+                // 예전처럼 이 클라이언트에만 보이는 임시 큐브로 대체한다.
+                GameObject fallbackObject =
                     GameObject.CreatePrimitive(
                         PrimitiveType.Cube);
 
-                enemyObject.transform.SetPositionAndRotation(
+                fallbackObject.transform.SetPositionAndRotation(
                     position,
                     rotation);
 
-                enemyObject.transform.localScale =
-                    new Vector3(
-                        0.8f,
-                        1.6f,
-                        0.8f);
+                fallbackObject.transform.localScale =
+                    new Vector3(0.8f, 1.6f, 0.8f);
+
+                return ConfigureSpawnedEnemy(
+                    fallbackObject,
+                    tutorialEnemy,
+                    healthMultiplier,
+                    spawnPoint);
             }
+
+            NetworkRunner runner = GetRunner();
+
+            if (runner == null || !runner.IsSharedModeMasterClient)
+            {
+                // 몬스터는 방장(마스터 클라이언트) 한 명만 실제로
+                // 스폰한다. 다른 클라이언트에서 호출된 웨이브 트리거는
+                // 여기서 조용히 무시된다 - 실제 몬스터는 방장이 스폰한
+                // 네트워크 오브젝트를 통해 이미 이 클라이언트에도
+                // 똑같이 보인다. (호출부인 SpawnTutorialEnemy /
+                // SpawnCombatEnemyAtPosition은 null 반환을 이미
+                // 안전하게 처리하고 있고, SpawnMixedGroup 등 웨이브
+                // 스폰 루프는 반환값을 쓰지 않는다.)
+                return null;
+            }
+
+            EnemyHealth spawnedHealth = null;
+
+            runner.Spawn(
+                selectedPrefab,
+                position,
+                rotation,
+                PlayerRef.None,
+                (spawnRunner, networkObject) =>
+                {
+                    spawnedHealth = ConfigureSpawnedEnemy(
+                        networkObject.gameObject,
+                        tutorialEnemy,
+                        healthMultiplier,
+                        spawnPoint);
+                });
+
+            return spawnedHealth;
+        }
+
+        /// <summary>
+        /// Instantiate/Runner.Spawn 어느 경로로 만들어졌든, 생성된
+        /// enemyObject 하나에 필요한 컴포넌트를 구성하고 초기화한다.
+        /// EnemyHealth만 예외적으로 "이미 프리팹에 붙어 있어야" 한다 -
+        /// Fusion은 NetworkBehaviour를 런타임에 AddComponent로 붙이는
+        /// 것을 지원하지 않기 때문이다(다른 컴포넌트들은 평범한
+        /// MonoBehaviour라 예전처럼 여기서 동적으로 붙여도 된다).
+        /// </summary>
+        private EnemyHealth ConfigureSpawnedEnemy(
+            GameObject enemyObject,
+            bool tutorialEnemy,
+            float healthMultiplier,
+            Transform spawnPoint)
+        {
+            Vector3 position = enemyObject.transform.position;
 
             enemyObject.name =
                 tutorialEnemy
@@ -703,9 +768,24 @@ namespace DreamGuardians
                     enemyObject);
             }
 
+            // EnemyHealth는 NetworkBehaviour라서 GetOrAdd(런타임
+            // AddComponent)로 붙일 수 없다 - 프리팹 자체에 미리 붙어
+            // 있어야 한다(팀원이 에디터에서 NetworkObject/
+            // NetworkTransform과 함께 미리 설정).
             EnemyHealth health =
-                GetOrAdd<EnemyHealth>(
+                enemyObject.GetComponent<EnemyHealth>();
+
+            if (health == null)
+            {
+                Debug.LogError(
+                    $"[DreamEnemySpawner] '{enemyObject.name}' 프리팹에 " +
+                    "EnemyHealth 컴포넌트가 없습니다. 이 적 프리팹 에셋에 " +
+                    "NetworkObject + NetworkTransform + EnemyHealth를 " +
+                    "미리 붙여야 협동 플레이에서 정상 동작합니다.",
                     enemyObject);
+
+                return null;
+            }
 
             RoleSynergyTracker synergyTracker =
                 GetOrAdd<RoleSynergyTracker>(

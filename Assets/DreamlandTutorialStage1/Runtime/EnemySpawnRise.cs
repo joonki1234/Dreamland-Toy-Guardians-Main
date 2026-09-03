@@ -32,6 +32,26 @@ namespace DreamGuardians
                 StopCoroutine(routine);
             }
 
+            // 협동 플레이 동기화: 이 연출은 transform.position을 매
+            // 프레임 직접 바꾸는데, 비authority 클라이언트에서 이걸
+            // 그대로 돌리면 NetworkTransform이 동기화하는 진짜 위치와
+            // 서로 다투게 된다(뚝뚝 끊기거나 튀어 보임). State
+            // Authority가 아니면 등장 연출 없이 바로 최종 위치로
+            // 맞추고, 실제 "솟아오르는" 움직임은 NetworkTransform이
+            // 방장 쪽 연출 결과를 그대로 보간해서 보여주게 둔다.
+            if (!EnemyNetworkAuthority.HasAuthority(this))
+            {
+                transform.position = finalPosition;
+
+                if (mover != null)
+                {
+                    mover.enabled = enableMoverAfterRise;
+                }
+
+                Destroy(this);
+                return;
+            }
+
             routine = StartCoroutine(
                 RiseRoutine(
                     finalPosition,

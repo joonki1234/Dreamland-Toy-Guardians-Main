@@ -186,6 +186,16 @@ namespace DreamGuardians
 
         private void Update()
         {
+            // 협동 플레이 동기화: 이동/코어 공격은 이 적을 스폰한
+            // State Authority(방장) 클라이언트에서만 계산한다. 다른
+            // 클라이언트는 NetworkTransform으로 그 결과를 그대로
+            // 따라오기만 해야 하므로, 여기서 직접 위치를 바꾸거나
+            // 코어에 중복으로 피해를 주면 안 된다.
+            if (!EnemyNetworkAuthority.HasAuthority(this))
+            {
+                return;
+            }
+
             if (health != null &&
                 health.IsDead)
             {

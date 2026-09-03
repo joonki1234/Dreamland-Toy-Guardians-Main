@@ -163,6 +163,14 @@ namespace DreamGuardians
 
         private void Update()
         {
+            // 협동 플레이 동기화: 비행/공격 이동은 State Authority(방장)
+            // 클라이언트에서만 계산하고, 나머지는 NetworkTransform으로
+            // 결과만 따라온다.
+            if (!DreamGuardians.EnemyNetworkAuthority.HasAuthority(this))
+            {
+                return;
+            }
+
             if (isDead ||
                 (health != null && health.IsDead) ||
                 targetCore == null ||

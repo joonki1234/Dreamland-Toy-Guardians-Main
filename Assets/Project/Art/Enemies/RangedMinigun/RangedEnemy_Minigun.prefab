@@ -12,6 +12,9 @@ GameObject:
   - component: {fileID: 7380943082016896754}
   - component: {fileID: 8451465813885383606}
   - component: {fileID: 1962939978377820457}
+  - component: {fileID: -4035359974949510327}
+  - component: {fileID: -5952217354961114996}
+  - component: {fileID: -6919413840469376066}
   m_Layer: 7
   m_Name: RangedEnemy_Minigun
   m_TagString: Untagged
@@ -51,10 +54,15 @@ MonoBehaviour:
   isWet: 0
   isOnFire: 0
   isShocked: 0
+  shockDuration: 0.25
+  knockbackDistance: 0.3
   waterEffectPrefab: {fileID: 0}
   electricSynergyVFX: {fileID: 0}
   fireSynergyVFX: {fileID: 0}
-  shockStunDuration: 0.1
+  maxShockCount: 3
+  wetDuration: 20
+  darkFactor: 0.32
+  modelRoot: {fileID: 0}
 --- !u!136 &8451465813885383606
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -99,8 +107,93 @@ MonoBehaviour:
   muzzle: {fileID: 0}
   muzzleForwardOffset: 0.18
   bulletColor: {r: 1, g: 0.72, b: 0.18, a: 1}
+  attackSfx: {fileID: 0}
+  attackSfxVolume: 0.35
+  modelYawOffset: 180
   animator: {fileID: 0}
   arrivalTolerance: 0.25
+  idleStateName: Idle
+  walkingStateName: Walking
+  attackStateName: AttackMinigun
+  animationCrossFadeDuration: 0.08
+--- !u!114 &-4035359974949510327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4376583669907981605}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 658681377
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 262402
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: -5952217354961114996}
+  - {fileID: -6919413840469376066}
+  ForceRemoteRenderTimeframe: 0
+--- !u!114 &-5952217354961114996
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4376583669907981605}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 158639473, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkTransform
+  _stateAuthorityChangeErrorCorrectionDelta: 0
+  SyncScale: 0
+  SyncParent: 0
+  _autoAOIOverride: 1
+  ConfigFlags: 0
+  PhysicsSettings:
+    ForecastEnabled: 1
+    DebugPhysics: 0
+    GravityForecast: 2
+    MaxExtrapolationTime: 0.15
+    MinLinearDetectedError: 0.02
+    MinAngularDetectedError: 3
+    MaxLinearError: 0
+    MaxAngularError: 0
+    LowCorrectionProgressThreshold: 0.015
+    HighErrorSimilarityThreshold: 1
+    MaxErrorTotalTime: 0.5
+    MaxRemoteSleepIgnoreTime: 0.5
+    ErrorCorrectionType: 0
+    LinearVelCorrectionMul: 1
+    AngularVelCorrectionMul: 1
+    PositionCorrectionLerp: 0.15
+    RotationCorrectionLerp: 0.15
+    Spring: 75
+    Damper: 2
+    MinImpactfulCollisionAlignment: 0.3
+    ImpactStartCorrectionTime: 0.1
+    ImpactCorrectionTimeComplete: 0.3
+--- !u!114 &-6919413840469376066
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4376583669907981605}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f52ea031900285941ad92669c32c8b97, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.EnemyHealth
+  maxHealth: 100
+  damageEnabled: 1
+  rememberedShotCount: 128
+  deathSfx: {fileID: 0}
+  deathSfxVolume: 0.45
 --- !u!1001 &341354743468666704
 PrefabInstance:
   m_ObjectHideFlags: 0

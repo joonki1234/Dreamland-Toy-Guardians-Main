@@ -171,6 +171,14 @@ namespace DreamGuardians
         {
             CacheReferences();
 
+            // 협동 플레이 동기화: 실제 탄환 발사·코어 피해는 State
+            // Authority(방장) 클라이언트에서만 실행한다. 그렇지 않으면
+            // 플레이어 수만큼 코어가 중복으로 피해를 입는다.
+            if (!EnemyNetworkAuthority.HasAuthority(this))
+            {
+                return;
+            }
+
             if (health != null && health.IsDead)
             {
                 SetAnimatorState(false, false);
