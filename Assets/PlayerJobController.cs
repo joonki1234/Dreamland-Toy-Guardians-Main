@@ -725,24 +725,18 @@ public class PlayerJobController : NetworkBehaviour
     /// <summary>
     /// 무기를 누구 시점에서 보고 있는지에 따라 다르게 붙인다.
     ///
-    /// - 내 캐릭터(HasInputAuthority)의 1인칭 시점: 무기를 원래대로
-    ///   카메라의 자식 상태로 둔다(프리팹에 이미 그렇게 배치돼 있음).
-    ///   이 위치는 처음부터 "1인칭 시점에서 자연스럽게 보이도록" 사람이
-    ///   손으로 맞춰놓은 값이라 안정적이다.
+    /// - 로컬 플레이어는 HandTarget_R에 붙인다. VRHandTargetFollower가
+    ///   컨트롤러 Pose로 이 Transform을 직접 갱신하므로 무기도 실제 손
+    ///   Pose를 따른다.
     ///
-    ///   RightHandGripReference(=Rig_IK 하위의 IK 기준점)로 옮겨봤지만,
-    ///   그 기준점의 실제 월드 위치/회전은 Animation Rigging(IK)이
-    ///   컨트롤러 타깃을 기준으로 매 프레임 재계산하는 값이다. 지금
-    ///   PC/데스크톱 테스트 환경에서는 그 컨트롤러 타깃이 VR 컨트롤러
-    ///   기준으로 설계돼 있어 제대로 초기화되지 않고, 그 결과 무기가
-    ///   허공에 이상한 방향으로 떠 보이는 문제가 생겼다. 로컬 1인칭
-    ///   시점에서는 이 IK 의존성을 아예 피하는 게 안전하다.
+    /// - 원격 플레이어는 기존처럼 RightHandGripReference에 붙인다.
+    ///   원격에서는 컨트롤러 Pose를 실행하지 않으므로 프리팹의 정적인
+    ///   손 위치를 사용한다.
     ///
-    /// - 다른 플레이어가 보는 시점(proxy): RightHandGripReference에
-    ///   붙인다. 다른 사람 캐릭터는 VRHandTargetFollower가 IK 바인딩
-    ///   자체를 하지 않도록 이미 막아뒀기 때문에(차렷 자세 고정), 이
-    ///   기준점은 프리팹에 미리 만들어둔 정적인 "손 위치"에 가만히
-    ///   있는다 - 그래서 여기서는 안전하게 손에 쥔 것처럼 보인다.
+    ///   HandTarget_R는 Animation Rigging이 읽는 IK target이다. Constraint는
+    ///   target을 읽기만 하고 target Transform을 덮어쓰지 않으므로, 로컬
+    ///   무기를 그 자식으로 두어도 무기와 IK 사이에 이중 변환이 생기지
+    ///   않는다.
     /// </summary>
     private void AttachWeaponForViewer(GameObject weapon, Vector3 positionOffset, Vector3 rotationOffsetEuler)
     {
@@ -751,13 +745,9 @@ public class PlayerJobController : NetworkBehaviour
             return;
         }
 
-        if (Object.HasInputAuthority)
-        {
-            // 내 1인칭 시점: 프리팹 원래 상태(카메라 자식)를 그대로 둔다.
-            return;
-        }
-
-        Transform gripAnchor = ResolveHandGripAnchor();
+        Transform gripAnchor = Object.HasInputAuthority
+            ? ResolveLocalHandTarget()
+            : ResolveHandGripAnchor();
 
         if (gripAnchor == null)
         {
@@ -774,6 +764,45 @@ public class PlayerJobController : NetworkBehaviour
         // Inspector에서 잡별 오프셋 값을 조절해서 맞출 수 있다.
         weapon.transform.localPosition = positionOffset;
         weapon.transform.localRotation = Quaternion.Euler(rotationOffsetEuler);
+    }
+
+
+    private Transform cachedLocalHandTarget;
+    private bool triedResolveLocalHandTarget;
+
+
+    private Transform ResolveLocalHandTarget()
+    {
+        if (cachedLocalHandTarget != null)
+        {
+            return cachedLocalHandTarget;
+        }
+
+        if (triedResolveLocalHandTarget)
+        {
+            return null;
+        }
+
+        triedResolveLocalHandTarget = true;
+
+        foreach (Transform candidate in GetComponentsInChildren<Transform>(true))
+        {
+            if (candidate != null && candidate.name == "HandTarget_R")
+            {
+                cachedLocalHandTarget = candidate;
+                break;
+            }
+        }
+
+        if (cachedLocalHandTarget == null)
+        {
+            Debug.LogWarning(
+                "[PlayerJobController] 'HandTarget_R'를 찾지 못해 " +
+                "로컬 무기를 손 Pose에 고정하지 못했습니다.",
+                this);
+        }
+
+        return cachedLocalHandTarget;
     }
 
 

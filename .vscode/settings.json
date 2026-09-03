@@ -68,5 +68,11 @@
         "*.slnx": "*.csproj"
     },
     "dotnet.defaultSolution": "Dreamland-Toy-Guardians-Main.slnx",
-    "dotnet.preferCSharpExtension": true
+    "dotnet.preferCSharpExtension": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^Get-ChildItem -Path 'Assets/Samples/XR Interaction Toolkit/3\\.5\\.1/XR Device Simulator' -Recurse -File -Include \\*\\.inputactions \\| ForEach-Object \\{ Write-Output \\$_\\.FullName; Get-Content \\$_\\.FullName \\| Select-String -Pattern '\"name\": \"\\(Main\\|1D Axis\\|2D Axis\\|Position\\|Rotation\\|Grip\\|Trigger\\|Primary 2D Axis\\)\"\\|<Mouse>\\|<Keyboard>' \\| Select-Object -First 80 \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }
