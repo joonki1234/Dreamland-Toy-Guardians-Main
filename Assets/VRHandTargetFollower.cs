@@ -184,6 +184,20 @@ public class VRHandTargetFollower : NetworkBehaviour
 
         jobController = GetJobController();
 
+        // 팔 IK(RightHand_IK/LeftHand_IK)는 매 프레임 LateUpdate()에서
+        // 로컬 컨트롤러/마우스 위치로 target을 계속 갱신해줘야 자연스럽다.
+        // 그런데 LateUpdate()는 HasInputAuthority(내 캐릭터)일 때만 돈다.
+        // 예전에는 여기서 다른 사람 캐릭터(proxy)에도 target을 한 번
+        // 연결해버려서, 그 target이 다시는 갱신되지 않는 채로 팔이 그
+        // 자리(대개 프리팹 기본 위치, 어깨 근처)를 향해 영원히 고정돼
+        // "한쪽 팔이 들려 있는" 이상한 자세로 보였다. 이제 내 캐릭터가
+        // 아니면 IK를 아예 걸지 않아서, 다른 사람 눈에는 그냥 자연스러운
+        // 차렷 자세(리깅 전 기본 포즈)로 보인다.
+        if (!Object.HasInputAuthority)
+        {
+            return;
+        }
+
         if (autoFindControllerTargets)
         {
             TryResolveControllerTargets();

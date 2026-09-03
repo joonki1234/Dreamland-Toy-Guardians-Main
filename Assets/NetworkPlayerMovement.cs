@@ -190,6 +190,25 @@ public class NetworkPlayerMovement : NetworkBehaviour
             audioListener.enabled = isMine;
         }
 
+        // 캐릭터 몸(Models 하위 전부)은 프리팹에서 "LocalPlayer" 레이어로
+        // 만들어져 있고, 카메라의 Culling Mask는 그 레이어를 제외하고
+        // 있다 - 그래야 1인칭 시점에서 내 몸이 카메라 바로 앞을 가리지
+        // 않는다. 문제는 이 레이어/마스크가 모든 플레이어에게 동일하게
+        // 적용된다는 점이다: 아무 처리도 안 하면 "다른 플레이어의 카메라"
+        // 역시 이 레이어를 제외하므로, 다른 사람 눈에도 내 몸이 안 보이게
+        // 된다. 그래서 "이 캐릭터가 내 캐릭터가 아닐 때"(즉 상대방이 내
+        // 화면에 보이는 경우)만 그 오브젝트의 레이어를 다시 기본
+        // 레이어로 바꿔서, 상대방에게는 정상적으로 보이게 한다.
+        if (!isMine)
+        {
+            Transform modelsRoot = transform.Find("Models");
+
+            if (modelsRoot != null)
+            {
+                SetLayerRecursively(modelsRoot.gameObject, LayerMask.NameToLayer("Default"));
+            }
+        }
+
         if (isMine)
         {
             Cursor.lockState = CursorLockMode.Locked;
@@ -549,5 +568,28 @@ public class NetworkPlayerMovement : NetworkBehaviour
         }
 
         return largestHorizontalScale * 0.5f;
+    }
+
+
+    /// <summary>
+    /// target과 그 모든 자식의 레이어를 재귀적으로 바꾼다.
+    /// 다른 플레이어(proxy) 캐릭터의 몸을 "LocalPlayer" 레이어에서 빼내
+    /// 내 카메라의 Culling Mask에 다시 걸리게 할 때 사용한다.
+    /// </summary>
+    private static void SetLayerRecursively(GameObject target, int layer)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        target.layer = layer;
+
+        Transform targetTransform = target.transform;
+
+        for (int i = 0; i < targetTransform.childCount; i++)
+        {
+            SetLayerRecursively(targetTransform.GetChild(i).gameObject, layer);
+        }
     }
 }
