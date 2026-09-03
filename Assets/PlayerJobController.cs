@@ -648,6 +648,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponPolice != null)
                 {
                     weaponPolice.SetActive(true);
+                    AttachWeaponToHandGrip(weaponPolice);
                 }
 
                 break;
@@ -661,6 +662,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponFirefighter != null)
                 {
                     weaponFirefighter.SetActive(true);
+                    AttachWeaponToHandGrip(weaponFirefighter);
                 }
 
                 break;
@@ -674,6 +676,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponChef != null)
                 {
                     weaponChef.SetActive(true);
+                    AttachWeaponToHandGrip(weaponChef);
                 }
 
                 break;
@@ -687,10 +690,84 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponBuilder != null)
                 {
                     weaponBuilder.SetActive(true);
+                    AttachWeaponToHandGrip(weaponBuilder);
                 }
 
                 break;
         }
+    }
+
+
+    private Transform cachedHandGripAnchor;
+    private bool triedResolveHandGripAnchor;
+
+
+    /// <summary>
+    /// 무기는 원래 카메라의 자식으로 붙어 있어서, 카메라(=시점)가
+    /// 움직이는 대로 따로 흔들렸다. 리깅에 이미 만들어져 있는 손 위치
+    /// 기준점(RightHandGripReference)의 자식으로 옮겨서, 캐릭터 손에
+    /// 실제로 고정된 것처럼 보이게 한다.
+    ///
+    /// SetParent(..., worldPositionStays: true)를 써서 옮기는 순간의
+    /// 월드 위치/회전은 그대로 유지한 채 부모만 바꾼다 - 그래야 오프셋
+    /// 값을 새로 추측해서 넣지 않아도 눈에 보이는 위치가 갑자기
+    /// 튀지 않는다.
+    /// </summary>
+    private void AttachWeaponToHandGrip(GameObject weapon)
+    {
+        if (weapon == null)
+        {
+            return;
+        }
+
+        Transform gripAnchor = ResolveHandGripAnchor();
+
+        if (gripAnchor == null)
+        {
+            return;
+        }
+
+        if (weapon.transform.parent == gripAnchor)
+        {
+            return;
+        }
+
+        weapon.transform.SetParent(gripAnchor, true);
+    }
+
+
+    private Transform ResolveHandGripAnchor()
+    {
+        if (cachedHandGripAnchor != null)
+        {
+            return cachedHandGripAnchor;
+        }
+
+        if (triedResolveHandGripAnchor)
+        {
+            return null;
+        }
+
+        triedResolveHandGripAnchor = true;
+
+        foreach (Transform candidate in GetComponentsInChildren<Transform>(true))
+        {
+            if (candidate != null && candidate.name == "RightHandGripReference")
+            {
+                cachedHandGripAnchor = candidate;
+                break;
+            }
+        }
+
+        if (cachedHandGripAnchor == null)
+        {
+            Debug.LogWarning(
+                "[PlayerJobController] 'RightHandGripReference'를 찾지 못해 " +
+                "무기를 손에 고정하지 못했습니다. 카메라 자식 상태로 남습니다.",
+                this);
+        }
+
+        return cachedHandGripAnchor;
     }
 
 
