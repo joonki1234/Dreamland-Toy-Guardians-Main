@@ -15529,13 +15529,13 @@ MonoBehaviour:
   weaponFirefighter: {fileID: 2956109996102229455}
   weaponChef: {fileID: 7022664455085778667}
   weaponBuilder: {fileID: 201037810324020591}
-  weaponPoliceGripOffset: {x: 0, y: -10, z: 0}
+  weaponPoliceGripOffset: {x: 0.15, y: -0.2, z: 0.16}
   weaponPoliceGripRotationOffset: {x: 0, y: 0, z: 0}
-  weaponFirefighterGripOffset: {x: 0, y: 0, z: -10}
+  weaponFirefighterGripOffset: {x: 0.66, y: 0, z: 0.2}
   weaponFirefighterGripRotationOffset: {x: 0, y: 0, z: 0}
   weaponChefGripOffset: {x: 0, y: 0, z: 0}
   weaponChefGripRotationOffset: {x: 0, y: 0, z: 0}
-  weaponBuilderGripOffset: {x: 0, y: -10, z: 0}
+  weaponBuilderGripOffset: {x: 0.66, y: -1.6, z: 2.2}
   weaponBuilderGripRotationOffset: {x: 0, y: 0, z: 0}
   dirtPrefab: {fileID: 6378157156313051141, guid: a2bce693e5de14482bc5aa783a92cd6e, type: 3}
   shovelFirePoint: {fileID: 5664976912871970265}
