@@ -225,6 +225,15 @@ public class NetworkPlayerMovement : NetworkBehaviour
             }
         }
 
+        // 시점 회전 동기화가 또 안 된다는 리포트가 계속 나와서, 다음 테스트 때
+        // 콘솔에서 바로 원인을 특정할 수 있도록 스폰 시점 권한 상태를 로그로 남긴다.
+        // (이 캐릭터가 "내 캐릭터"인지, StateAuthority를 실제로 갖고 있는지 확인용.
+        //  이후 문제 없으면 지워도 된다.)
+        Debug.Log(
+            $"[NetworkPlayerMovement] Spawned: isMine(InputAuthority)={isMine}, " +
+            $"HasStateAuthority={Object.HasStateAuthority}, " +
+            $"초기 rotation.y={transform.eulerAngles.y:F1}");
+
         if (isMine)
         {
             Cursor.lockState = CursorLockMode.Locked;
@@ -394,11 +403,28 @@ public class NetworkPlayerMovement : NetworkBehaviour
     }
 
 
+    private float _rotationDebugLogTimer;
+
     private void Update()
     {
         // 스폰 직후 첫 프레임 등 Fusion이 아직 Object를 연결하기 전에
         // Update()가 먼저 호출될 수 있다 - 안전하게 무시한다.
         if (Object == null) return;
+
+        // 시점 회전이 상대방 화면에 안 보인다는 리포트를 진단하기 위한 임시 로그.
+        // isMine 여부와 상관없이(=내 캐릭터든 다른 사람이 조종하는 캐릭터의 proxy든)
+        // 2초마다 현재 y축 회전값을 찍는다. 다른 사람이 실제로 마우스를 돌릴 때
+        // 이 값이 콘솔에서 실제로 바뀌는지 보면, 네트워크 동기화 문제인지
+        // 단순히 눈으로 보이는(렌더링) 문제인지 구분할 수 있다.
+        // 문제 없는 게 확인되면 이 블록은 지워도 된다.
+        _rotationDebugLogTimer += Time.deltaTime;
+        if (_rotationDebugLogTimer >= 2f)
+        {
+            _rotationDebugLogTimer = 0f;
+            Debug.Log(
+                $"[NetworkPlayerMovement][회전진단] isMine={Object.HasInputAuthority}, " +
+                $"HasStateAuthority={Object.HasStateAuthority}, rotation.y={transform.eulerAngles.y:F1}");
+        }
 
         // 마우스 입력은 내 클라이언트에서만 읽는다. 좌우 회전량은 아래에서
         // 모아뒀다가 FixedUpdateNetwork()에서 실제로 적용하고(동기화 필요),

@@ -34,6 +34,26 @@ public class PlayerJobController : NetworkBehaviour
     public GameObject weaponBuilder;
 
 
+    [Header("상대방 시점 무기 위치 보정 (RightHandGripReference 기준 로컬 오프셋)")]
+    [Tooltip(
+        "무기 프리팹마다 원래 만들어진 기준점(피벗) 위치가 제각각이라, " +
+        "손 위치(RightHandGripReference)에 그냥 딱 붙이면 무기마다 손 안에 " +
+        "파묻히거나(안 보임) 엉뚱한 곳에 떠 보일 수 있다. 유니티 에디터에서 " +
+        "Play 하면서 이 값을 조금씩 바꿔보고, 다른 사람 화면(또는 2번째 캐릭터로 " +
+        "접속해서)에서 자연스럽게 손에 쥔 것처럼 보일 때까지 맞추면 된다.")]
+    public Vector3 weaponPoliceGripOffset = Vector3.zero;
+    public Vector3 weaponPoliceGripRotationOffset = Vector3.zero;
+
+    public Vector3 weaponFirefighterGripOffset = Vector3.zero;
+    public Vector3 weaponFirefighterGripRotationOffset = Vector3.zero;
+
+    public Vector3 weaponChefGripOffset = Vector3.zero;
+    public Vector3 weaponChefGripRotationOffset = Vector3.zero;
+
+    public Vector3 weaponBuilderGripOffset = Vector3.zero;
+    public Vector3 weaponBuilderGripRotationOffset = Vector3.zero;
+
+
     [Header("건축가(Builder) 흙 발사 기본 설정")]
     public GameObject dirtPrefab;
 
@@ -648,7 +668,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponPolice != null)
                 {
                     weaponPolice.SetActive(true);
-                    AttachWeaponForViewer(weaponPolice);
+                    AttachWeaponForViewer(weaponPolice, weaponPoliceGripOffset, weaponPoliceGripRotationOffset);
                 }
 
                 break;
@@ -662,7 +682,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponFirefighter != null)
                 {
                     weaponFirefighter.SetActive(true);
-                    AttachWeaponForViewer(weaponFirefighter);
+                    AttachWeaponForViewer(weaponFirefighter, weaponFirefighterGripOffset, weaponFirefighterGripRotationOffset);
                 }
 
                 break;
@@ -676,7 +696,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponChef != null)
                 {
                     weaponChef.SetActive(true);
-                    AttachWeaponForViewer(weaponChef);
+                    AttachWeaponForViewer(weaponChef, weaponChefGripOffset, weaponChefGripRotationOffset);
                 }
 
                 break;
@@ -690,7 +710,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponBuilder != null)
                 {
                     weaponBuilder.SetActive(true);
-                    AttachWeaponForViewer(weaponBuilder);
+                    AttachWeaponForViewer(weaponBuilder, weaponBuilderGripOffset, weaponBuilderGripRotationOffset);
                 }
 
                 break;
@@ -724,7 +744,7 @@ public class PlayerJobController : NetworkBehaviour
     ///   기준점은 프리팹에 미리 만들어둔 정적인 "손 위치"에 가만히
     ///   있는다 - 그래서 여기서는 안전하게 손에 쥔 것처럼 보인다.
     /// </summary>
-    private void AttachWeaponForViewer(GameObject weapon)
+    private void AttachWeaponForViewer(GameObject weapon, Vector3 positionOffset, Vector3 rotationOffsetEuler)
     {
         if (weapon == null || Object == null)
         {
@@ -744,15 +764,16 @@ public class PlayerJobController : NetworkBehaviour
             return;
         }
 
-        if (weapon.transform.parent == gripAnchor)
+        if (weapon.transform.parent != gripAnchor)
         {
-            return;
+            weapon.transform.SetParent(gripAnchor, false);
+            weapon.transform.localScale = Vector3.one;
         }
 
-        weapon.transform.SetParent(gripAnchor, false);
-        weapon.transform.localPosition = Vector3.zero;
-        weapon.transform.localRotation = Quaternion.identity;
-        weapon.transform.localScale = Vector3.one;
+        // 무기마다 원래 피벗 위치가 달라서 (0,0,0)만으로는 다 안 맞는다.
+        // Inspector에서 잡별 오프셋 값을 조절해서 맞출 수 있다.
+        weapon.transform.localPosition = positionOffset;
+        weapon.transform.localRotation = Quaternion.Euler(rotationOffsetEuler);
     }
 
 
