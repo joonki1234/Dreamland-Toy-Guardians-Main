@@ -44,6 +44,19 @@ public class PlayerJobController : NetworkBehaviour
     public Vector3 weaponPoliceGripOffset = Vector3.zero;
     public Vector3 weaponPoliceGripRotationOffset = Vector3.zero;
 
+    [Header("로컬 VR Police Grip (HandTarget_R 기준)")]
+    [Tooltip("로컬 Police 총 전용 위치 보정. 원격 표시용 weaponPoliceGripOffset과 좌표 기준을 공유하지 않습니다.")]
+    [SerializeField]
+    private Vector3 localVrPoliceGripPosition = Vector3.zero;
+
+    [Tooltip("로컬 Police 총 전용 회전 보정(Euler). (0,0,0)이면 총 루트 +Z와 Controller +Z가 일치합니다.")]
+    [SerializeField]
+    private Vector3 localVrPoliceGripRotation = Vector3.zero;
+
+    [Tooltip("HandTarget_R 아래의 로컬 Police 전용 무기 기준점")]
+    [SerializeField]
+    private Transform policeWeaponAnchor;
+
     public Vector3 weaponFirefighterGripOffset = Vector3.zero;
     public Vector3 weaponFirefighterGripRotationOffset = Vector3.zero;
 
@@ -668,7 +681,7 @@ public class PlayerJobController : NetworkBehaviour
                 if (weaponPolice != null)
                 {
                     weaponPolice.SetActive(true);
-                    AttachWeaponForViewer(weaponPolice, weaponPoliceGripOffset, weaponPoliceGripRotationOffset);
+                    AttachPoliceWeaponForViewer();
                 }
 
                 break;
@@ -721,6 +734,43 @@ public class PlayerJobController : NetworkBehaviour
     private Transform cachedHandGripAnchor;
     private bool triedResolveHandGripAnchor;
 
+    private void AttachPoliceWeaponForViewer()
+    {
+        bool isLocalVrWeapon = Object != null && Object.HasInputAuthority;
+
+        if (isLocalVrWeapon)
+        {
+            Transform anchor = ResolvePoliceWeaponAnchor();
+            AttachWeaponToAnchor(
+                weaponPolice,
+                anchor,
+                localVrPoliceGripPosition,
+                localVrPoliceGripRotation);
+            return;
+        }
+
+        AttachWeaponForViewer(
+            weaponPolice,
+            weaponPoliceGripOffset,
+            weaponPoliceGripRotationOffset);
+    }
+
+    private Transform ResolvePoliceWeaponAnchor()
+    {
+        if (policeWeaponAnchor != null)
+        {
+            return policeWeaponAnchor;
+        }
+
+        Transform handTarget = ResolveLocalHandTarget();
+        if (handTarget != null)
+        {
+            policeWeaponAnchor = handTarget.Find("PoliceWeaponAnchor");
+        }
+
+        return policeWeaponAnchor;
+    }
+
 
     /// <summary>
     /// 무기를 누구 시점에서 보고 있는지에 따라 다르게 붙인다.
@@ -749,7 +799,16 @@ public class PlayerJobController : NetworkBehaviour
             ? ResolveLocalHandTarget()
             : ResolveHandGripAnchor();
 
-        if (gripAnchor == null)
+        AttachWeaponToAnchor(weapon, gripAnchor, positionOffset, rotationOffsetEuler);
+    }
+
+    private static void AttachWeaponToAnchor(
+        GameObject weapon,
+        Transform gripAnchor,
+        Vector3 positionOffset,
+        Vector3 rotationOffsetEuler)
+    {
+        if (weapon == null || gripAnchor == null)
         {
             return;
         }

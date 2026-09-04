@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using Fusion;
 using UnityEngine;
@@ -33,9 +32,9 @@ public class GunController : MonoBehaviour
     public float bulletLifetime = 3f;
 
 
-    [Header("조준 설정")]
+    [Header("조준 설정 (총구 기준)")]
 
-    [Tooltip("화면 중앙 조준 방향을 계산할 플레이어 카메라")]
+    [Tooltip("기존 Inspector 참조 호환용. Police 기본 공격 방향에는 사용하지 않습니다.")]
     public Camera playerCamera;
 
     [Tooltip("조준 가능한 최대 거리")]
@@ -131,33 +130,10 @@ public class GunController : MonoBehaviour
             return;
         }
 
-        if (playerCamera == null)
-        {
-            playerCamera = Camera.main;
-
-            if (playerCamera == null)
-            {
-                Debug.LogWarning(
-                    $"{gameObject.name}: Player Camera가 비어 있습니다."
-                );
-
-                return;
-            }
-        }
-
-        Vector3 targetPoint =
-            FindAimTargetPoint();
-
-        Vector3 shootDirection =
-            targetPoint - firePoint.position;
-
-        if (shootDirection.sqrMagnitude <= 0.0001f)
-        {
-            shootDirection =
-                playerCamera.transform.forward;
-        }
-
-        shootDirection.Normalize();
+        // VR에서는 HMD가 아니라 오른손에 고정된 총구가 조준 기준이다.
+        // FirePoint는 Weapon_Police의 자식이므로 Controller -> HandTarget_R ->
+        // Weapon_Police의 회전을 그대로 이어받는다.
+        Vector3 shootDirection = firePoint.forward;
 
         Quaternion bulletRotation =
             Quaternion.LookRotation(
@@ -217,62 +193,6 @@ public class GunController : MonoBehaviour
             bullet,
             Mathf.Max(0.1f, bulletLifetime)
         );
-    }
-
-
-    /// <summary>
-    /// 카메라 화면 중앙이 가리키는 지점을 찾는다.
-    ///
-    /// 이것은 피해 판정이 아니라,
-    /// 총구에서 총알이 날아갈 방향만 계산하는 용도다.
-    /// </summary>
-    private Vector3 FindAimTargetPoint()
-    {
-        Ray aimRay = new Ray(
-            playerCamera.transform.position,
-            playerCamera.transform.forward
-        );
-
-        RaycastHit[] hits =
-            Physics.RaycastAll(
-                aimRay,
-                aimDistance,
-                aimMask,
-                QueryTriggerInteraction.Ignore
-            );
-
-        if (hits != null && hits.Length > 0)
-        {
-            Array.Sort(
-                hits,
-                (left, right) =>
-                    left.distance.CompareTo(right.distance)
-            );
-
-            Transform playerRoot =
-                transform.root;
-
-            foreach (RaycastHit hit in hits)
-            {
-                if (hit.collider == null)
-                {
-                    continue;
-                }
-
-                // 플레이어 자신의 Collider는 조준 대상에서 제외한다.
-                if (hit.collider.transform.IsChildOf(playerRoot))
-                {
-                    continue;
-                }
-
-                return hit.point;
-            }
-        }
-
-        return
-            playerCamera.transform.position +
-            playerCamera.transform.forward *
-            aimDistance;
     }
 
 
