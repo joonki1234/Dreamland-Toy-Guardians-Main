@@ -115,6 +115,11 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         _runner = Instantiate(runnerPrefab);
         _runner.name = "NetworkRunner";
         _runner.AddCallbacks(this);
+        // Direct-map entry can supply a runner-only template. The tutorial's scene
+        // NetworkObject must be registered by the same scene manager as normal lobby entry.
+        var sceneManager = _runner.GetComponent<NetworkSceneManagerDefault>();
+        if (sceneManager == null)
+            sceneManager = _runner.gameObject.AddComponent<NetworkSceneManagerDefault>();
 
         // 씬이 바뀌어도(로비 -> 맵) 같은 접속을 계속 유지한다.
         DontDestroyOnLoad(_runner.gameObject);
@@ -127,7 +132,9 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         {
             GameMode = GameMode.Shared,
             SessionName = roomName,
+            PlayerCount = 8,
             Scene = sceneInfo,
+            SceneManager = sceneManager,
         };
 
         var result = await _runner.StartGame(startArguments);

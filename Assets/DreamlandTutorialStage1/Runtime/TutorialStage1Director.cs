@@ -484,68 +484,42 @@ namespace DreamGuardians
             }
 
 
-            // Wait for the real game runner, not a fixed delay or a scene template.
-            const float runnerReadyTimeout = 15f;
-            float runnerWaitStarted = Time.realtimeSinceStartup;
-            bool waitingLogged = false;
-            while (true)
+            // Only the Master creates the enemy. Every peer resolves the shared ID,
+            // including peers whose scene or enemy replication arrives later.
+            float connectionStarted = Time.realtimeSinceStartup;
+            float nextDiagnostic = connectionStarted + 10f;
+            while (spawner != null && !spawner.TryFindTutorialEnemy(out tutorialEnemy))
             {
-                if (spawner == null)
+                if (spawner.CanSpawnTutorialEnemy && !spawner.TutorialSpawnIssued)
                 {
-                    Debug.LogError("[Dreamland] 튜토리얼 중단: 대기 중 Spawner가 사라졌습니다.", this);
-                    flowRoutine = null;
-                    yield break;
+                    PlaceTutorialSpawnInFrontOfCamera();
+                    spawner.SpawnTutorialEnemy(tutorialSpawnPoint);
                 }
 
-                DreamEnemySpawner.TutorialSpawnStatus status =
-                    spawner.GetTutorialRunnerStatus(out string reason);
-                if (status == DreamEnemySpawner.TutorialSpawnStatus.ReadyMaster)
-                    break;
-
-                if (status == DreamEnemySpawner.TutorialSpawnStatus.NonMaster)
+                if (Time.realtimeSinceStartup >= nextDiagnostic)
                 {
-                    // TODO: Bind the replicated tutorial enemy via network identity here.
-                    // Remain in Intro; shooting practice cannot start without that reference.
-                    Debug.LogWarning("[Dreamland] 튜토리얼 진행 보류: Shared Mode Non-Master이므로 Spawn을 생략합니다. 복제 적 연결이 아직 구현되지 않아 Intro에서 중단합니다.", this);
-                    flowRoutine = null;
-                    yield break;
+                    string detail = spawner.IsTutorialSessionReady
+                        ? $"master={spawner.CanSpawnTutorialEnemy}, issued={spawner.TutorialSpawnIssued}, enemy={spawner.TutorialEnemyId}"
+                        : "RoomManager.Runner 연결 또는 Scene NetworkObject 등록 대기";
+                    Debug.LogWarning($"[TutorialNetwork] 복제 연결 대기: {detail}", this);
+                    nextDiagnostic += 10f;
                 }
-
-                if (status == DreamEnemySpawner.TutorialSpawnStatus.InvalidRunnerMode ||
-                    Time.realtimeSinceStartup - runnerWaitStarted >= runnerReadyTimeout)
-                {
-                    Debug.LogError($"[Dreamland] 튜토리얼 Runner 준비 실패 (대기 {Time.realtimeSinceStartup - runnerWaitStarted:F1}초 / 제한 {runnerReadyTimeout}초): {reason}. Intro에서 중단합니다.", this);
-                    flowRoutine = null;
-                    yield break;
-                }
-
-                if (!waitingLogged)
-                {
-                    Debug.Log($"[Dreamland] 튜토리얼 Runner 준비 대기 (최대 {runnerReadyTimeout}초): {reason}", this);
-                    waitingLogged = true;
-                }
-                yield return null;
+                if (Time.realtimeSinceStartup - connectionStarted >= 60f) break;
+                yield return new WaitForSecondsRealtime(0.25f);
             }
-
-            PlaceTutorialSpawnInFrontOfCamera();
-
-
-            /*
-             * 6단계: 튜토리얼 적 생성
-             */
-            tutorialEnemy =
-                spawner.SpawnTutorialEnemy(
-                    tutorialSpawnPoint);
 
             if (tutorialEnemy == null)
             {
                 Debug.LogError(
-                    $"[Dreamland] 튜토리얼 진행 중단: {spawner.LastTutorialSpawnStatus}. 앞선 Spawn/EnemyHealth 진단을 확인하세요. 자동 Spawn 재시도는 하지 않습니다.",
+                    "[TutorialNetwork] 연결 대기 종료. 세션/Scene 등록/Enemy 복제 상태를 확인하세요.",
                     this);
 
+                State = TutorialStage1State.Idle;
                 flowRoutine = null;
                 yield break;
             }
+
+            Debug.Log($"[TutorialNetwork] Bound player={tutorialEnemy.Runner.LocalPlayer}, enemy={tutorialEnemy.Object.Id}", this);
 
             tutorialEnemy.SetDamageEnabled(false);
 
