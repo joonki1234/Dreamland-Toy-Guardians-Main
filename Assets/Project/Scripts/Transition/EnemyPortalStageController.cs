@@ -828,6 +828,33 @@ public sealed class EnemyPortalStageController : MonoBehaviour
             this);
     }
 
+    /// <summary>
+    /// "테스트 - Stage 2부터 시작" 같은 테스트 진입점이 Stage 1의 실제
+    /// 준비 코루틴(RunStage1PreparationAll)을 거치지 않고 곧바로 Stage 2로
+    /// 넘어갈 때 사용합니다. Portal A~D와 Road_1~4를 즉시 모두 연 상태로
+    /// 만들어, DreamEnemySpawner가 활성화된 스폰 포인트를 찾지 못해
+    /// 적을 하나도 생성하지 못하는 문제를 막습니다.
+    /// </summary>
+    public void OpenAllStage1PortalsImmediatelyForTest()
+    {
+        SetActivePortalCount(4);
+
+        portalA?.ApplyLargePortal();
+        portalB?.ApplyLargePortal();
+        portalC?.ApplyLargePortal();
+        portalD?.ApplyLargePortal();
+
+        RevealRoad1Once();
+        RevealRoad2Once();
+        RevealRoad3Once();
+        RevealRoad4Once();
+
+        Debug.Log(
+            "[PortalStage][TEST] Stage 2 직접 테스트를 위해 " +
+            "Portal A~D와 Road_1~4를 즉시 모두 열었습니다.",
+            this);
+    }
+
     private void SetActivePortalCount(
         int count)
     {

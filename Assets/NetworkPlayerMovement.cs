@@ -132,6 +132,19 @@ public class NetworkPlayerMovement : NetworkBehaviour
             _headTrackedPoseDriver = playerCamera.GetComponent<TrackedPoseDriver>();
         }
 
+        // TrackedPoseDriver는 프리팹에 기본적으로 Enabled 상태로 붙어 있는데,
+        // 정작 이 값을 실제 VR 기기 연결 여부에 따라 꺼주는 코드가 어디에도
+        // 없다. 그래서 실제 헤드셋이 연결되지 않은 마우스+키보드 테스트에서도
+        // Update()의 "TrackedPoseDriver가 이미 회전을 담당한다" 분기에 걸려
+        // 마우스 시점 회전이 통째로 막힌다. 실제 XR 기기가 연결돼 있을
+        // 때만 켜진 상태로 두고, 아니면 강제로 꺼서 마우스 회전이 항상
+        // 동작하게 한다.
+        if (_headTrackedPoseDriver != null &&
+            !UnityEngine.XR.XRSettings.isDeviceActive)
+        {
+            _headTrackedPoseDriver.enabled = false;
+        }
+
         // 01_Player.prefab은 씬에 배치되지 않고 Fusion이 런타임에 에셋에서
         // 바로 스폰하는 방식이라, playerBoundaryShield처럼 "다른 씬의 특정
         // 오브젝트"를 가리키는 Inspector 참조는 프리팹을 독립적으로 열어서
@@ -204,6 +217,40 @@ public class NetworkPlayerMovement : NetworkBehaviour
         if (audioListener != null)
         {
             audioListener.enabled = isMine;
+        }
+
+        // 씬(예: Dreamland_map_3)에 편집용으로 남아있는 카메라가 태그나
+        // 이름과 상관없이 AudioListener를 켠 채로 있으면, 내 플레이어
+        // 오디오리스너를 켜는 순간 리스너 2개가 동시에 활성화된다.
+        // ("There are 2 audio listeners in the scene" 경고가 계속 뜨고,
+        // 화면도 그 씬 카메라가 계속 우선해 플레이어 시점으로 안 넘어가는
+        // 것처럼 보일 수 있다.) 태그/이름에 의존하지 않도록, 씬에 있는
+        // 모든 AudioListener 중 내 것이 아닌 것을 전부 찾아서 끈다.
+        if (isMine)
+        {
+            AudioListener[] sceneAudioListeners =
+                FindObjectsByType<AudioListener>(
+                    FindObjectsSortMode.None);
+
+            foreach (AudioListener sceneAudioListener in sceneAudioListeners)
+            {
+                if (sceneAudioListener == audioListener)
+                {
+                    continue;
+                }
+
+                sceneAudioListener.enabled = false;
+
+                Camera sceneCamera =
+                    sceneAudioListener.GetComponent<Camera>();
+
+                if (sceneCamera != null &&
+                    (playerCamera == null ||
+                     sceneCamera != playerCamera))
+                {
+                    sceneCamera.enabled = false;
+                }
+            }
         }
 
         // 캐릭터 몸(Models 하위 전부)은 프리팹에서 "LocalPlayer" 레이어로

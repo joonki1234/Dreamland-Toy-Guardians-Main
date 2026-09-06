@@ -139,8 +139,13 @@ namespace DreamGuardians
             {
                 localHealthFallback = maxHealth;
                 localIsDeadFallback = false;
-                HealthChanged?.Invoke(this, localHealthFallback, maxHealth);
             }
+
+            // Configure()와 동일하게 항상 명시적으로 호출한다.
+            // NetworkedHealth가 이미 maxHealth였다면(예: 튜토리얼 무적 상태) Fusion의
+            // OnChangedRender는 값이 변하지 않아 발동하지 않으므로, 여기서 직접
+            // 호출하지 않으면 체력바 UI가 갱신되지 않는다.
+            HealthChanged?.Invoke(this, maxHealth, maxHealth);
         }
 
         /// <summary>

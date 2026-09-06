@@ -103,6 +103,7 @@ namespace DreamGuardians
 
         private CoreState targetCore;
         private EnemyHealth health;
+        private float spawnGroundHeight;
         private Vector3 attackDestination;
         private float orbitAngleDegrees;
         private bool hasReachedOrbit;
@@ -292,7 +293,8 @@ namespace DreamGuardians
                 orbitDirection * attackRange;
 
             attackDestination.y =
-                corePosition.y + flightHeight;
+                Mathf.Max(corePosition.y, spawnGroundHeight) +
+                flightHeight;
         }
 
 
@@ -318,6 +320,13 @@ namespace DreamGuardians
 
             Vector3 corePosition =
                 targetCore.transform.position;
+
+            // 스폰된 지면 높이를 함께 기억해둔다. 코어 높이만 기준으로
+            // 삼으면 방향(A~D)별 포탈이 코어보다 지형이 낮거나 높은
+            // 경우 목표 고도가 스폰 지점 지면과 비슷하거나 그보다
+            // 낮아져 드론이 날아오르지 못하고 지면을 기어다니는
+            // 것처럼 보일 수 있다.
+            spawnGroundHeight = transform.position.y;
 
             Vector3 outwardDirection =
                 transform.position - corePosition;
@@ -354,7 +363,8 @@ namespace DreamGuardians
                 outwardDirection * attackRange;
 
             attackDestination.y =
-                corePosition.y + flightHeight;
+                Mathf.Max(corePosition.y, spawnGroundHeight) +
+                flightHeight;
 
             nextAttackTime =
                 Time.time + Random.Range(0.15f, 0.45f);

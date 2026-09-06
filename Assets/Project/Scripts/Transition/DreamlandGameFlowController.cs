@@ -39,6 +39,9 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
     private DreamlandTransitionController transitionController;
 
     [SerializeField]
+    private EnemyPortalStageController enemyPortalStageController;
+
+    [SerializeField]
     private FinalBossDirector finalBossDirector;
 
     [SerializeField]
@@ -157,6 +160,13 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             transitionController =
                 UnityEngine.Object
                     .FindAnyObjectByType<DreamlandTransitionController>();
+        }
+
+        if (enemyPortalStageController == null)
+        {
+            enemyPortalStageController =
+                UnityEngine.Object
+                    .FindAnyObjectByType<EnemyPortalStageController>();
         }
 
         if (finalBossDirector == null)
@@ -670,6 +680,13 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
         PrepareDirectScenarioTest(
             applyRealityState: false,
             applyFullDreamlandState: false);
+
+        // Stage 1의 실제 준비 코루틴을 거치지 않으므로, Stage 1이 정상
+        // 진행됐다면 이미 열려 있었을 Portal A~D / Road_1~4를 직접 열어준다.
+        // 그렇지 않으면 DreamEnemySpawner가 활성화된 스폰 포인트를 찾지
+        // 못해 Stage 2 적이 하나도 생성되지 않는다.
+        enemyPortalStageController?.
+            OpenAllStage1PortalsImmediatelyForTest();
 
         StartStage2();
 
