@@ -44,16 +44,16 @@ public class PlayerJobController : NetworkBehaviour
     public Vector3 weaponPoliceGripOffset = Vector3.zero;
     public Vector3 weaponPoliceGripRotationOffset = Vector3.zero;
 
-    [Header("로컬 VR Police Grip (HandTarget_R 기준)")]
+    [Header("로컬 VR Police Grip (실제 손 WeaponAnchor 기준)")]
     [Tooltip("로컬 Police 총 전용 위치 보정. 원격 표시용 weaponPoliceGripOffset과 좌표 기준을 공유하지 않습니다.")]
     [SerializeField]
     private Vector3 localVrPoliceGripPosition = Vector3.zero;
 
-    [Tooltip("로컬 Police 총 전용 회전 보정(Euler). (0,0,0)이면 총 루트 +Z와 Controller +Z가 일치합니다.")]
+    [Tooltip("로컬 Police 총 전용 회전 보정(Euler). (0,0,0)이면 기존 GripPoint 방향을 손 Anchor에 정렬합니다.")]
     [SerializeField]
     private Vector3 localVrPoliceGripRotation = Vector3.zero;
 
-    [Tooltip("HandTarget_R 아래의 로컬 Police 전용 무기 기준점")]
+    [Tooltip("기존 Police Anchor. 로컬에서만 실제 오른손 아래 WeaponAnchor로 재사용합니다.")]
     [SerializeField]
     private Transform policeWeaponAnchor;
 
@@ -740,12 +740,8 @@ public class PlayerJobController : NetworkBehaviour
 
         if (isLocalVrWeapon)
         {
-            Transform anchor = ResolvePoliceWeaponAnchor();
-            AttachWeaponToAnchor(
-                weaponPolice,
-                anchor,
-                localVrPoliceGripPosition,
-                localVrPoliceGripRotation);
+            AttachLocalWeapon(weaponPolice, modelPolice,
+                localVrPoliceGripPosition, localVrPoliceGripRotation);
             return;
         }
 
@@ -755,39 +751,7 @@ public class PlayerJobController : NetworkBehaviour
             weaponPoliceGripRotationOffset);
     }
 
-    private Transform ResolvePoliceWeaponAnchor()
-    {
-        if (policeWeaponAnchor != null)
-        {
-            return policeWeaponAnchor;
-        }
-
-        Transform handTarget = ResolveLocalHandTarget();
-        if (handTarget != null)
-        {
-            policeWeaponAnchor = handTarget.Find("PoliceWeaponAnchor");
-        }
-
-        return policeWeaponAnchor;
-    }
-
-
-    /// <summary>
-    /// 무기를 누구 시점에서 보고 있는지에 따라 다르게 붙인다.
-    ///
-    /// - 로컬 플레이어는 HandTarget_R에 붙인다. VRHandTargetFollower가
-    ///   컨트롤러 Pose로 이 Transform을 직접 갱신하므로 무기도 실제 손
-    ///   Pose를 따른다.
-    ///
-    /// - 원격 플레이어는 기존처럼 RightHandGripReference에 붙인다.
-    ///   원격에서는 컨트롤러 Pose를 실행하지 않으므로 프리팹의 정적인
-    ///   손 위치를 사용한다.
-    ///
-    ///   HandTarget_R는 Animation Rigging이 읽는 IK target이다. Constraint는
-    ///   target을 읽기만 하고 target Transform을 덮어쓰지 않으므로, 로컬
-    ///   무기를 그 자식으로 두어도 무기와 IK 사이에 이중 변환이 생기지
-    ///   않는다.
-    /// </summary>
+    // Local weapons inherit the solved hand; remote attachment stays unchanged.
     private void AttachWeaponForViewer(GameObject weapon, Vector3 positionOffset, Vector3 rotationOffsetEuler)
     {
         if (weapon == null || Object == null)
@@ -795,11 +759,130 @@ public class PlayerJobController : NetworkBehaviour
             return;
         }
 
-        Transform gripAnchor = Object.HasInputAuthority
-            ? ResolveLocalHandTarget()
-            : ResolveHandGripAnchor();
+        if (Object.HasInputAuthority)
+        {
+            GameObject model = weapon == weaponFirefighter ? modelFirefighter
+                : weapon == weaponChef ? modelChef : modelBuilder;
+            LocalGripAdjustment adjustment = weapon == weaponFirefighter ? localFirefighterGrip
+                : weapon == weaponChef ? localChefGrip : localBuilderGrip;
+            AttachLocalWeapon(weapon, model, adjustment.position, adjustment.rotation);
+            return;
+        }
 
-        AttachWeaponToAnchor(weapon, gripAnchor, positionOffset, rotationOffsetEuler);
+        AttachWeaponToAnchor(weapon, ResolveHandGripAnchor(), positionOffset, rotationOffsetEuler);
+    }
+
+    [System.Serializable]
+    private sealed class LocalGripAdjustment
+    {
+        public Vector3 position = Vector3.zero;
+        public Vector3 rotation = Vector3.zero;
+    }
+
+    [Header("Local hand grip adjustments (metres / Euler degrees)")]
+    [SerializeField] private LocalGripAdjustment localFirefighterGrip = new LocalGripAdjustment();
+    [SerializeField] private LocalGripAdjustment localChefGrip = new LocalGripAdjustment();
+    [SerializeField] private LocalGripAdjustment localBuilderGrip = new LocalGripAdjustment();
+    private readonly Dictionary<Transform, Vector3> localWeaponWorldScales = new Dictionary<Transform, Vector3>();
+
+    private void AttachLocalWeapon(GameObject weapon, GameObject model, Vector3 position, Vector3 rotation)
+    {
+        if (Object == null || !Object.HasInputAuthority || weapon == null || model == null) return;
+        Transform hand = FindWeaponTransform(model.transform, "CC_Base_R_Hand");
+        if (hand == null)
+        {
+            Debug.LogError("[PlayerJobController] CC_Base_R_Hand missing on " + model.name, this);
+            return;
+        }
+
+        Transform grip = ResolveWeaponGrip(weapon);
+        if (grip == null) return;
+        Transform weaponTransform = weapon.transform;
+        if (!localWeaponWorldScales.TryGetValue(weaponTransform, out Vector3 worldScale))
+        {
+            worldScale = weaponTransform.lossyScale;
+            localWeaponWorldScales.Add(weaponTransform, worldScale);
+        }
+        Quaternion gripRotationInWeapon = Quaternion.Inverse(weaponTransform.rotation) * grip.rotation;
+
+        Transform anchor = hand.Find("WeaponAnchor");
+        if (anchor == null)
+        {
+            // Reuse the authored Police anchor, but never move it on a remote player.
+            anchor = weapon == weaponPolice ? policeWeaponAnchor : null;
+            if (anchor == null && weapon == weaponPolice)
+                anchor = FindWeaponTransform(transform, "PoliceWeaponAnchor");
+            if (anchor == null) anchor = new GameObject("WeaponAnchor").transform;
+            anchor.SetParent(hand, false);
+            anchor.name = "WeaponAnchor";
+            // Hand bone is the wrist; place the grip halfway towards the index knuckle.
+            Transform index = FindWeaponTransform(hand, "CC_Base_R_Index1");
+            anchor.localPosition = index != null
+                ? hand.InverseTransformPoint(index.position) * 0.5f : Vector3.zero;
+            anchor.localRotation = Quaternion.identity;
+            // FBX skeletons carry import scale. Keep grip offsets in metres and weapon size intact.
+            Vector3 handScale = hand.lossyScale;
+            anchor.localScale = new Vector3(1f / handScale.x, 1f / handScale.y, 1f / handScale.z);
+        }
+
+        weaponTransform.SetParent(anchor, false);
+        Vector3 anchorScale = anchor.lossyScale;
+        weaponTransform.localScale = new Vector3(worldScale.x / anchorScale.x,
+            worldScale.y / anchorScale.y, worldScale.z / anchorScale.z);
+        weaponTransform.rotation = anchor.rotation * Quaternion.Euler(rotation) * Quaternion.Inverse(gripRotationInWeapon);
+        // Match the actual handle point, not a camera-space weapon root offset.
+        weaponTransform.position += anchor.TransformPoint(position) - grip.position;
+    }
+
+    private Transform ResolveWeaponGrip(GameObject weapon)
+    {
+        Transform existing = FindWeaponTransform(weapon.transform, "GripPoint");
+        if (existing != null) return existing;
+
+        Vector3 gripPosition;
+        if (weapon == weaponChef)
+        {
+            ChefWeaponController chef = weapon.GetComponentInChildren<ChefWeaponController>(true);
+            if (chef == null || chef.panTransform == null) return null;
+            // Read the existing handle definition; do not modify the pan or its attack controller.
+            gripPosition = chef.panTransform.TransformPoint(chef.handleOffset);
+        }
+        else if (weapon == weaponFirefighter)
+        {
+            Transform nozzle = FindWeaponTransform(weapon.transform, "Nozzle");
+            if (nozzle == null) return null;
+            gripPosition = nozzle.position;
+        }
+        else if (weapon == weaponBuilder)
+        {
+            // The source FBX uses a Cyrillic C in the upper shaft mesh name.
+            Transform handle = FindWeaponTransform(weapon.transform, "Shovel_001_С05");
+            MeshFilter mesh = handle != null ? handle.GetComponent<MeshFilter>() : null;
+            if (mesh == null || mesh.sharedMesh == null)
+            {
+                Debug.LogError("[PlayerJobController] Builder upper shaft grip mesh missing.", this);
+                return null;
+            }
+            gripPosition = handle.TransformPoint(mesh.sharedMesh.bounds.center);
+        }
+        else
+        {
+            Debug.LogError("[PlayerJobController] Police GripPoint missing.", this);
+            return null;
+        }
+
+        Transform grip = new GameObject("GripPoint").transform;
+        grip.SetParent(weapon.transform, false);
+        grip.position = gripPosition;
+        grip.localRotation = Quaternion.identity;
+        return grip;
+    }
+
+    private static Transform FindWeaponTransform(Transform root, string objectName)
+    {
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            if (child.name == objectName) return child;
+        return null;
     }
 
     private static void AttachWeaponToAnchor(
@@ -823,45 +906,6 @@ public class PlayerJobController : NetworkBehaviour
         // Inspector에서 잡별 오프셋 값을 조절해서 맞출 수 있다.
         weapon.transform.localPosition = positionOffset;
         weapon.transform.localRotation = Quaternion.Euler(rotationOffsetEuler);
-    }
-
-
-    private Transform cachedLocalHandTarget;
-    private bool triedResolveLocalHandTarget;
-
-
-    private Transform ResolveLocalHandTarget()
-    {
-        if (cachedLocalHandTarget != null)
-        {
-            return cachedLocalHandTarget;
-        }
-
-        if (triedResolveLocalHandTarget)
-        {
-            return null;
-        }
-
-        triedResolveLocalHandTarget = true;
-
-        foreach (Transform candidate in GetComponentsInChildren<Transform>(true))
-        {
-            if (candidate != null && candidate.name == "HandTarget_R")
-            {
-                cachedLocalHandTarget = candidate;
-                break;
-            }
-        }
-
-        if (cachedLocalHandTarget == null)
-        {
-            Debug.LogWarning(
-                "[PlayerJobController] 'HandTarget_R'를 찾지 못해 " +
-                "로컬 무기를 손 Pose에 고정하지 못했습니다.",
-                this);
-        }
-
-        return cachedLocalHandTarget;
     }
 
 

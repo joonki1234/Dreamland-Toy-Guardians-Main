@@ -1,8 +1,10 @@
 using Fusion;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
+using UnityEngine.Playables;
 
 /// <summary>
 /// Local-authority VR hand tracking helper.
@@ -40,6 +42,34 @@ public class VRHandTargetFollower : NetworkBehaviour
     [Header("Local Body Yaw")]
     [SerializeField]
     private float bodyYawSmoothing = 10f;
+    [SerializeField, Range(0f, 180f)] private float bodyYawThreshold = 60f;
+    [SerializeField, Min(0f)] private float bodyMovingSpeedThreshold = 0.15f;
+    private bool bodyYawInitialized;
+    private float desiredBodyWorldYaw;
+    private Vector3 previousBodyRootPosition;
+    private Vector3 smoothedBodyVelocity;
+    private RigBuilder rigBuilder;
+
+    // Only the local instance receives a mesh copy with head triangles removed.
+    // Bone scales, skinning weights, shared assets and remote renderers stay intact.
+    private readonly List<LocalBodyMesh> localBodyMeshes = new List<LocalBodyMesh>();
+    private GameObject visibleLocalModel;
+    private Camera localBodyCamera;
+    private bool cameraOriginallyIncludedLocalPlayer;
+    private int localBodyLayerMask;
+
+    private sealed class LocalBodyMesh
+    {
+        public SkinnedMeshRenderer renderer;
+        public Mesh original;
+        public Mesh local;
+    }
+
+    private void OnDisable()
+    {
+        RestoreLocalBodyVisibility();
+        bodyYawInitialized = false;
+    }
 
     [Header("Controller target auto resolve")]
     [SerializeField]
@@ -104,10 +134,13 @@ public class VRHandTargetFollower : NetworkBehaviour
 
         if (Object == null || !Object.HasInputAuthority)
         {
+            RestoreLocalBodyVisibility();
+            bodyYawInitialized = false;
             return;
         }
 
         RefreshJobBindingIfNeeded();
+        UpdateLocalBodyVisibility();
 
         if (rightControllerTarget == null || leftControllerTarget == null)
         {
@@ -144,6 +177,8 @@ public class VRHandTargetFollower : NetworkBehaviour
             Debug.LogWarning("[VRHandTargetFollower] Left hand target is still missing.");
             _warnedMissingLeftHandTarget = true;
         }
+        // Evaluate only after body placement and both controller targets are current.
+        if (rigBuilder != null && rigBuilder.graph.IsValid()) rigBuilder.Evaluate(Time.deltaTime);
     }
 
     private void InitializeRuntimeOnce()
@@ -325,6 +360,9 @@ public class VRHandTargetFollower : NetworkBehaviour
         );
 
         ConfigureRightElbowHint(activeModel);
+        rigBuilder = GetComponent<RigBuilder>();
+        if (rigBuilder != null && rigBuilder.Build())
+            rigBuilder.graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
     }
 
     private void RebindTwoBoneIK(
@@ -708,8 +746,25 @@ public class VRHandTargetFollower : NetworkBehaviour
             return;
         }
 
-        Vector3 playerLocalForward = transform.InverseTransformDirection(hmdTransform.forward);
-        Vector3 flatForward = Vector3.ProjectOnPlane(playerLocalForward, Vector3.up);
+        float deltaTime = Time.deltaTime;
+        if (deltaTime <= 0f) return;
+
+        if (!bodyYawInitialized)
+        {
+            desiredBodyWorldYaw = (modelsRoot.rotation * Quaternion.Inverse(modelsBaseLocalRotation)).eulerAngles.y;
+            previousBodyRootPosition = transform.position;
+            smoothedBodyVelocity = Vector3.zero;
+            bodyYawInitialized = true;
+        }
+
+        // Observe Fusion's resulting movement, without reading or changing stick input.
+        Vector3 velocity = Vector3.ProjectOnPlane(
+            transform.position - previousBodyRootPosition, Vector3.up) / deltaTime;
+        previousBodyRootPosition = transform.position;
+        smoothedBodyVelocity = Vector3.Lerp(smoothedBodyVelocity, velocity,
+            1f - Mathf.Exp(-10f * deltaTime));
+
+        Vector3 flatForward = Vector3.ProjectOnPlane(hmdTransform.forward, Vector3.up);
         if (flatForward.sqrMagnitude < 0.0001f)
         {
             return;
@@ -717,12 +772,122 @@ public class VRHandTargetFollower : NetworkBehaviour
 
         flatForward.Normalize();
         float yaw = Mathf.Atan2(flatForward.x, flatForward.z) * Mathf.Rad2Deg;
-        Quaternion targetLocalRotation =
-            Quaternion.AngleAxis(yaw, Vector3.up) * modelsBaseLocalRotation;
+        float currentYaw = (modelsRoot.rotation * Quaternion.Inverse(modelsBaseLocalRotation)).eulerAngles.y;
+        if (smoothedBodyVelocity.magnitude > bodyMovingSpeedThreshold)
+        {
+            desiredBodyWorldYaw = Mathf.Atan2(smoothedBodyVelocity.x, smoothedBodyVelocity.z) * Mathf.Rad2Deg;
+        }
+        else if (Mathf.Abs(Mathf.DeltaAngle(currentYaw, yaw)) > bodyYawThreshold)
+        {
+            desiredBodyWorldYaw = yaw;
+        }
+
+        Quaternion targetRotation =
+            Quaternion.AngleAxis(desiredBodyWorldYaw, Vector3.up) * modelsBaseLocalRotation;
         float blend = 1f - Mathf.Exp(-Mathf.Max(0f, bodyYawSmoothing) * Time.deltaTime);
-        modelsRoot.localRotation = Quaternion.Slerp(
-            modelsRoot.localRotation,
-            targetLocalRotation,
+        modelsRoot.rotation = Quaternion.Slerp(
+            modelsRoot.rotation,
+            targetRotation,
             blend);
+    }
+
+    private void UpdateLocalBodyVisibility()
+    {
+        if (visibleLocalModel == currentActiveModel) return;
+        RestoreLocalBodyVisibility();
+        if (currentActiveModel == null || activeHead == null || hmdTransform == null) return;
+
+        visibleLocalModel = currentActiveModel;
+        Camera camera = hmdTransform.GetComponent<Camera>();
+        int layer = LayerMask.NameToLayer("LocalPlayer");
+        if (camera == null || layer < 0) return;
+
+        foreach (SkinnedMeshRenderer renderer in currentActiveModel.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            Mesh original = renderer.sharedMesh;
+            if (original == null) continue;
+            if (!original.isReadable)
+            {
+                Debug.LogError("[VRHandTargetFollower] Local body mesh requires Read/Write: " + original.name, this);
+                return; // Keep the camera's existing body exclusion if preparation fails.
+            }
+
+            Transform[] bones = renderer.bones;
+            bool[] headBones = new bool[bones.Length];
+            for (int i = 0; i < bones.Length; i++)
+                headBones[i] = bones[i] != null && (bones[i] == activeHead || bones[i].IsChildOf(activeHead));
+
+            BoneWeight[] weights = original.boneWeights;
+            bool[] headVertices = new bool[original.vertexCount];
+            for (int i = 0; i < weights.Length; i++)
+            {
+                BoneWeight w = weights[i];
+                float headWeight = HeadWeight(headBones, w.boneIndex0, w.weight0)
+                    + HeadWeight(headBones, w.boneIndex1, w.weight1)
+                    + HeadWeight(headBones, w.boneIndex2, w.weight2)
+                    + HeadWeight(headBones, w.boneIndex3, w.weight3);
+                headVertices[i] = headWeight >= 0.5f;
+            }
+
+            Mesh local = Instantiate(original);
+            local.name = original.name + " (Local body)";
+            int removedTriangles = 0;
+            for (int submesh = 0; submesh < original.subMeshCount; submesh++)
+            {
+                int[] triangles = original.GetTriangles(submesh);
+                List<int> retained = new List<int>(triangles.Length);
+                for (int i = 0; i < triangles.Length; i += 3)
+                {
+                    if (headVertices[triangles[i]] || headVertices[triangles[i + 1]] || headVertices[triangles[i + 2]])
+                    {
+                        removedTriangles++;
+                        continue;
+                    }
+                    retained.Add(triangles[i]);
+                    retained.Add(triangles[i + 1]);
+                    retained.Add(triangles[i + 2]);
+                }
+                local.SetTriangles(retained, submesh, false);
+            }
+
+            if (removedTriangles == 0)
+            {
+                Destroy(local);
+                continue;
+            }
+            localBodyMeshes.Add(new LocalBodyMesh { renderer = renderer, original = original, local = local });
+            renderer.sharedMesh = local;
+        }
+
+        if (localBodyMeshes.Count == 0)
+        {
+            Debug.LogError("[VRHandTargetFollower] No head triangles found; local body visibility was not enabled.", this);
+            return;
+        }
+
+        localBodyCamera = camera;
+        localBodyLayerMask = 1 << layer;
+        cameraOriginallyIncludedLocalPlayer = (camera.cullingMask & localBodyLayerMask) != 0;
+        camera.cullingMask |= localBodyLayerMask;
+    }
+
+    private static float HeadWeight(bool[] headBones, int index, float weight)
+    {
+        return index >= 0 && index < headBones.Length && headBones[index] ? weight : 0f;
+    }
+
+    private void RestoreLocalBodyVisibility()
+    {
+        if (localBodyCamera != null && !cameraOriginallyIncludedLocalPlayer)
+            localBodyCamera.cullingMask &= ~localBodyLayerMask;
+        localBodyCamera = null;
+        foreach (LocalBodyMesh entry in localBodyMeshes)
+        {
+            if (entry.renderer != null && entry.renderer.sharedMesh == entry.local)
+                entry.renderer.sharedMesh = entry.original;
+            if (entry.local != null) Destroy(entry.local);
+        }
+        localBodyMeshes.Clear();
+        visibleLocalModel = null;
     }
 }
