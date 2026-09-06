@@ -880,9 +880,23 @@ namespace DreamGuardians
             GetOrAdd<EnemyWorldHealthBar>(
                 enemyObject);
 
+            // EnemyCoreMover도 EnemyHealth와 마찬가지로 NetworkBehaviour라서
+            // 런타임에 AddComponent로 붙일 수 없다 - 프리팹 자체에 미리
+            // 붙어 있어야 한다.
             EnemyCoreMover mover =
-                GetOrAdd<EnemyCoreMover>(
+                enemyObject.GetComponent<EnemyCoreMover>();
+
+            if (mover == null)
+            {
+                Debug.LogError(
+                    $"[DreamEnemySpawner] '{enemyObject.name}' 프리팹에 " +
+                    "EnemyCoreMover 컴포넌트가 없습니다. 이 적 프리팹 에셋에 " +
+                    "EnemyCoreMover를 미리 붙여야 협동 플레이에서 정상 " +
+                    "동작합니다.",
                     enemyObject);
+
+                return null;
+            }
 
             // 원거리 미니건 적은 프리팹에 붙은 전용 설정값을 사용합니다.
             // 해당 컴포넌트가 없으면 기존 근접 적 설정을 그대로 유지합니다.

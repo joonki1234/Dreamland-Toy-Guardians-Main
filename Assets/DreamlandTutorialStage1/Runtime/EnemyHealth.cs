@@ -47,7 +47,13 @@ namespace DreamGuardians
         [Networked, OnChangedRender(nameof(HandleNetworkedDeathChanged))]
         private NetworkBool NetworkedIsDead { get; set; }
 
-        private bool IsNetworked => Object != null;
+        // Object != null만으로는 부족하다 - Fusion의 Spawned() 콜백이 아직
+        // 호출되기 전에도 Object 참조 자체는 이미 채워져 있을 수 있어서,
+        // 그 짧은 시점에 [Networked] 프로퍼티(NetworkedHealth/NetworkedIsDead)에
+        // 접근하면 "Networked properties can only be accessed when Spawned()
+        // has been called" 예외가 난다. IsValid는 실제로 스폰이 끝나 안전하게
+        // 접근 가능한 상태인지까지 확인해준다.
+        private bool IsNetworked => IsValid;
 
 #if UNITY_EDITOR
         private static bool editorTestDamageBoostEnabled;

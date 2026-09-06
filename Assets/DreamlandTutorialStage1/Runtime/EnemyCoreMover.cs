@@ -1,4 +1,5 @@
 using System.Collections;
+using Fusion;
 using UnityEngine;
 
 namespace DreamGuardians
@@ -10,9 +11,17 @@ namespace DreamGuardians
     /// 미끼 시너지가 적용되면 일정 시간 동안
     /// 코어 대신 미끼 위치로 이동한 뒤,
     /// 시간이 끝나면 원래 코어 이동으로 복귀한다.
+    ///
+    /// NetworkBehaviour다: 이동은 반드시 FixedUpdateNetwork()(시뮬레이션
+    /// 틱) 안에서 transform.position을 바꿔야 한다. 예전에는 평범한
+    /// MonoBehaviour로 Update()에서 위치를 바꿨는데, 같은 오브젝트의
+    /// Fusion.NetworkTransform이 매 프레임 "마지막으로 확인된 시뮬레이션
+    /// 틱 위치"로 렌더링을 다시 스냅해버려서, 계산은 정상적으로 실행되는데
+    /// 실제 위치는 절대 안 바뀌고 제자리걸음하는 문제가 있었다
+    /// (NetworkPlayerMovement.cs의 FixedUpdateNetwork() 패턴과 동일하게 맞춘다).
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class EnemyCoreMover : MonoBehaviour
+    public sealed class EnemyCoreMover : NetworkBehaviour
     {
         [Header("목표 설정")]
 
@@ -184,14 +193,14 @@ namespace DreamGuardians
         }
 
 
-        private void Update()
+        public override void FixedUpdateNetwork()
         {
             // 협동 플레이 동기화: 이동/코어 공격은 이 적을 스폰한
             // State Authority(방장) 클라이언트에서만 계산한다. 다른
             // 클라이언트는 NetworkTransform으로 그 결과를 그대로
             // 따라오기만 해야 하므로, 여기서 직접 위치를 바꾸거나
             // 코어에 중복으로 피해를 주면 안 된다.
-            if (!EnemyNetworkAuthority.HasAuthority(this))
+            if (!Object.HasStateAuthority)
             {
                 return;
             }
@@ -364,7 +373,7 @@ namespace DreamGuardians
                 currentPosition +
                 direction *
                 moveSpeed *
-                Time.deltaTime;
+                Runner.DeltaTime;
 
             if (keepSpawnHeight)
             {
@@ -900,7 +909,7 @@ namespace DreamGuardians
                     transform.rotation,
                     targetRotation,
                     turnSpeed *
-                    Time.deltaTime
+                    Runner.DeltaTime
                 );
         }
 

@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: -4035359974949510327}
   - component: {fileID: -5952217354961114996}
   - component: {fileID: -6919413840469376066}
+  - component: {fileID: -2368586991287152903}
   m_Layer: 7
   m_Name: RangedEnemy_Minigun
   m_TagString: Untagged
@@ -136,6 +137,7 @@ MonoBehaviour:
   NetworkedBehaviours:
   - {fileID: -5952217354961114996}
   - {fileID: -6919413840469376066}
+  - {fileID: -2368586991287152903}
   ForceRemoteRenderTimeframe: 0
 --- !u!114 &-5952217354961114996
 MonoBehaviour:
@@ -194,6 +196,38 @@ MonoBehaviour:
   rememberedShotCount: 128
   deathSfx: {fileID: 0}
   deathSfxVolume: 0.45
+--- !u!114 &-2368586991287152903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4376583669907981605}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 882d538b7a9a7e94a99d52f9e18de50d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.EnemyCoreMover
+  targetCore: {fileID: 0}
+  attackDestination: {x: 0, y: 0, z: 0}
+  useAttackDestination: 0
+  moveSpeed: 0.35
+  arrivalDistance: 0.2
+  keepSpawnHeight: 1
+  coreDamage: 1
+  attackInterval: 1.5
+  headbuttWindupDuration: 0.16
+  headbuttLungeDuration: 0.18
+  headbuttRecoverDuration: 0.24
+  headbuttDistance: 1.65
+  headbuttWindbackDistance: 0.22
+  headbuttAttackSfx: {fileID: 0}
+  headbuttAttackSfxVolume: 0.35
+  turnSpeed: 8
+  modelYawOffset: 0
+  useZigzagMovement: 0
+  zigzagAmplitude: 1.2
+  zigzagFrequency: 1.2
 --- !u!1001 &341354743468666704
 PrefabInstance:
   m_ObjectHideFlags: 0

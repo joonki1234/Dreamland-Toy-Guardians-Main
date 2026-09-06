@@ -1,4 +1,5 @@
 using System.Collections;
+using Fusion;
 using UnityEngine;
 
 namespace DreamGuardians
@@ -9,9 +10,15 @@ namespace DreamGuardians
     ///
     /// 체력, 체력바, 정화와 웨이브 생존 수 추적은
     /// 기존 DreamEnemySpawner 시스템을 그대로 사용합니다.
+    ///
+    /// NetworkBehaviour다: 비행 이동은 반드시 FixedUpdateNetwork()(시뮬레이션
+    /// 틱) 안에서 transform.position을 바꿔야 한다. 평범한 MonoBehaviour로
+    /// Update()에서 위치를 바꾸면 같은 오브젝트의 Fusion.NetworkTransform이
+    /// 매 프레임 "마지막으로 확인된 시뮬레이션 틱 위치"로 되돌려버려서
+    /// 실제로는 전혀 움직이지 않는 문제가 있었다.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class DroneEnemyWaspy : MonoBehaviour
+    public sealed class DroneEnemyWaspy : NetworkBehaviour
     {
         [Header("공중 이동")]
 
@@ -162,12 +169,12 @@ namespace DreamGuardians
         }
 
 
-        private void Update()
+        public override void FixedUpdateNetwork()
         {
             // 협동 플레이 동기화: 비행/공격 이동은 State Authority(방장)
             // 클라이언트에서만 계산하고, 나머지는 NetworkTransform으로
             // 결과만 따라온다.
-            if (!DreamGuardians.EnemyNetworkAuthority.HasAuthority(this))
+            if (!Object.HasStateAuthority)
             {
                 return;
             }
@@ -195,7 +202,7 @@ namespace DreamGuardians
                         Vector3.MoveTowards(
                             transform.position,
                             attackDestination,
-                            moveSpeed * Time.deltaTime);
+                            moveSpeed * Runner.DeltaTime);
 
                     RotateTowards(toInitial);
                     return;
@@ -206,7 +213,7 @@ namespace DreamGuardians
                 orbitPhaseTimer = orbitMoveDuration;
             }
 
-            orbitPhaseTimer -= Time.deltaTime;
+            orbitPhaseTimer -= Runner.DeltaTime;
 
             if (isOrbitMoving)
             {
@@ -259,7 +266,7 @@ namespace DreamGuardians
                 Vector3.MoveTowards(
                     transform.position,
                     hoverDestination,
-                    moveSpeed * Time.deltaTime);
+                    moveSpeed * Runner.DeltaTime);
 
             RotateTowards(
                 targetCore.AttackTargetPosition -
@@ -274,7 +281,7 @@ namespace DreamGuardians
         private void UpdateOrbitDestination()
         {
             orbitAngleDegrees +=
-                orbitAngularSpeed * Time.deltaTime;
+                orbitAngularSpeed * Runner.DeltaTime;
 
             Vector3 corePosition =
                 targetCore.transform.position;
@@ -663,7 +670,7 @@ namespace DreamGuardians
                 Quaternion.Slerp(
                     transform.rotation,
                     targetRotation,
-                    turnSpeed * Time.deltaTime);
+                    turnSpeed * Runner.DeltaTime);
         }
 
 

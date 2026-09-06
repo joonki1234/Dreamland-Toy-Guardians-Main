@@ -1028,6 +1028,7 @@ GameObject:
   - component: {fileID: -2520288548859707016}
   - component: {fileID: 3036600955776138873}
   - component: {fileID: 4814672059578906442}
+  - component: {fileID: -7046214948356717652}
   m_Layer: 7
   m_Name: Enemy_ToyRobot
   m_TagString: Untagged
@@ -1148,6 +1149,7 @@ MonoBehaviour:
   NetworkedBehaviours:
   - {fileID: 3036600955776138873}
   - {fileID: 4814672059578906442}
+  - {fileID: -7046214948356717652}
   ForceRemoteRenderTimeframe: 0
 --- !u!114 &3036600955776138873
 MonoBehaviour:
@@ -1206,6 +1208,38 @@ MonoBehaviour:
   rememberedShotCount: 128
   deathSfx: {fileID: 0}
   deathSfxVolume: 0.45
+--- !u!114 &-7046214948356717652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7208967736245470348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 882d538b7a9a7e94a99d52f9e18de50d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamGuardians.EnemyCoreMover
+  targetCore: {fileID: 0}
+  attackDestination: {x: 0, y: 0, z: 0}
+  useAttackDestination: 0
+  moveSpeed: 0.35
+  arrivalDistance: 0.2
+  keepSpawnHeight: 1
+  coreDamage: 1
+  attackInterval: 1.5
+  headbuttWindupDuration: 0.16
+  headbuttLungeDuration: 0.18
+  headbuttRecoverDuration: 0.24
+  headbuttDistance: 1.65
+  headbuttWindbackDistance: 0.22
+  headbuttAttackSfx: {fileID: 0}
+  headbuttAttackSfxVolume: 0.35
+  turnSpeed: 8
+  modelYawOffset: 0
+  useZigzagMovement: 0
+  zigzagAmplitude: 1.2
+  zigzagFrequency: 1.2
 --- !u!1 &7879924939525970573
 GameObject:
   m_ObjectHideFlags: 0
