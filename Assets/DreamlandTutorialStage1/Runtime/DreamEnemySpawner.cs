@@ -7,7 +7,8 @@ using UnityEngine;
 namespace DreamGuardians
 {
     [DisallowMultipleComponent]
-    public sealed class DreamEnemySpawner : MonoBehaviour
+    [RequireComponent(typeof(NetworkObject))]
+    public sealed class DreamEnemySpawner : NetworkBehaviour
     {
         // 협동 플레이 동기화: 몬스터는 이제 Runner.Spawn()으로 생성되는
         // 진짜 네트워크 오브젝트다(전에는 Instantiate로 각 클라이언트가
@@ -15,60 +16,42 @@ namespace DreamGuardians
         // "방장(마스터 클라이언트)" 한 명만 실제로 스폰하고, 나머지
         // 클라이언트는 그 결과를 그대로 받아서 보게 된다 - 그래야
         // 인원수만큼 몬스터가 중복 생성되지 않는다.
-        public enum TutorialSpawnStatus
+        private RoomManager roomManager;
+
+        [Networked] public NetworkId TutorialEnemyId { get; private set; }
+        // Retain the attempt even if Spawn throws or the enemy later disappears.
+        // Missing replication must never authorize another Spawn.
+        [Networked] public NetworkBool TutorialSpawnIssued { get; private set; }
+        private bool tutorialSpawnInProgress;
+
+        public bool IsTutorialSessionReady
         {
-            RunnerNotReady,
-            InvalidRunnerMode,
-            ReadyMaster,
-            NonMaster,
-            SpawnFailed,
-            ConfigurationFailed,
-            Spawned
+            get
+            {
+                var runner = GetRunner();
+                return runner != null && Object != null && Object.IsValid && Object.Runner == runner;
+            }
         }
 
-        private RoomManager roomManager;
-        private bool tutorialSpawnAttempted;
-        private EnemyHealth spawnedTutorialEnemy;
-        public TutorialSpawnStatus LastTutorialSpawnStatus { get; private set; }
+        public bool CanSpawnTutorialEnemy => IsTutorialSessionReady &&
+            Runner.IsSharedModeMasterClient && Object.HasStateAuthority;
 
-        public TutorialSpawnStatus GetTutorialRunnerStatus(out string reason)
+        public bool TryFindTutorialEnemy(out EnemyHealth enemy)
         {
-            if (roomManager == null)
-                roomManager = FindAnyObjectByType<RoomManager>();
-
-            NetworkRunner runner = roomManager != null ? roomManager.Runner : null;
-            if (runner == null || !runner.IsRunning || !runner.IsConnectedToServer)
-            {
-                reason = runner == null
-                    ? "RoomManager 또는 RoomManager.Runner 없음"
-                    : $"RoomManager.Runner 준비 중 (IsRunning={runner.IsRunning}, IsConnectedToServer={runner.IsConnectedToServer})";
-                return TutorialSpawnStatus.RunnerNotReady;
-            }
-
-            if (runner.GameMode != GameMode.Shared)
-            {
-                reason = $"Shared Mode가 아닌 Runner: {runner.GameMode}";
-                return TutorialSpawnStatus.InvalidRunnerMode;
-            }
-
-            if (runner.IsSceneManagerBusy)
-            {
-                reason = "RoomManager.Runner의 네트워크 씬 로딩 중";
-                return TutorialSpawnStatus.RunnerNotReady;
-            }
-
-            reason = runner.IsSharedModeMasterClient ? "Shared Mode Master 준비됨" : "Shared Mode Non-Master";
-            return runner.IsSharedModeMasterClient
-                ? TutorialSpawnStatus.ReadyMaster
-                : TutorialSpawnStatus.NonMaster;
+            enemy = null;
+            if (!IsTutorialSessionReady || !TutorialEnemyId.IsValid ||
+                !Runner.TryFindObject(TutorialEnemyId, out var networkObject)) return false;
+            enemy = networkObject.GetComponent<EnemyHealth>();
+            return enemy != null;
         }
 
         private NetworkRunner GetRunner()
         {
-            // Always re-read the manager's current runner; never cache a scene template.
-            return GetTutorialRunnerStatus(out _) == TutorialSpawnStatus.ReadyMaster
-                ? roomManager.Runner
-                : null;
+            if (roomManager == null)
+                roomManager = FindAnyObjectByType<RoomManager>();
+            var runner = roomManager != null ? roomManager.Runner : null;
+            return runner != null && runner.IsRunning && runner.IsConnectedToServer &&
+                runner.GameMode == GameMode.Shared && !runner.IsSceneManagerBusy ? runner : null;
         }
         [Header("Enemy")]
         [SerializeField] private GameObject enemyPrefab;
@@ -570,28 +553,18 @@ namespace DreamGuardians
         public EnemyHealth SpawnTutorialEnemy(
             Transform tutorialSpawnPoint)
         {
-            // A failed attempt may already have created a NetworkObject. Do not retry it.
-            if (tutorialSpawnAttempted)
-                return spawnedTutorialEnemy;
-
-            LastTutorialSpawnStatus = GetTutorialRunnerStatus(out _);
-            if (LastTutorialSpawnStatus != TutorialSpawnStatus.ReadyMaster)
-                return null;
-
-            tutorialSpawnAttempted = true;
-            if (enemyPrefab == null || enemyPrefab.GetComponent<NetworkObject>() == null)
+            if (!CanSpawnTutorialEnemy || tutorialSpawnInProgress) return null;
+            if (TryFindTutorialEnemy(out var existing)) return existing;
+            if (TutorialSpawnIssued) return null;
+            if (enemyPrefab == null || enemyPrefab.GetComponent<NetworkObject>() == null ||
+                enemyPrefab.GetComponent<EnemyHealth>() == null)
             {
-                LastTutorialSpawnStatus = TutorialSpawnStatus.SpawnFailed;
-                Debug.LogError("[Dreamland] 튜토리얼 Spawn 불가: Enemy Prefab 또는 루트 NetworkObject가 없습니다.", this);
-                return null;
-            }
-            if (enemyPrefab.GetComponent<EnemyHealth>() == null)
-            {
-                LastTutorialSpawnStatus = TutorialSpawnStatus.ConfigurationFailed;
-                Debug.LogError("[Dreamland] 튜토리얼 EnemyHealth 구성 실패: 프리팹 루트에 EnemyHealth가 없습니다.", this);
+                Debug.LogError("[TutorialNetwork] Enemy 프리팹의 NetworkObject/EnemyHealth가 필요합니다.", this);
                 return null;
             }
 
+            TutorialSpawnIssued = true;
+            tutorialSpawnInProgress = true;
             Vector3 position =
                 tutorialSpawnPoint != null
                     ? tutorialSpawnPoint.position +
@@ -605,21 +578,19 @@ namespace DreamGuardians
                     ? tutorialSpawnPoint.rotation
                     : transform.rotation;
 
-            LastTutorialSpawnStatus = TutorialSpawnStatus.SpawnFailed;
             try
             {
-                spawnedTutorialEnemy = SpawnEnemy(
-                    position, rotation, true, 1f, tutorialSpawnPoint, null);
-                if (spawnedTutorialEnemy != null)
-                    LastTutorialSpawnStatus = TutorialSpawnStatus.Spawned;
-                else
-                    Debug.LogError($"[Dreamland] 튜토리얼 생성 결과가 null입니다: {LastTutorialSpawnStatus}. 중복 방지를 위해 Spawn은 재시도하지 않습니다.", this);
+                return SpawnEnemy(position, rotation, true, 1f, tutorialSpawnPoint, null);
             }
             catch (Exception exception)
             {
-                Debug.LogError($"[Dreamland] 튜토리얼 {LastTutorialSpawnStatus}: {exception}", this);
+                Debug.LogError($"[TutorialNetwork] Spawn 예외; 중복 생성을 방지하기 위해 재생성하지 않습니다: {exception}", this);
+                return null;
             }
-            return spawnedTutorialEnemy;
+            finally
+            {
+                tutorialSpawnInProgress = false;
+            }
         }
 
         /// <summary>
@@ -786,23 +757,25 @@ namespace DreamGuardians
 
             EnemyHealth spawnedHealth = null;
 
-            runner.Spawn(
+            var spawnedObject = runner.Spawn(
                 selectedPrefab,
                 position,
                 rotation,
                 PlayerRef.None,
                 (spawnRunner, networkObject) =>
                 {
-                    if (tutorialEnemy)
-                        LastTutorialSpawnStatus = TutorialSpawnStatus.ConfigurationFailed;
                     spawnedHealth = ConfigureSpawnedEnemy(
                         networkObject.gameObject,
                         tutorialEnemy,
                         healthMultiplier,
                         spawnPoint);
-                    if (tutorialEnemy && spawnedHealth != null)
-                        LastTutorialSpawnStatus = TutorialSpawnStatus.SpawnFailed;
                 });
+
+            if (tutorialEnemy && spawnedObject != null)
+            {
+                TutorialEnemyId = spawnedObject.Id;
+                Debug.Log($"[TutorialNetwork] Spawn master={runner.LocalPlayer}, enemy={TutorialEnemyId}", this);
+            }
 
             return spawnedHealth;
         }
