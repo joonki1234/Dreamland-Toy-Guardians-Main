@@ -64,6 +64,7 @@ public class VRHandTargetFollower : NetworkBehaviour
     private Transform rigRoot;
     private Transform modelsRoot;
     private Transform hmdTransform;
+    private Transform activeHead;
     private Transform controllerTrackingOrigin;
     private Quaternion modelsBaseLocalRotation = Quaternion.identity;
     private bool modelsBaseRotationCached;
@@ -114,6 +115,7 @@ public class VRHandTargetFollower : NetworkBehaviour
         }
 
         UpdateLocalBodyYaw();
+        UpdateLocalBodyHorizontalPosition();
 
         if (handTarget != null && rightControllerTarget != null)
         {
@@ -228,12 +230,15 @@ public class VRHandTargetFollower : NetworkBehaviour
     private void BindCurrentJobModelIK()
     {
         GameObject activeModel = GetActiveModelForCurrentJob();
+        activeHead = null;
+        currentActiveModel = activeModel;
         if (activeModel == null)
         {
             return;
         }
 
-        currentActiveModel = activeModel;
+        // Cache once per job binding, using the active model rather than Police only.
+        activeHead = FindBoneInModel(activeModel, "CC_Base_Head", "Head", "head");
 
         if (rigRoot == null)
         {
@@ -678,6 +683,21 @@ public class VRHandTargetFollower : NetworkBehaviour
                 hmdTransform = playerCamera.transform;
             }
         }
+    }
+
+    private void UpdateLocalBodyHorizontalPosition()
+    {
+        if (modelsRoot == null || hmdTransform == null || activeHead == null ||
+            !activeHead.gameObject.activeInHierarchy)
+        {
+            return;
+        }
+
+        // Read the head after body yaw. Both the delta and the assignment are
+        // world-space, so the parent's rotation/scale cannot mix coordinate spaces.
+        Vector3 horizontalDelta = hmdTransform.position - activeHead.position;
+        horizontalDelta.y = 0f;
+        modelsRoot.position += horizontalDelta;
     }
 
     private void UpdateLocalBodyYaw()

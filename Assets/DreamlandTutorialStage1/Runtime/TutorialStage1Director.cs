@@ -484,6 +484,49 @@ namespace DreamGuardians
             }
 
 
+            // Wait for the real game runner, not a fixed delay or a scene template.
+            const float runnerReadyTimeout = 15f;
+            float runnerWaitStarted = Time.realtimeSinceStartup;
+            bool waitingLogged = false;
+            while (true)
+            {
+                if (spawner == null)
+                {
+                    Debug.LogError("[Dreamland] 튜토리얼 중단: 대기 중 Spawner가 사라졌습니다.", this);
+                    flowRoutine = null;
+                    yield break;
+                }
+
+                DreamEnemySpawner.TutorialSpawnStatus status =
+                    spawner.GetTutorialRunnerStatus(out string reason);
+                if (status == DreamEnemySpawner.TutorialSpawnStatus.ReadyMaster)
+                    break;
+
+                if (status == DreamEnemySpawner.TutorialSpawnStatus.NonMaster)
+                {
+                    // TODO: Bind the replicated tutorial enemy via network identity here.
+                    // Remain in Intro; shooting practice cannot start without that reference.
+                    Debug.LogWarning("[Dreamland] 튜토리얼 진행 보류: Shared Mode Non-Master이므로 Spawn을 생략합니다. 복제 적 연결이 아직 구현되지 않아 Intro에서 중단합니다.", this);
+                    flowRoutine = null;
+                    yield break;
+                }
+
+                if (status == DreamEnemySpawner.TutorialSpawnStatus.InvalidRunnerMode ||
+                    Time.realtimeSinceStartup - runnerWaitStarted >= runnerReadyTimeout)
+                {
+                    Debug.LogError($"[Dreamland] 튜토리얼 Runner 준비 실패 (대기 {Time.realtimeSinceStartup - runnerWaitStarted:F1}초 / 제한 {runnerReadyTimeout}초): {reason}. Intro에서 중단합니다.", this);
+                    flowRoutine = null;
+                    yield break;
+                }
+
+                if (!waitingLogged)
+                {
+                    Debug.Log($"[Dreamland] 튜토리얼 Runner 준비 대기 (최대 {runnerReadyTimeout}초): {reason}", this);
+                    waitingLogged = true;
+                }
+                yield return null;
+            }
+
             PlaceTutorialSpawnInFrontOfCamera();
 
 
@@ -497,7 +540,7 @@ namespace DreamGuardians
             if (tutorialEnemy == null)
             {
                 Debug.LogError(
-                    "[Dreamland] 튜토리얼 몬스터 생성에 실패했습니다.",
+                    $"[Dreamland] 튜토리얼 진행 중단: {spawner.LastTutorialSpawnStatus}. 앞선 Spawn/EnemyHealth 진단을 확인하세요. 자동 Spawn 재시도는 하지 않습니다.",
                     this);
 
                 flowRoutine = null;
