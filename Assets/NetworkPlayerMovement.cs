@@ -76,6 +76,16 @@ public class NetworkPlayerMovement : NetworkBehaviour
     private float footstepVolume = 0.2f;
 
 
+    /// <summary>
+    /// "내" 캐릭터(입력 권한을 가진 로컬 플레이어)의 1인칭 카메라를 다른
+    /// 스크립트에서 쉽게 참조할 수 있도록 노출한다. 01_Player 프리팹은
+    /// 씬에 미리 배치되지 않고 Fusion이 런타임에 스폰하기 때문에,
+    /// WebcamPassthroughSimulator처럼 씬에 미리 놓인 오브젝트에서는
+    /// Inspector로 직접 연결할 방법이 없다 - 대신 이 정적 프로퍼티를
+    /// 폴링해서 스폰된 뒤에 가져다 쓴다.
+    /// </summary>
+    public static Camera LocalPlayerCamera { get; private set; }
+
     private CharacterController _cc;
     private SphereCollider _boundarySphereCollider;
     private TrackedPoseDriver _headTrackedPoseDriver;
@@ -283,6 +293,8 @@ public class NetworkPlayerMovement : NetworkBehaviour
 
         if (isMine)
         {
+            LocalPlayerCamera = playerCamera;
+
             Cursor.lockState = CursorLockMode.Locked;
 
             // 화면 고정 HUD(ToyFriendMapHud 등)가 Camera.main에 의존하면
