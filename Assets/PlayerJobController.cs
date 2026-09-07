@@ -44,16 +44,16 @@ public class PlayerJobController : NetworkBehaviour
     public Vector3 weaponPoliceGripOffset = Vector3.zero;
     public Vector3 weaponPoliceGripRotationOffset = Vector3.zero;
 
-    [Header("로컬 VR Police Grip (실제 손 WeaponAnchor 기준)")]
+    [Header("로컬 VR Police Grip (Right Controller 기준)")]
     [Tooltip("로컬 Police 총 전용 위치 보정. 원격 표시용 weaponPoliceGripOffset과 좌표 기준을 공유하지 않습니다.")]
     [SerializeField]
     private Vector3 localVrPoliceGripPosition = Vector3.zero;
 
-    [Tooltip("로컬 Police 총 전용 회전 보정(Euler). (0,0,0)이면 기존 GripPoint 방향을 손 Anchor에 정렬합니다.")]
+    [Tooltip("로컬 Police 총 전용 회전 보정(Euler). (0,0,0)이면 기존 GripPoint 방향을 LocalWeaponAnchor에 정렬합니다.")]
     [SerializeField]
     private Vector3 localVrPoliceGripRotation = Vector3.zero;
 
-    [Tooltip("기존 Police Anchor. 로컬에서만 실제 오른손 아래 WeaponAnchor로 재사용합니다.")]
+    [Tooltip("기존 직렬화 참조 보존용. LocalWeaponAnchor는 HandTarget_R 아래 별도로 생성합니다.")]
     [SerializeField]
     private Transform policeWeaponAnchor;
 
@@ -153,6 +153,7 @@ public class PlayerJobController : NetworkBehaviour
 
     private void OnEnable()
     {
+        if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(true);
         if (xrActivateAction != null && xrActivateAction.action != null)
         {
             xrActivateAction.action.Enable();
@@ -162,6 +163,7 @@ public class PlayerJobController : NetworkBehaviour
 
     private void OnDisable()
     {
+        if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(false);
         if (xrActivateAction != null && xrActivateAction.action != null)
         {
             xrActivateAction.action.Disable();
@@ -740,7 +742,7 @@ public class PlayerJobController : NetworkBehaviour
 
         if (isLocalVrWeapon)
         {
-            AttachLocalWeapon(weaponPolice, modelPolice,
+            AttachLocalWeapon(weaponPolice,
                 localVrPoliceGripPosition, localVrPoliceGripRotation);
             return;
         }
@@ -751,7 +753,7 @@ public class PlayerJobController : NetworkBehaviour
             weaponPoliceGripRotationOffset);
     }
 
-    // Local weapons inherit the solved hand; remote attachment stays unchanged.
+    // Local weapons inherit the controller pose in Player space; remote attachment stays unchanged.
     private void AttachWeaponForViewer(GameObject weapon, Vector3 positionOffset, Vector3 rotationOffsetEuler)
     {
         if (weapon == null || Object == null)
@@ -761,11 +763,9 @@ public class PlayerJobController : NetworkBehaviour
 
         if (Object.HasInputAuthority)
         {
-            GameObject model = weapon == weaponFirefighter ? modelFirefighter
-                : weapon == weaponChef ? modelChef : modelBuilder;
             LocalGripAdjustment adjustment = weapon == weaponFirefighter ? localFirefighterGrip
                 : weapon == weaponChef ? localChefGrip : localBuilderGrip;
-            AttachLocalWeapon(weapon, model, adjustment.position, adjustment.rotation);
+            AttachLocalWeapon(weapon, adjustment.position, adjustment.rotation);
             return;
         }
 
@@ -779,21 +779,42 @@ public class PlayerJobController : NetworkBehaviour
         public Vector3 rotation = Vector3.zero;
     }
 
-    [Header("Local hand grip adjustments (metres / Euler degrees)")]
+    [Header("Local controller grip adjustments (metres / Euler degrees)")]
     [SerializeField] private LocalGripAdjustment localFirefighterGrip = new LocalGripAdjustment();
     [SerializeField] private LocalGripAdjustment localChefGrip = new LocalGripAdjustment();
     [SerializeField] private LocalGripAdjustment localBuilderGrip = new LocalGripAdjustment();
     private readonly Dictionary<Transform, Vector3> localWeaponWorldScales = new Dictionary<Transform, Vector3>();
 
-    private void AttachLocalWeapon(GameObject weapon, GameObject model, Vector3 position, Vector3 rotation)
+    private Transform localWeaponAnchor;
+    private VRHandTargetFollower localTracking;
+    private GameObject pendingLocalWeapon;
+    private Vector3 pendingLocalPosition;
+    private Vector3 pendingLocalRotation;
+
+    private void LateUpdate()
     {
-        if (Object == null || !Object.HasInputAuthority || weapon == null || model == null) return;
-        Transform hand = FindWeaponTransform(model.transform, "CC_Base_R_Hand");
-        if (hand == null)
-        {
-            Debug.LogError("[PlayerJobController] CC_Base_R_Hand missing on " + model.name, this);
-            return;
-        }
+        if (localWeaponAnchor != null)
+            localWeaponAnchor.gameObject.SetActive(Object != null && Object.HasInputAuthority);
+        // XR Origin can appear after Fusion Spawned. Retry only the pending attachment.
+        if (pendingLocalWeapon != null && Object != null && Object.HasInputAuthority)
+            AttachLocalWeapon(pendingLocalWeapon, pendingLocalPosition, pendingLocalRotation);
+    }
+
+    private void OnDestroy()
+    {
+        // Clean up the runtime anchor when this component is destroyed.
+        if (localWeaponAnchor != null) Destroy(localWeaponAnchor.gameObject);
+    }
+
+    private void AttachLocalWeapon(GameObject weapon, Vector3 position, Vector3 rotation)
+    {
+        if (Object == null || !Object.HasInputAuthority || weapon == null) return;
+        pendingLocalWeapon = weapon;
+        pendingLocalPosition = position;
+        pendingLocalRotation = rotation;
+        if (localTracking == null) localTracking = GetComponent<VRHandTargetFollower>();
+        Transform weaponTarget = localTracking != null ? localTracking.ResolveLocalWeaponTarget() : null;
+        if (weaponTarget == null) return;
 
         Transform grip = ResolveWeaponGrip(weapon);
         if (grip == null) return;
@@ -805,33 +826,20 @@ public class PlayerJobController : NetworkBehaviour
         }
         Quaternion gripRotationInWeapon = Quaternion.Inverse(weaponTransform.rotation) * grip.rotation;
 
-        Transform anchor = hand.Find("WeaponAnchor");
-        if (anchor == null)
-        {
-            // Reuse the authored Police anchor, but never move it on a remote player.
-            anchor = weapon == weaponPolice ? policeWeaponAnchor : null;
-            if (anchor == null && weapon == weaponPolice)
-                anchor = FindWeaponTransform(transform, "PoliceWeaponAnchor");
-            if (anchor == null) anchor = new GameObject("WeaponAnchor").transform;
-            anchor.SetParent(hand, false);
-            anchor.name = "WeaponAnchor";
-            // Hand bone is the wrist; place the grip halfway towards the index knuckle.
-            Transform index = FindWeaponTransform(hand, "CC_Base_R_Index1");
-            anchor.localPosition = index != null
-                ? hand.InverseTransformPoint(index.position) * 0.5f : Vector3.zero;
-            anchor.localRotation = Quaternion.identity;
-            // FBX skeletons carry import scale. Keep grip offsets in metres and weapon size intact.
-            Vector3 handScale = hand.lossyScale;
-            anchor.localScale = new Vector3(1f / handScale.x, 1f / handScale.y, 1f / handScale.z);
-        }
+        if (localWeaponAnchor == null)
+            localWeaponAnchor = new GameObject("LocalWeaponAnchor").transform;
+        localWeaponAnchor.SetParent(weaponTarget, false);
+        localWeaponAnchor.localPosition = position;
+        localWeaponAnchor.localRotation = Quaternion.Euler(rotation);
+        localWeaponAnchor.localScale = Vector3.one;
 
-        weaponTransform.SetParent(anchor, false);
-        Vector3 anchorScale = anchor.lossyScale;
+        weaponTransform.SetParent(localWeaponAnchor, false);
+        Vector3 anchorScale = localWeaponAnchor.lossyScale;
         weaponTransform.localScale = new Vector3(worldScale.x / anchorScale.x,
             worldScale.y / anchorScale.y, worldScale.z / anchorScale.z);
-        weaponTransform.rotation = anchor.rotation * Quaternion.Euler(rotation) * Quaternion.Inverse(gripRotationInWeapon);
-        // Match the actual handle point, not a camera-space weapon root offset.
-        weaponTransform.position += anchor.TransformPoint(position) - grip.position;
+        weaponTransform.localRotation = Quaternion.Inverse(gripRotationInWeapon);
+        weaponTransform.position += localWeaponAnchor.position - grip.position;
+        pendingLocalWeapon = null;
     }
 
     private Transform ResolveWeaponGrip(GameObject weapon)
