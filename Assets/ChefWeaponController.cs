@@ -54,7 +54,11 @@ public class ChefWeaponController : MonoBehaviour
     {
         if (ownerNetworkObject != null && !ownerNetworkObject.HasInputAuthority) return;
 
-        if (Input.GetButtonDown("Fire1") && !isAttacking)
+    }
+
+    public void TriggerAttack()
+    {
+        if (!isAttacking)
         {
             StartCoroutine(WokSwingRoutine());
         }

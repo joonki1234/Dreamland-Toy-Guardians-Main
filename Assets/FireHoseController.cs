@@ -59,9 +59,6 @@ public class FireHoseController : MonoBehaviour
     {
         if (ownerNetworkObject != null && !ownerNetworkObject.HasInputAuthority) return;
 
-        if (Input.GetButtonDown("Fire1")) StartWater();
-        else if (Input.GetButtonUp("Fire1")) StopWater();
-
         if (isShooting && firePoint != null) ProcessWaterHit();
     }
 

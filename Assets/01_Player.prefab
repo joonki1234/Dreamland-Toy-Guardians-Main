@@ -15619,6 +15619,7 @@ MonoBehaviour:
   additionalShardDamage: 1.8
   maxShotDamagePerEnemy: 15
   xrActivateAction: {fileID: 0}
+  xrInputActionAsset: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!95 &6790173718373879798
 Animator:
   serializedVersion: 7

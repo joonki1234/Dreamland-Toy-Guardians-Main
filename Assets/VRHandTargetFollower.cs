@@ -77,6 +77,11 @@ public class VRHandTargetFollower : NetworkBehaviour
     private bool _warnedMissingHandTarget;
     private bool _warnedMissingLeftHandTarget;
     private bool _warnedMissingRightHandGripReference;
+    private bool rightControllerPoseInitialized;
+    private Vector3 initialRightControllerPosition;
+    private Quaternion initialRightControllerRotation;
+
+    public bool HasRightControllerPoseChanged { get; private set; }
     private bool networkSpawned;
 
     private void Awake()
@@ -637,6 +642,25 @@ public class VRHandTargetFollower : NetworkBehaviour
         }
 
         GetControllerPoseInPlayerSpace(source, out Vector3 controllerPosition, out Quaternion controllerRotation);
+        Vector3 trackingPosition = controllerTrackingOrigin != null
+            ? controllerTrackingOrigin.InverseTransformPoint(source.position)
+            : source.localPosition;
+        Quaternion trackingRotation = controllerTrackingOrigin != null
+            ? Quaternion.Inverse(controllerTrackingOrigin.rotation) * source.rotation
+            : source.localRotation;
+
+        if (!rightControllerPoseInitialized)
+        {
+            initialRightControllerPosition = trackingPosition;
+            initialRightControllerRotation = trackingRotation;
+            rightControllerPoseInitialized = true;
+        }
+        else if (trackingPosition != initialRightControllerPosition ||
+                 trackingRotation != initialRightControllerRotation)
+        {
+            HasRightControllerPoseChanged = true;
+        }
+
         Vector3 targetPosition = controllerPosition + controllerRotation * rightHandPositionOffset;
         Quaternion targetRotation = controllerRotation
             * rightHandGripReference.localRotation

@@ -126,17 +126,21 @@ public class PlayerJobController : NetworkBehaviour
     public float maxShotDamagePerEnemy = 18f;
 
 
-    [Header("XR 컨트롤러 입력 (선택)")]
+    [Header("XR 컨트롤러 입력")]
     [Tooltip(
         "XRI Default Input Actions의 'XRI Right Interaction/Activate' " +
-        "(또는 Left) 액션을 연결하면 VR 컨트롤러 트리거로도 공격할 수 있습니다. " +
-        "비워두면 마우스 클릭만으로 동작합니다(PC 테스트용).")]
+        "액션을 연결하면 VR 컨트롤러 트리거로 공격할 수 있습니다.")]
     [SerializeField]
     private InputActionReference xrActivateAction;
+
+    [SerializeField]
+    private InputActionAsset xrInputActionAsset;
 
 
     private float lastAttackTime = -999f;
     private bool isSwinging;
+    private InputAction xrActivateInput;
+    private bool firefighterTriggerHeld;
 
     private static int nextBuilderProjectileShotId =
         300000;
@@ -154,9 +158,10 @@ public class PlayerJobController : NetworkBehaviour
     private void OnEnable()
     {
         if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(true);
-        if (xrActivateAction != null && xrActivateAction.action != null)
+        xrActivateInput = ResolveXrActivateAction();
+        if (xrActivateInput != null)
         {
-            xrActivateAction.action.Enable();
+            xrActivateInput.Enable();
         }
     }
 
@@ -164,9 +169,15 @@ public class PlayerJobController : NetworkBehaviour
     private void OnDisable()
     {
         if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(false);
-        if (xrActivateAction != null && xrActivateAction.action != null)
+        if (firefighterTriggerHeld)
         {
-            xrActivateAction.action.Disable();
+            GetComponentInChildren<FireHoseController>(true)?.StopWater();
+            firefighterTriggerHeld = false;
+        }
+
+        if (xrActivateInput != null)
+        {
+            xrActivateInput.Disable();
         }
     }
 
@@ -184,15 +195,42 @@ public class PlayerJobController : NetworkBehaviour
         PollEditorJobDebugInput();
 #endif
 
-        // PC 테스트: 마우스 왼쪽 클릭. VR: 컨트롤러 트리거(Activate 액션이 연결된 경우).
-        bool mouseFire = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
-        bool xrFire = xrActivateAction != null && xrActivateAction.action != null
-            && xrActivateAction.action.WasPressedThisFrame();
+        xrActivateInput = ResolveXrActivateAction();
 
-        if (mouseFire || xrFire)
+        // Quest와 Editor XR Device Simulator 모두 같은 XRI 오른손 Activate 액션을 사용한다.
+        bool xrPressed = xrActivateInput != null && xrActivateInput.IsPressed();
+        bool xrFire = xrActivateInput != null && xrActivateInput.WasPressedThisFrame();
+
+        if (CurrentJob == PlayerJob.Firefighter)
+        {
+            if (xrPressed && !firefighterTriggerHeld)
+            {
+                GetComponentInChildren<FireHoseController>(true)?.StartWater();
+            }
+            else if (!xrPressed && firefighterTriggerHeld)
+            {
+                GetComponentInChildren<FireHoseController>(true)?.StopWater();
+            }
+
+            firefighterTriggerHeld = xrPressed;
+        }
+
+        if (xrFire && CurrentJob != PlayerJob.Firefighter)
         {
             Attack();
         }
+    }
+
+    private InputAction ResolveXrActivateAction()
+    {
+        if (xrActivateAction != null && xrActivateAction.action != null)
+        {
+            return xrActivateAction.action;
+        }
+
+        return xrInputActionAsset != null
+            ? xrInputActionAsset.FindAction("XRI Right Interaction/Activate", false)
+            : null;
     }
 
 
@@ -249,14 +287,17 @@ public class PlayerJobController : NetworkBehaviour
         {
             case PlayerJob.Police:
                 lastAttackTime = Time.time;
+                weaponPolice?.GetComponentInChildren<GunController>(true)?.TriggerShoot();
                 break;
 
             case PlayerJob.Firefighter:
                 lastAttackTime = Time.time;
+                weaponFirefighter?.GetComponentInChildren<FireHoseController>(true)?.StartWater();
                 break;
 
             case PlayerJob.Chef:
                 lastAttackTime = Time.time;
+                weaponChef?.GetComponentInChildren<ChefWeaponController>(true)?.TriggerAttack();
                 break;
 
             case PlayerJob.Builder:
@@ -743,7 +784,8 @@ public class PlayerJobController : NetworkBehaviour
         if (isLocalVrWeapon)
         {
             AttachLocalWeapon(weaponPolice,
-                localVrPoliceGripPosition, localVrPoliceGripRotation);
+                localVrPoliceGripPosition, localVrPoliceGripRotation,
+                weaponPoliceGripOffset, weaponPoliceGripRotationOffset);
             return;
         }
 
@@ -765,7 +807,8 @@ public class PlayerJobController : NetworkBehaviour
         {
             LocalGripAdjustment adjustment = weapon == weaponFirefighter ? localFirefighterGrip
                 : weapon == weaponChef ? localChefGrip : localBuilderGrip;
-            AttachLocalWeapon(weapon, adjustment.position, adjustment.rotation);
+            AttachLocalWeapon(weapon, adjustment.position, adjustment.rotation,
+                positionOffset, rotationOffsetEuler);
             return;
         }
 
@@ -790,6 +833,10 @@ public class PlayerJobController : NetworkBehaviour
     private GameObject pendingLocalWeapon;
     private Vector3 pendingLocalPosition;
     private Vector3 pendingLocalRotation;
+    private Vector3 pendingRemotePosition;
+    private Vector3 pendingRemoteRotation;
+    private GameObject activeLocalWeapon;
+    private bool localControllerPoseApplied;
 
     private void LateUpdate()
     {
@@ -797,7 +844,20 @@ public class PlayerJobController : NetworkBehaviour
             localWeaponAnchor.gameObject.SetActive(Object != null && Object.HasInputAuthority);
         // XR Origin can appear after Fusion Spawned. Retry only the pending attachment.
         if (pendingLocalWeapon != null && Object != null && Object.HasInputAuthority)
-            AttachLocalWeapon(pendingLocalWeapon, pendingLocalPosition, pendingLocalRotation);
+            AttachLocalWeapon(pendingLocalWeapon, pendingLocalPosition, pendingLocalRotation,
+                pendingRemotePosition, pendingRemoteRotation);
+
+        if (activeLocalWeapon == null || localTracking == null) return;
+
+        if (!localTracking.HasRightControllerPoseChanged)
+        {
+            ApplyRemoteDefaultPose(activeLocalWeapon, pendingRemotePosition, pendingRemoteRotation);
+        }
+        else if (!localControllerPoseApplied)
+        {
+            AlignLocalWeaponToController(activeLocalWeapon, pendingLocalPosition, pendingLocalRotation);
+            localControllerPoseApplied = true;
+        }
     }
 
     private void OnDestroy()
@@ -806,14 +866,30 @@ public class PlayerJobController : NetworkBehaviour
         if (localWeaponAnchor != null) Destroy(localWeaponAnchor.gameObject);
     }
 
-    private void AttachLocalWeapon(GameObject weapon, Vector3 position, Vector3 rotation)
+    private void AttachLocalWeapon(GameObject weapon, Vector3 position, Vector3 rotation,
+        Vector3 remotePosition, Vector3 remoteRotation)
     {
         if (Object == null || !Object.HasInputAuthority || weapon == null) return;
         pendingLocalWeapon = weapon;
         pendingLocalPosition = position;
         pendingLocalRotation = rotation;
+        pendingRemotePosition = remotePosition;
+        pendingRemoteRotation = remoteRotation;
         if (localTracking == null) localTracking = GetComponent<VRHandTargetFollower>();
         Transform weaponTarget = localTracking != null ? localTracking.ResolveLocalWeaponTarget() : null;
+        if (weaponTarget == null) return;
+
+        AlignLocalWeaponToController(weapon, position, rotation);
+        activeLocalWeapon = weapon;
+        localControllerPoseApplied = localTracking.HasRightControllerPoseChanged;
+        if (!localControllerPoseApplied)
+            ApplyRemoteDefaultPose(weapon, remotePosition, remoteRotation);
+        pendingLocalWeapon = null;
+    }
+
+    private void AlignLocalWeaponToController(GameObject weapon, Vector3 position, Vector3 rotation)
+    {
+        Transform weaponTarget = localTracking.ResolveLocalWeaponTarget();
         if (weaponTarget == null) return;
 
         Transform grip = ResolveWeaponGrip(weapon);
@@ -839,7 +915,16 @@ public class PlayerJobController : NetworkBehaviour
             worldScale.y / anchorScale.y, worldScale.z / anchorScale.z);
         weaponTransform.localRotation = Quaternion.Inverse(gripRotationInWeapon);
         weaponTransform.position += localWeaponAnchor.position - grip.position;
-        pendingLocalWeapon = null;
+    }
+
+    private void ApplyRemoteDefaultPose(GameObject weapon, Vector3 position, Vector3 rotation)
+    {
+        Transform remoteAnchor = ResolveHandGripAnchor();
+        if (weapon == null || remoteAnchor == null) return;
+
+        weapon.transform.SetPositionAndRotation(
+            remoteAnchor.TransformPoint(position),
+            remoteAnchor.rotation * Quaternion.Euler(rotation));
     }
 
     private Transform ResolveWeaponGrip(GameObject weapon)

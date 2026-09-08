@@ -97,11 +97,11 @@ public class GunController : MonoBehaviour
             return;
         }
 
-        if (Mouse.current != null &&
-            Mouse.current.leftButton.wasPressedThisFrame)
-        {
-            Shoot();
-        }
+    }
+
+    public void TriggerShoot()
+    {
+        Shoot();
     }
 
 
