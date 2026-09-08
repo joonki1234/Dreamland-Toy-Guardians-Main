@@ -53,7 +53,7 @@ public class PlayerJobController : NetworkBehaviour
     [SerializeField]
     private Vector3 localVrPoliceGripRotation = Vector3.zero;
 
-    [Tooltip("기존 직렬화 참조 보존용. LocalWeaponAnchor는 HandTarget_R 아래 별도로 생성합니다.")]
+    [Tooltip("기존 직렬화 참조 보존용. LocalWeaponAnchor는 Rig_IK 아래 독립적으로 생성합니다.")]
     [SerializeField]
     private Transform policeWeaponAnchor;
 
@@ -157,6 +157,7 @@ public class PlayerJobController : NetworkBehaviour
 
     private void OnEnable()
     {
+        Application.onBeforeRender += ApplyLocalWeaponAnchorPoseBeforeRender;
         if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(true);
         xrActivateInput = ResolveXrActivateAction();
         if (xrActivateInput != null)
@@ -168,6 +169,7 @@ public class PlayerJobController : NetworkBehaviour
 
     private void OnDisable()
     {
+        Application.onBeforeRender -= ApplyLocalWeaponAnchorPoseBeforeRender;
         if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(false);
         if (firefighterTriggerHeld)
         {
@@ -836,10 +838,24 @@ public class PlayerJobController : NetworkBehaviour
     private Vector3 pendingRemotePosition;
     private Vector3 pendingRemoteRotation;
     private GameObject activeLocalWeapon;
-    private bool localControllerPoseApplied;
+    private bool isLocalWeaponTrackingActive;
+#if UNITY_EDITOR
+    private bool editorWeaponPoseRebased;
+    private int editorWeaponPoseRebaseFrame = -1;
+    private Vector3 editorBaselineControllerPosition;
+    private Quaternion editorBaselineControllerRotation;
+    private Vector3 editorBaselineWeaponPosition;
+    private Quaternion editorBaselineWeaponRotation;
+#pragma warning disable CS0618 // Reuse the project's Classic XR Device Simulator action.
+    private UnityEngine.XR.Interaction.Toolkit.Inputs.Simulation.XRDeviceSimulator localWeaponSimulator;
+#pragma warning restore CS0618
+#endif
+    private Vector3 alignedLocalWeaponPosition;
+    private Quaternion alignedLocalWeaponRotation;
 
     private void LateUpdate()
     {
+        UpdateLocalWeaponTrackingMode();
         if (localWeaponAnchor != null)
             localWeaponAnchor.gameObject.SetActive(Object != null && Object.HasInputAuthority);
         // XR Origin can appear after Fusion Spawned. Retry only the pending attachment.
@@ -847,17 +863,7 @@ public class PlayerJobController : NetworkBehaviour
             AttachLocalWeapon(pendingLocalWeapon, pendingLocalPosition, pendingLocalRotation,
                 pendingRemotePosition, pendingRemoteRotation);
 
-        if (activeLocalWeapon == null || localTracking == null) return;
-
-        if (!localTracking.HasRightControllerPoseChanged)
-        {
-            ApplyRemoteDefaultPose(activeLocalWeapon, pendingRemotePosition, pendingRemoteRotation);
-        }
-        else if (!localControllerPoseApplied)
-        {
-            AlignLocalWeaponToController(activeLocalWeapon, pendingLocalPosition, pendingLocalRotation);
-            localControllerPoseApplied = true;
-        }
+        ApplyLocalWeaponAnchorPose();
     }
 
     private void OnDestroy()
@@ -877,13 +883,11 @@ public class PlayerJobController : NetworkBehaviour
         pendingRemoteRotation = remoteRotation;
         if (localTracking == null) localTracking = GetComponent<VRHandTargetFollower>();
         Transform weaponTarget = localTracking != null ? localTracking.ResolveLocalWeaponTarget() : null;
-        if (weaponTarget == null) return;
+        if (weaponTarget == null || ResolveHandGripAnchor() == null) return;
 
         AlignLocalWeaponToController(weapon, position, rotation);
         activeLocalWeapon = weapon;
-        localControllerPoseApplied = localTracking.HasRightControllerPoseChanged;
-        if (!localControllerPoseApplied)
-            ApplyRemoteDefaultPose(weapon, remotePosition, remoteRotation);
+        ApplyLocalWeaponAnchorPose();
         pendingLocalWeapon = null;
     }
 
@@ -904,10 +908,11 @@ public class PlayerJobController : NetworkBehaviour
 
         if (localWeaponAnchor == null)
             localWeaponAnchor = new GameObject("LocalWeaponAnchor").transform;
-        localWeaponAnchor.SetParent(weaponTarget, false);
-        localWeaponAnchor.localPosition = position;
-        localWeaponAnchor.localRotation = Quaternion.Euler(rotation);
+        localWeaponAnchor.SetParent(ResolveHandGripAnchor().parent, false);
         localWeaponAnchor.localScale = Vector3.one;
+        localWeaponAnchor.SetPositionAndRotation(
+            weaponTarget.TransformPoint(position),
+            weaponTarget.rotation * Quaternion.Euler(rotation));
 
         weaponTransform.SetParent(localWeaponAnchor, false);
         Vector3 anchorScale = localWeaponAnchor.lossyScale;
@@ -915,16 +920,119 @@ public class PlayerJobController : NetworkBehaviour
             worldScale.y / anchorScale.y, worldScale.z / anchorScale.z);
         weaponTransform.localRotation = Quaternion.Inverse(gripRotationInWeapon);
         weaponTransform.position += localWeaponAnchor.position - grip.position;
+
+        // Keep the existing local grip correction on the weapon, so the independent
+        // anchor itself can copy HandTarget_R's world pose without an extra offset.
+        Vector3 alignedWorldPosition = weaponTransform.position;
+        Quaternion alignedWorldRotation = weaponTransform.rotation;
+        localWeaponAnchor.SetPositionAndRotation(weaponTarget.position, weaponTarget.rotation);
+        weaponTransform.SetPositionAndRotation(alignedWorldPosition, alignedWorldRotation);
+        alignedLocalWeaponPosition = weaponTransform.localPosition;
+        alignedLocalWeaponRotation = weaponTransform.localRotation;
     }
 
-    private void ApplyRemoteDefaultPose(GameObject weapon, Vector3 position, Vector3 rotation)
+    private void ApplyLocalWeaponAnchorPoseBeforeRender()
     {
-        Transform remoteAnchor = ResolveHandGripAnchor();
-        if (weapon == null || remoteAnchor == null) return;
+#if UNITY_EDITOR
+        // Capture after all LateUpdates so the first rendered tracking frame uses
+        // the current HandTarget_R, regardless of the two scripts' execution order.
+        if (isLocalWeaponTrackingActive && !editorWeaponPoseRebased &&
+            Object != null && Object.HasInputAuthority && activeLocalWeapon != null &&
+            localWeaponAnchor != null && localTracking != null)
+        {
+            Transform controller = localTracking.ResolveLocalWeaponTarget();
+            Transform space = localWeaponAnchor.parent;
+            if (controller == null || space == null) return;
+            // Store both poses in the anchor parent's space (Rig_IK), so player
+            // locomotion carries the baseline without becoming controller input.
+            editorBaselineControllerPosition = space.InverseTransformPoint(controller.position);
+            editorBaselineControllerRotation = Quaternion.Inverse(space.rotation) * controller.rotation;
+            editorBaselineWeaponPosition = localWeaponAnchor.localPosition;
+            editorBaselineWeaponRotation = localWeaponAnchor.localRotation;
+            editorWeaponPoseRebased = true;
+            editorWeaponPoseRebaseFrame = Time.frameCount;
+            // Do not write either Transform on the capture frame.
+            return;
+        }
+#endif
+        ApplyLocalWeaponAnchorPose();
+    }
 
-        weapon.transform.SetPositionAndRotation(
-            remoteAnchor.TransformPoint(position),
-            remoteAnchor.rotation * Quaternion.Euler(rotation));
+    private void ApplyLocalWeaponAnchorPose()
+    {
+        // Also run before rendering so this anchor sees HandTarget_R after all LateUpdates.
+        if (Object == null || !Object.HasInputAuthority || activeLocalWeapon == null ||
+            localWeaponAnchor == null || localTracking == null) return;
+
+        UpdateLocalWeaponTrackingMode();
+        if (isLocalWeaponTrackingActive)
+        {
+            Transform weaponTarget = localTracking.ResolveLocalWeaponTarget();
+            if (weaponTarget == null) return;
+#if UNITY_EDITOR
+            // Keep the captured pose untouched for the entire activation frame,
+            // including repeated before-render callbacks. Follow deltas next frame.
+            if (!editorWeaponPoseRebased || editorWeaponPoseRebaseFrame == Time.frameCount) return;
+            Transform space = localWeaponAnchor.parent;
+            if (space == null) return;
+            Vector3 controllerPosition = space.InverseTransformPoint(weaponTarget.position);
+            Quaternion controllerRotation = Quaternion.Inverse(space.rotation) * weaponTarget.rotation;
+            // Translation is independent of rotation: rotating the simulator must
+            // not orbit the anchor around the initial controller-to-weapon gap.
+            Vector3 deltaPosition = controllerPosition - editorBaselineControllerPosition;
+            Quaternion deltaRotation = controllerRotation * Quaternion.Inverse(editorBaselineControllerRotation);
+            localWeaponAnchor.SetLocalPositionAndRotation(
+                editorBaselineWeaponPosition + deltaPosition,
+                deltaRotation * editorBaselineWeaponRotation);
+#else
+            localWeaponAnchor.SetPositionAndRotation(
+                weaponTarget.position, weaponTarget.rotation);
+#endif
+            return;
+        }
+
+        Transform defaultReference = ResolveHandGripAnchor();
+        if (defaultReference == null) return;
+
+        // Preserve the existing default weapon pose while keeping its grip alignment fixed.
+        Quaternion anchorRotation = defaultReference.rotation * Quaternion.Euler(pendingRemoteRotation)
+            * Quaternion.Inverse(alignedLocalWeaponRotation);
+        Vector3 weaponPosition = defaultReference.TransformPoint(pendingRemotePosition);
+        localWeaponAnchor.SetPositionAndRotation(
+            weaponPosition - anchorRotation * Vector3.Scale(
+                localWeaponAnchor.lossyScale, alignedLocalWeaponPosition),
+            anchorRotation);
+    }
+
+    private void UpdateLocalWeaponTrackingMode()
+    {
+        if (isLocalWeaponTrackingActive || Object == null || !Object.HasInputAuthority) return;
+
+#if UNITY_EDITOR
+        // Pose initialization is never evidence of user input in the Editor.
+        // Read the simulator-owned action; do not enable, disable or rebind it.
+#pragma warning disable CS0618
+        if (localWeaponSimulator == null)
+            localWeaponSimulator = FindFirstObjectByType<UnityEngine.XR.Interaction.Toolkit.Inputs.Simulation.XRDeviceSimulator>();
+#pragma warning restore CS0618
+        if (localWeaponSimulator == null || !localWeaponSimulator.isActiveAndEnabled) return;
+        InputAction manipulateRight = localWeaponSimulator.manipulateRightAction?.action;
+        isLocalWeaponTrackingActive = manipulateRight != null && manipulateRight.enabled &&
+            manipulateRight.WasPressedThisFrame();
+#else
+        // Actual XR devices start immediately when the right controller is tracked.
+        foreach (var device in InputSystem.devices)
+        {
+            if (!(device is UnityEngine.InputSystem.XR.XRController controller) ||
+                !controller.added || !controller.isTracked.isPressed) continue;
+            foreach (var usage in controller.usages)
+            {
+                if (usage != CommonUsages.RightHand) continue;
+                isLocalWeaponTrackingActive = true;
+                return;
+            }
+        }
+#endif
     }
 
     private Transform ResolveWeaponGrip(GameObject weapon)
