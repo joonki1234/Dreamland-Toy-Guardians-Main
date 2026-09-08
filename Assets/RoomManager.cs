@@ -39,6 +39,12 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     [Tooltip("NetworkObject + LobbyPlayerState가 붙은 가벼운 로비 상태 프리팹")]
     [SerializeField] private GameObject lobbyPlayerStatePrefab;
 
+    [Tooltip(
+        "NetworkObject + GameDifficultyState가 붙은 프리팹. 방 전체가 공유하는 " +
+        "난이도(하/중/상) 값을 담는다. 개별 플레이어마다 스폰되는 " +
+        "lobbyPlayerStatePrefab과 달리, 방에 딱 하나만 스폰된다.")]
+    [SerializeField] private GameObject difficultyStatePrefab;
+
     [Header("게임플레이 단계 프리팹")]
     [Tooltip("NetworkObject + NetworkPlayerMovement + PlayerJobController가 붙은 실제 캐릭터 프리팹")]
     [SerializeField] private GameObject gameplayPlayerPrefab;
@@ -58,6 +64,7 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     private PlayerJob _devDefaultJob;
     private bool _hasPendingJob;
     private PlayerJob _pendingJob;
+    private GameDifficultyState _difficultyState;
 
     /// <summary>다른 스크립트(로비 UI 등)가 참조할 수 있도록 노출한다.</summary>
     public NetworkRunner Runner => _runner;
@@ -235,6 +242,47 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         {
             lobbyIntroController.ShowJobSelectionScreen();
         }
+
+        // 난이도는 개별 플레이어 값이 아니라 방 전체가 공유하는 하나의 값이라,
+        // 아무나 스폰하면 안 되고 딱 한 번만 만들어져야 한다. 방을 만든
+        // 마스터 클라이언트만 스폰하도록 제한한다 - 나중에 들어오는
+        // 플레이어들은 이미 존재하는 걸 GetOrFindDifficultyState()로 찾아서 쓴다.
+        if (difficultyStatePrefab != null &&
+            runner.IsSharedModeMasterClient &&
+            GetOrFindDifficultyState() == null)
+        {
+            runner.Spawn(
+                difficultyStatePrefab,
+                Vector3.zero,
+                Quaternion.identity,
+                PlayerRef.None,
+                (spawnRunner, networkObject) =>
+                {
+                    GameDifficultyState state = networkObject.GetComponent<GameDifficultyState>();
+
+                    if (state != null && networkObject.HasStateAuthority)
+                    {
+                        state.CurrentDifficulty = GameDifficulty.Medium;
+                    }
+                });
+        }
+    }
+
+
+    /// <summary>
+    /// 방 전체가 공유하는 난이도 상태 오브젝트를 찾아서 캐싱해 반환한다.
+    /// 마스터 클라이언트가 스폰하기 전이거나, 아직 이 클라이언트에 복제되지
+    /// 않았다면 null을 반환할 수 있다(호출하는 쪽에서 매 프레임 다시 시도해도 안전).
+    /// </summary>
+    public GameDifficultyState GetOrFindDifficultyState()
+    {
+        if (_difficultyState != null)
+        {
+            return _difficultyState;
+        }
+
+        _difficultyState = FindAnyObjectByType<GameDifficultyState>();
+        return _difficultyState;
     }
 
 

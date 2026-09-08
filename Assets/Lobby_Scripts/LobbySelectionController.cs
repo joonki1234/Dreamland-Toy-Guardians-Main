@@ -83,6 +83,19 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private LobbyPlayerStatusUI playerStatusUI;
 
+    [Header("난이도 선택")]
+    [Tooltip("난이도를 한 단계 낮추는(하 방향) 화살표 버튼")]
+    [SerializeField]
+    private Button difficultyLeftArrowButton;
+
+    [Tooltip("난이도를 한 단계 높이는(상 방향) 화살표 버튼")]
+    [SerializeField]
+    private Button difficultyRightArrowButton;
+
+    [Tooltip("현재 난이도(하/중/상)를 보여줄 텍스트")]
+    [SerializeField]
+    private TMP_Text difficultyText;
+
     [Header("인원 설정")]
     [Tooltip("게임에 접속할 수 있는 최대 플레이어 수입니다.")]
     [SerializeField, Range(1, 8)]
@@ -172,6 +185,16 @@ public class LobbySelectionController : MonoBehaviour
         if (readyButton != null)
         {
             readyButton.onClick.AddListener(ToggleReady);
+        }
+
+        if (difficultyLeftArrowButton != null)
+        {
+            difficultyLeftArrowButton.onClick.AddListener(() => StepDifficulty(-1));
+        }
+
+        if (difficultyRightArrowButton != null)
+        {
+            difficultyRightArrowButton.onClick.AddListener(() => StepDifficulty(1));
         }
     }
 
@@ -304,6 +327,97 @@ public class LobbySelectionController : MonoBehaviour
                 hasJob,
                 ready
             );
+        }
+
+        UpdateDifficultyUI();
+    }
+
+    /// <summary>
+    /// 화살표를 눌렀을 때 난이도를 한 단계 옮긴다.
+    /// direction은 -1(하 방향) 또는 1(상 방향)이다. 하/상 끝에서는
+    /// 그 이상 넘어가지 않고 멈춘다(순환 안 함).
+    /// </summary>
+    private void StepDifficulty(int direction)
+    {
+        if (roomManager == null)
+        {
+            return;
+        }
+
+        GameDifficultyState difficultyState =
+            roomManager.GetOrFindDifficultyState();
+
+        if (difficultyState == null)
+        {
+            return;
+        }
+
+        int nextValue =
+            Mathf.Clamp(
+                (int)difficultyState.CurrentDifficulty + direction,
+                0,
+                2
+            );
+
+        difficultyState.RequestSetDifficulty((GameDifficulty)nextValue);
+    }
+
+    /// <summary>
+    /// 현재 난이도 텍스트와 화살표 버튼의 활성/비활성 상태를 갱신한다.
+    /// 전원 준비 완료 카운트다운이 시작되면(곧 맵으로 넘어가면) 더 이상
+    /// 바꿀 수 없도록 잠근다 - 방 전체가 공유하는 값이라 그 시점 이후
+    /// 바뀌면 다른 플레이어와 혼란스러울 수 있다.
+    /// </summary>
+    private void UpdateDifficultyUI()
+    {
+        GameDifficultyState difficultyState =
+            roomManager != null
+                ? roomManager.GetOrFindDifficultyState()
+                : null;
+
+        GameDifficulty difficulty =
+            difficultyState != null
+                ? difficultyState.CurrentDifficulty
+                : GameDifficulty.Medium;
+
+        if (difficultyText != null)
+        {
+            difficultyText.text =
+                difficultyState != null
+                    ? $"난이도: {GetDifficultyName(difficulty)}"
+                    : "난이도: 중 (연결 중...)";
+        }
+
+        bool locked = isCountdownActive || difficultyState == null;
+
+        if (difficultyLeftArrowButton != null)
+        {
+            difficultyLeftArrowButton.interactable =
+                !locked && difficulty != GameDifficulty.Easy;
+        }
+
+        if (difficultyRightArrowButton != null)
+        {
+            difficultyRightArrowButton.interactable =
+                !locked && difficulty != GameDifficulty.Hard;
+        }
+    }
+
+    /// <summary>
+    /// 난이도 값을 화면에 표시할 한글로 변환한다.
+    /// </summary>
+    private string GetDifficultyName(GameDifficulty difficulty)
+    {
+        switch (difficulty)
+        {
+            case GameDifficulty.Easy:
+                return "하";
+
+            case GameDifficulty.Hard:
+                return "상";
+
+            default:
+                return "중";
         }
     }
 
@@ -787,6 +901,16 @@ public class LobbySelectionController : MonoBehaviour
         if (readyButton != null)
         {
             readyButton.onClick.RemoveAllListeners();
+        }
+
+        if (difficultyLeftArrowButton != null)
+        {
+            difficultyLeftArrowButton.onClick.RemoveAllListeners();
+        }
+
+        if (difficultyRightArrowButton != null)
+        {
+            difficultyRightArrowButton.onClick.RemoveAllListeners();
         }
     }
 }
