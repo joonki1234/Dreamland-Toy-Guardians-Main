@@ -124,18 +124,27 @@ public sealed class FinalBossAttackController : MonoBehaviour
     [SerializeField, Min(0.02f)]
     private float hitFlashDuration = 0.12f;
 
-    [Header("붉은 눈")]
+    [Header("고오스풍 흰 눈")]
     [SerializeField]
-    private Color eyeColor = new Color(1f, 0.015f, 0.02f, 1f);
+    private Color eyeColor = new Color(1f, 1f, 1f, 1f);
 
     [SerializeField, Min(0.05f)]
-    private float eyeSize = 0.48f;
+    private float eyeSize = 1.3f;
 
-    [SerializeField, Range(0.1f, 0.45f)]
-    private float eyeSpacingRatio = 0.22f;
+    [Tooltip("눈 크기를 상자 크기의 몇 배까지 키울지입니다. 값을 올리면 상자보다 크고 넓게 벌어질 수 있습니다.")]
+    [SerializeField, Range(0.1f, 0.6f)]
+    private float eyeSizeRatio = 0.28f;
+
+    [Tooltip("두 눈 사이 간격입니다. 1.0을 넘으면 상자 폭보다 넓게 벌어집니다.")]
+    [SerializeField, Range(0.1f, 2f)]
+    private float eyeSpacingRatio = 0.7f;
 
     [SerializeField, Range(-0.25f, 0.35f)]
     private float eyeVerticalRatio = 0.08f;
+
+    [Tooltip("눈을 좌우로 반대 방향(\\ /)으로 얼마나 기울일지입니다. 클수록 바깥쪽이 위로 더 치켜올라간 사나운 눈매가 됩니다.")]
+    [SerializeField, Range(0f, 60f)]
+    private float eyeTiltAngle = 25f;
 
     [Header("Director에서 전달되는 전투 수치")]
     [SerializeField]
@@ -1141,29 +1150,73 @@ public sealed class FinalBossAttackController : MonoBehaviour
         UpdateEyePresentation();
     }
 
+    private static Mesh cachedSlitEyeMesh;
+
+    /// <summary>
+    /// 둥근 구체 대신, 포켓몬 고오스 같은 뾰족하고 각진 슬릿 모양 눈을
+    /// 절차적으로 만든다. 평평한 카드 형태라 항상 뷰어 카메라를 보도록
+    /// 회전하는 eyeRoot(UpdateEyePresentation)에 얹혀서 정면으로 보인다.
+    /// </summary>
     private Transform CreateEye(string eyeName)
     {
-        GameObject eye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        eye.name = eyeName;
+        GameObject eye = new GameObject(eyeName);
         eye.layer = gameObject.layer;
         eye.transform.SetParent(eyeRoot.transform, false);
 
-        Collider eyeCollider = eye.GetComponent<Collider>();
-        if (eyeCollider != null)
-        {
-            Destroy(eyeCollider);
-        }
+        MeshFilter meshFilter = eye.AddComponent<MeshFilter>();
+        meshFilter.sharedMesh = GetSlitEyeMesh();
 
-        Renderer eyeRenderer = eye.GetComponent<Renderer>();
-        if (eyeRenderer != null)
-        {
-            eyeRenderer.sharedMaterial = GetEyeMaterial();
-            eyeRenderer.shadowCastingMode =
-                UnityEngine.Rendering.ShadowCastingMode.Off;
-            eyeRenderer.receiveShadows = false;
-        }
+        MeshRenderer eyeRenderer = eye.AddComponent<MeshRenderer>();
+        eyeRenderer.sharedMaterial = GetEyeMaterial();
+        eyeRenderer.shadowCastingMode =
+            UnityEngine.Rendering.ShadowCastingMode.Off;
+        eyeRenderer.receiveShadows = false;
 
         return eye.transform;
+    }
+
+    private static Mesh GetSlitEyeMesh()
+    {
+        if (cachedSlitEyeMesh != null)
+        {
+            return cachedSlitEyeMesh;
+        }
+
+        // 곡선으로 이어지는 초승달/쐐기 모양은 두 눈이 가까워지면
+        // 가운데서 곡선끼리 맞닿아 하트/미소처럼 보이는 문제가 있었다.
+        // 대신 직선 변만 있는 뾰족한 마름모(다이아몬드)로 단순화한다.
+        // 이 모양을 CreateEye()에서 좌우로 반대 방향(예: \ / )으로
+        // 기울여서 사납게 치켜올라간 인상을 낸다. eyeRoot가 항상
+        // 카메라를 보도록 회전하므로 로컬 XY 평면에 평평하게(Z=0)
+        // 만들어도 항상 정면으로 보인다.
+        Vector3[] vertices =
+        {
+            new Vector3(0.6f, 0f, 0f),    // 0: 바깥쪽 뾰족한 끝
+            new Vector3(0.05f, 0.5f, 0f), // 1: 위
+            new Vector3(-0.6f, 0f, 0f),   // 2: 안쪽 뾰족한 끝
+            new Vector3(-0.05f, -0.5f, 0f), // 3: 아래
+        };
+
+        int[] triangles =
+        {
+            0, 1, 2,
+            0, 2, 3,
+        };
+
+        Vector3[] normals = new Vector3[vertices.Length];
+        for (int i = 0; i < normals.Length; i++)
+        {
+            normals[i] = Vector3.back;
+        }
+
+        Mesh mesh = new Mesh { name = "FinalBoss_SlitEye" };
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.normals = normals;
+        mesh.RecalculateBounds();
+
+        cachedSlitEyeMesh = mesh;
+        return cachedSlitEyeMesh;
     }
 
     private void UpdateEyePresentation()
@@ -1214,10 +1267,15 @@ public sealed class FinalBossAttackController : MonoBehaviour
             Mathf.Min(
                 bounds.size.y,
                 Mathf.Max(bounds.size.x, bounds.size.z)));
-        float resolvedEyeSize = Mathf.Max(eyeSize, referenceSize * 0.10f);
+        float resolvedEyeSize = Mathf.Max(eyeSize, referenceSize * eyeSizeRatio);
+
+        // eyeSpacingRatio가 1.0을 넘으면 두 눈이 상자 절반 폭(horizontalHalfSpan)보다
+        // 더 넓게 벌어질 수 있다 - 고오스처럼 눈이 몸통 경계를 넘어서는 느낌을 내기 위함.
+        // 마름모 메시는 중심에서 좌우로 0.6*resolvedEyeSize까지 뻗어 있으므로,
+        // 최소 간격을 1.6배로 잡아 둘이 서로 닿지 않게 여유를 둔다.
         float spacing = Mathf.Max(
-            resolvedEyeSize * 1.8f,
-            horizontalHalfSpan * Mathf.Clamp01(eyeSpacingRatio * 2.2f));
+            resolvedEyeSize * 1.6f,
+            horizontalHalfSpan * eyeSpacingRatio);
 
         float eyeY =
             bounds.center.y + bounds.extents.y * eyeVerticalRatio;
@@ -1231,12 +1289,20 @@ public sealed class FinalBossAttackController : MonoBehaviour
         leftEye.localPosition = Vector3.left * spacing * 0.5f;
         rightEye.localPosition = Vector3.right * spacing * 0.5f;
 
+        // 마름모를 좌우로 반대 방향(\ /)으로 기울여서, 바깥쪽이 위로
+        // 치켜올라간 사나운 눈매를 만든다.
+        leftEye.localRotation = Quaternion.Euler(0f, 0f, -eyeTiltAngle);
+        rightEye.localRotation = Quaternion.Euler(0f, 0f, eyeTiltAngle);
+
         Vector3 eyeScale = new Vector3(
             resolvedEyeSize,
             resolvedEyeSize * 0.58f,
             resolvedEyeSize * 0.34f);
+        // 마름모는 좌우 대칭이라 X 반전은 실루엣에 영향이 없지만,
+        // 관례상 오른쪽 눈을 반전시켜 둔다(비대칭 모양으로 바뀌어도
+        // 자동으로 거울 대칭이 맞도록).
         leftEye.localScale = eyeScale;
-        rightEye.localScale = eyeScale;
+        rightEye.localScale = new Vector3(-eyeScale.x, eyeScale.y, eyeScale.z);
 
         if (eyeLight != null)
         {
@@ -1281,6 +1347,14 @@ public sealed class FinalBossAttackController : MonoBehaviour
         {
             eyeMaterial.EnableKeyword("_EMISSION");
             eyeMaterial.SetColor("_EmissionColor", eyeColor * 7.5f);
+        }
+
+        // 눈이 평평한 슬릿 메시라서, 오른쪽 눈을 좌우 반전(음수 스케일)
+        // 시키면 삼각형 감기 순서가 뒤집혀 뒷면 컬링에 걸려 안 보일 수
+        // 있다. 항상 양면을 그리도록 컬링을 끈다.
+        if (eyeMaterial.HasProperty("_Cull"))
+        {
+            eyeMaterial.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
         }
 
         return eyeMaterial;
@@ -1581,6 +1655,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
         auraEmissionRate = Mathf.Max(1f, auraEmissionRate);
         hitFlashDuration = Mathf.Max(0.02f, hitFlashDuration);
         eyeSize = Mathf.Max(0.05f, eyeSize);
+        eyeSizeRatio = Mathf.Clamp(eyeSizeRatio, 0.1f, 0.6f);
+        eyeSpacingRatio = Mathf.Clamp(eyeSpacingRatio, 0.1f, 2f);
+        eyeTiltAngle = Mathf.Clamp(eyeTiltAngle, 0f, 60f);
         coreDamage = Mathf.Max(0f, coreDamage);
         attackInterval = Mathf.Max(0.1f, attackInterval);
         firstAttackDelay = Mathf.Max(0f, firstAttackDelay);
