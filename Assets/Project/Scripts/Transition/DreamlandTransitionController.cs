@@ -1144,7 +1144,10 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             HideSkyImmediately();
 
         Debug.Log(
-            "[DreamTransition] 현실 시작 상태 적용 완료",
+            "[DreamTransition] 현실 시작 상태 적용 완료. " +
+            $"realityWorld={(realityWorld != null ? realityWorld.activeSelf.ToString() : "null참조")}, " +
+            $"dreamRoadRoot={(dreamRoadRoot != null ? dreamRoadRoot.activeSelf.ToString() : "null참조")}, " +
+            $"portalEffects={(portalEffects != null ? portalEffects.activeSelf.ToString() : "null참조")}",
             this);
     }
 

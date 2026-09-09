@@ -145,6 +145,11 @@ namespace DreamGuardians
 
         private void Start()
         {
+            Debug.Log(
+                $"[TutorialFlow] TutorialStage1Director.Start() 실행됨. " +
+                $"autoStart={autoStart}, gameObject.activeInHierarchy={gameObject.activeInHierarchy}",
+                this);
+
             if (autoStart)
             {
                 Begin();
@@ -285,9 +290,21 @@ namespace DreamGuardians
 
         public void Begin()
         {
+            Debug.Log(
+                $"[TutorialFlow] Begin() 호출됨. " +
+                $"flowRoutine={(flowRoutine != null)}, State={State}, " +
+                $"spawner={(spawner != null)}, stage1={(stage1 != null)}, " +
+                $"allyPortalCoreRevealController={(allyPortalCoreRevealController != null)}",
+                this);
+
             if (flowRoutine != null ||
                 State != TutorialStage1State.Idle)
             {
+                Debug.LogWarning(
+                    "[TutorialFlow] Begin()이 무시됐습니다 - 이미 진행 중이거나 Idle 상태가 아닙니다. " +
+                    $"flowRoutine={(flowRoutine != null)}, State={State}",
+                    this);
+
                 return;
             }
 
@@ -325,6 +342,10 @@ namespace DreamGuardians
         /// </summary>
         private IEnumerator BeginRoutine()
         {
+            Debug.Log(
+                "[TutorialFlow] BeginRoutine() 시작.",
+                this);
+
             State =
                 TutorialStage1State.Intro;
 
@@ -339,6 +360,12 @@ namespace DreamGuardians
              */
             if (allyPortalCoreRevealController != null)
             {
+                Debug.Log(
+                    $"[TutorialFlow] 포탈/코어/Road_0 등장 연출 호출 직전. " +
+                    $"HasCompleted={allyPortalCoreRevealController.HasCompleted}, " +
+                    $"IsRevealing={allyPortalCoreRevealController.IsRevealing}",
+                    this);
+
                 allyPortalCoreRevealController.PlayReveal();
 
                 /*
@@ -358,6 +385,12 @@ namespace DreamGuardians
                     Debug.LogWarning(
                         "[Dreamland] 아군 포탈과 코어 등장 연출이 " +
                         "완료되지 않았습니다.",
+                        this);
+                }
+                else
+                {
+                    Debug.Log(
+                        "[TutorialFlow] 포탈/코어/Road_0 등장 연출 완료 확인됨.",
                         this);
                 }
             }
