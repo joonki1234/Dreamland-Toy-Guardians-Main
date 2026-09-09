@@ -47,6 +47,18 @@ namespace DreamGuardians
         [Networked, OnChangedRender(nameof(HandleNetworkedDeathChanged))]
         private NetworkBool NetworkedIsDead { get; set; }
 
+        // 튜토리얼 훈련용 몬스터(damageEnabled=false, 무적)는 실제 체력이
+        // 줄지 않아 ApplyDamageAuthoritative가 아무 것도 하지 않는다. 그래서
+        // "명중 횟수"만 따로 네트워크에 동기화해서, 방 안의 누가 맞혔든
+        // 모든 클라이언트가 똑같은 값을 보고 함께 다음 단계로 넘어갈 수
+        // 있게 한다(예전에는 DreamGameEvents.EnemyHit이 실제로 쏜 사람의
+        // 클라이언트에서만 로컬로 발생해서, 다른 플레이어는 자기가 직접
+        // 3발을 맞히지 않는 한 스토리가 영영 진행되지 않았다).
+        [Networked, OnChangedRender(nameof(HandleNetworkedTutorialHitCountChanged))]
+        public int NetworkedTutorialHitCount { get; private set; }
+
+        public event Action<EnemyHealth, int> TutorialHitCountChanged;
+
         // Object != null이나 Fusion 기본 제공 IsValid만으로는 부족했다 -
         // 실제로 "InvalidOperationException: Networked properties can only
         // be accessed when Spawned() has been called" 예외가 재현됐다
@@ -122,6 +134,7 @@ namespace DreamGuardians
                 {
                     NetworkedHealth = maxHealth;
                     NetworkedIsDead = false;
+                    NetworkedTutorialHitCount = 0;
                 }
             }
             else
@@ -184,6 +197,13 @@ namespace DreamGuardians
             HitRegistered?.Invoke(this, info);
             DreamGameEvents.RaiseEnemyHit(this, info);
 
+            if (!damageEnabled)
+            {
+                // 무적 상태(튜토리얼 훈련용)라 실제 데미지 계산 경로를
+                // 타지 않으므로, 명중 횟수만 별도로 동기화한다.
+                RegisterTutorialHit();
+            }
+
             if (IsNetworked && !Object.HasStateAuthority)
             {
                 RPC_RequestDamage(
@@ -226,6 +246,46 @@ namespace DreamGuardians
             RememberShot(info);
 
             ApplyDamageAuthoritative(info);
+        }
+
+        /// <summary>
+        /// 명중 횟수를 네트워크로 동기화한다. State Authority(적을 스폰한
+        /// 클라이언트) 본인이 맞혔다면 바로 값을 올리고, 다른 클라이언트가
+        /// 맞혔다면 RPC로 State Authority에게 "1회 명중"만 요청한다 -
+        /// ApplyDamageAuthoritative와 동일한 권한 구조다.
+        /// </summary>
+        private void RegisterTutorialHit()
+        {
+            if (!IsNetworked)
+            {
+                return;
+            }
+
+            if (Object.HasStateAuthority)
+            {
+                NetworkedTutorialHitCount++;
+            }
+            else
+            {
+                RPC_RequestTutorialHit();
+            }
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_RequestTutorialHit()
+        {
+            NetworkedTutorialHitCount++;
+        }
+
+        /// <summary>
+        /// [Networked] NetworkedTutorialHitCount가 바뀔 때마다(State
+        /// Authority 본인 클라이언트를 포함해) 모든 클라이언트에서
+        /// 호출된다 - 방 안의 누가 맞혔든 모든 클라이언트가 똑같은
+        /// 횟수를 보게 된다.
+        /// </summary>
+        private void HandleNetworkedTutorialHitCountChanged()
+        {
+            TutorialHitCountChanged?.Invoke(this, NetworkedTutorialHitCount);
         }
 
         /// <summary>

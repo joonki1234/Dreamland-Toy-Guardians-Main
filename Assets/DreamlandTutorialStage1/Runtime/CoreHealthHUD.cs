@@ -211,6 +211,9 @@ namespace DreamGuardians
         {
             if (canvas != null)
             {
+                // 캔버스는 이미 만들어져 있어도 "내" 카메라가 나중에(스폰 이후)
+                // 확정되는 경우를 대비해 매번 카메라 참조를 다시 확인/보정한다.
+                ApplyCamera();
                 return;
             }
 
@@ -327,13 +330,33 @@ namespace DreamGuardians
                 return;
             }
 
-            Camera target = explicitCamera;
-            if (!cameraExplicitlySet)
+            // "내" 카메라가 확정돼 있다면(NetworkPlayerMovement.LocalPlayerCamera)
+            // SetCamera()가 아직 호출되지 않았거나 다른 인스턴스를 잘못 잡았더라도
+            // 항상 최우선으로 다시 확인해서 스스로 고쳐지도록 한다. (자세한 이유는
+            // MissionBannerUI.ApplyCamera()의 주석 참고 - 같은 원인의 버그다.)
+            Camera localPlayerCamera =
+                NetworkPlayerMovement.LocalPlayerCamera;
+
+            Camera target;
+
+            if (localPlayerCamera != null &&
+                localPlayerCamera.enabled)
             {
-                target = Camera.main;
-                if (target == null)
+                target = localPlayerCamera;
+                explicitCamera = localPlayerCamera;
+                cameraExplicitlySet = true;
+            }
+            else
+            {
+                target = explicitCamera;
+
+                if (!cameraExplicitlySet)
                 {
-                    target = Object.FindAnyObjectByType<Camera>();
+                    target = Camera.main;
+                    if (target == null)
+                    {
+                        target = Object.FindAnyObjectByType<Camera>();
+                    }
                 }
             }
 

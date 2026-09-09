@@ -168,6 +168,12 @@ namespace DreamGuardians
             DreamGameEvents.SynergyTriggered -=
                 HandleSynergyTriggered;
 
+            if (tutorialEnemy != null)
+            {
+                tutorialEnemy.TutorialHitCountChanged -=
+                    HandleTutorialHitCountChanged;
+            }
+
             if (stage1 != null)
             {
                 stage1.Completed -=
@@ -556,6 +562,16 @@ namespace DreamGuardians
 
             tutorialEnemy.SetDamageEnabled(false);
 
+            // 명중 횟수는 EnemyHealth 쪽에서 네트워크로 동기화되므로,
+            // 방 안의 누가 맞혔든 모든 클라이언트가 여기서 똑같은 값을
+            // 받아 함께 다음 단계로 넘어갈 수 있게 구독한다. (재구독을
+            // 막기 위해 먼저 구독 해제 후 다시 구독한다.)
+            tutorialEnemy.TutorialHitCountChanged -=
+                HandleTutorialHitCountChanged;
+
+            tutorialEnemy.TutorialHitCountChanged +=
+                HandleTutorialHitCountChanged;
+
             // 코어 체력은 튜토리얼 내내(사격 연습, 정화 연습 포함) 숨겨두고
             // 실제 Stage 1이 시작될 때(TransitionToWaveRoutine)만 보여줍니다.
 
@@ -787,9 +803,32 @@ namespace DreamGuardians
         }
 
 
+        /// <summary>
+        /// DreamGameEvents.EnemyHit은 실제로 "쏜 사람"의 클라이언트에서만
+        /// 로컬로 발생한다(다른 클라이언트에서는 보여주기용 발사체라
+        /// 충돌 콜백 자체가 꺼져 있음). 그래서 예전에는 명중 횟수도
+        /// 여기서 로컬로만 세다 보니, 자기가 직접 3발을 맞히지 않은
+        /// 참가자는 스토리가 영영 진행되지 않는 버그가 있었다. 이제
+        /// 실제 카운트/완료 판정은 EnemyHealth.NetworkedTutorialHitCount
+        /// (모든 클라이언트에 동기화됨)를 구독하는 HandleTutorialHitCountChanged가
+        /// 전담하므로, 이 메서드는 더 이상 카운트를 건드리지 않는다.
+        /// </summary>
         private void HandleEnemyHit(
             EnemyHealth enemy,
             DamageInfo info)
+        {
+        }
+
+
+        /// <summary>
+        /// 방 안의 누가 맞혔든(호스트든 나중에 들어온 플레이어든) 모든
+        /// 클라이언트가 똑같은 명중 횟수를 보고 똑같은 시점에 함께
+        /// 다음 단계로 넘어가도록, EnemyHealth의 네트워크 동기화된
+        /// 명중 횟수 변경 이벤트를 직접 구독해서 처리한다.
+        /// </summary>
+        private void HandleTutorialHitCountChanged(
+            EnemyHealth enemy,
+            int newCount)
         {
             if (enemy != tutorialEnemy ||
                 State !=
@@ -798,30 +837,10 @@ namespace DreamGuardians
                 return;
             }
 
-
-            // 싱글 플레이 튜토리얼에서는 무기/네트워크 계층이 어떤 playerId를
-            // 보내더라도 하나의 LOCAL 카운터로 합칩니다. 이렇게 해야 화면의
-            // 0/3 표시와 실제 완료 판정이 항상 같은 값을 사용합니다.
-            string playerId =
-                expectedPlayerCount <= 1
-                    ? "LOCAL"
-                    : (string.IsNullOrWhiteSpace(info.playerId)
-                        ? "LOCAL"
-                        : info.playerId);
-
-
-            hitCountsByPlayer.TryGetValue(
-                playerId,
-                out int currentCount);
-
-
             int updatedCount =
                 Mathf.Min(
                     requiredHitsPerPlayer,
-                    currentCount + 1);
-
-            hitCountsByPlayer[playerId] = updatedCount;
-
+                    newCount);
 
             RefreshShootingProgress();
 
@@ -843,8 +862,8 @@ namespace DreamGuardians
             }
 
 
-            if (GetCompletedPlayerCount() <
-                expectedPlayerCount)
+            if (updatedCount <
+                requiredHitsPerPlayer)
             {
                 return;
             }
@@ -1434,35 +1453,23 @@ namespace DreamGuardians
         }
 
 
+        /// <summary>
+        /// 명중 횟수는 이제 EnemyHealth.NetworkedTutorialHitCount(모든
+        /// 클라이언트에 동기화됨)를 그대로 표시한다 - 방 안의 누가
+        /// 맞혔든 모두가 같은 숫자를 본다.
+        /// </summary>
         private void RefreshShootingProgress()
         {
-            int completedPlayers =
-                GetCompletedPlayerCount();
-
-
-            int localHits = 0;
-
-            if (hitCountsByPlayer.TryGetValue(
-                    "LOCAL",
-                    out int count))
-            {
-                localHits = count;
-            }
-            else if (expectedPlayerCount <= 1)
-            {
-                foreach (int value in hitCountsByPlayer.Values)
-                {
-                    localHits = Mathf.Max(localHits, value);
-                }
-            }
-
+            int syncedHits =
+                tutorialEnemy != null
+                    ? Mathf.Min(
+                        requiredHitsPerPlayer,
+                        tutorialEnemy.NetworkedTutorialHitCount)
+                    : 0;
 
             missionUI?.SetProgress(
-                expectedPlayerCount <= 1
-                    ? $"명중 {localHits} / " +
-                      $"{requiredHitsPerPlayer}"
-                    : $"훈련 완료 {completedPlayers} / " +
-                      $"{expectedPlayerCount}");
+                $"명중 {syncedHits} / " +
+                $"{requiredHitsPerPlayer}");
         }
 
 

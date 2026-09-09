@@ -792,6 +792,10 @@ namespace DreamGuardians
         {
             if (canvas != null)
             {
+                // 캔버스는 이미 만들어져 있어도, "내" 카메라가 나중에(스폰 이후)
+                // 확정되는 경우를 대비해 매번 카메라 참조는 다시 확인/보정한다.
+                // (자세한 이유는 ApplyCamera() 주석 참고)
+                ApplyCamera();
                 return;
             }
 
@@ -1382,7 +1386,29 @@ namespace DreamGuardians
                 return;
             }
 
-            if (uiCamera == null)
+            // 씬 로드 직후에는 EnsureUI()(→ 최초 Show* 호출)가
+            // NetworkPlayerMovement.Spawned()의 Configure() 호출보다
+            // 먼저 실행될 수 있다. 그러면 uiCamera가 아직 비어 있는
+            // 상태로 Canvas가 만들어지고(예전 코드는 이때 Camera.main으로
+            // 폴백했는데, 이 프로젝트 카메라는 MainCamera 태그를 쓰지
+            // 않아 남의 카메라나 비활성 카메라를 잘못 붙잡을 수 있었다),
+            // 이후 진짜 Configure()가 불려도 그 시점 이전에는 화면에
+            // 아무것도 안 그려지는 채로 있었다(2번째로 들어온 플레이어의
+            // 하단 대사/상단 UI가 통째로 안 보이던 버그의 원인).
+            //
+            // "내" 카메라가 확정돼 있다면(NetworkPlayerMovement.LocalPlayerCamera)
+            // 그걸 최우선으로 매번 다시 확인해서, 시점 순서와 무관하게
+            // 항상 올바른 카메라로 스스로 고쳐지도록 한다.
+            Camera localPlayerCamera =
+                NetworkPlayerMovement.LocalPlayerCamera;
+
+            if (localPlayerCamera != null &&
+                localPlayerCamera.enabled)
+            {
+                uiCamera = localPlayerCamera;
+            }
+            else if (uiCamera == null ||
+                     !uiCamera.enabled)
             {
                 uiCamera = Camera.main;
             }
