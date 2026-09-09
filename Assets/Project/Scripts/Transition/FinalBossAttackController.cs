@@ -207,6 +207,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
         localViewerCamera = camera;
     }
 
+    private FinalBossFaceController Face => GetComponent<FinalBossFaceController>();
+
     public bool IsPhaseMoving => phaseMoving;
 
     private static readonly int BaseColorId =
@@ -461,6 +463,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private IEnumerator PhaseAdvanceRoutine(int phaseIndex)
     {
+        Face?.BeginAction(phaseIndex == 1 ? FinalBossFaceController.Expression.ApproachPhase2 : FinalBossFaceController.Expression.ApproachPhase3);
         phaseMoving = true;
         transform.localScale = baseScale;
 
@@ -532,6 +535,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         finalToCore.y = 0f;
         FaceDirection(finalToCore);
 
+        Face?.EndAction();
         phaseMoving = false;
         phaseRoutine = null;
         nextAttackTime = Time.time + attackInterval;
@@ -613,6 +617,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private IEnumerator SlamAttackRoutine()
     {
+        Face?.BeginAction(FinalBossFaceController.Expression.SlamWindup);
         Vector3 startPosition =
             new Vector3(
                 transform.position.x,
@@ -651,6 +656,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         SetPosition(startPosition);
         transform.localScale = baseScale;
 
+        Face?.ShowSlamImpact();
         PlaySlamImpactEffects(startPosition);
 
         DamageCore(1f);
@@ -726,6 +732,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private IEnumerator SpinAttackRoutine()
     {
+        Face?.BeginAction(FinalBossFaceController.Expression.Spin);
         PlaySpinChargeEffects();
 
         Vector3 startPosition =
@@ -842,6 +849,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private void FinishAttack()
     {
+        Face?.EndAction();
         attackRoutine = null;
         attacking = false;
         nextAttackTime = Time.time + attackInterval;
@@ -976,6 +984,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
+                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer)
             {
@@ -1047,6 +1056,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
+                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer)
             {
@@ -1123,6 +1133,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private void CreateCorruptedEyes()
     {
+        // The atlas overlay replaces the legacy billboard eyes and their light.
+        if (Face != null) return;
+
         if (eyeRoot != null)
         {
             UpdateEyePresentation();
@@ -1390,6 +1403,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 modelRenderer.transform.IsChildOf(eyeRoot.transform);
 
             if (modelRenderer == null ||
+                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer ||
                 isEyeRenderer)
@@ -1592,6 +1606,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private void StopOwnedRoutines()
     {
+        Face?.EndAction();
         if (attackRoutine != null)
         {
             StopCoroutine(attackRoutine);
