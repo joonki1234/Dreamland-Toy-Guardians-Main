@@ -64,6 +64,7 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     private PlayerJob _devDefaultJob;
     private bool _hasPendingJob;
     private PlayerJob _pendingJob;
+    private PlayMode _pendingPlayMode;
     private GameDifficultyState _difficultyState;
 
     /// <summary>다른 스크립트(로비 UI 등)가 참조할 수 있도록 노출한다.</summary>
@@ -181,6 +182,8 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
                 _hasPendingJob = true;
             }
 
+            _pendingPlayMode = LocalLobbyPlayerState.SelectedPlayMode;
+
             // 씬과 함께 자동으로 사라지게 두면 Fusion 쪽 동기화 상태가 꼬여서
             // tick 관련 AssertException이 날 수 있다 - 미리 정상적으로 정리한다.
             _runner.Despawn(LocalLobbyPlayerState.Object);
@@ -217,9 +220,10 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         if (player != runner.LocalPlayer) return;
 
         // Dreamland_map_3를 단독으로 열어서 테스트하는 중이면 로비 단계를 통째로 건너뛴다.
+        // 개발용 단독 실행은 기존 VR 테스트 흐름을 그대로 유지한다(PlayMode.VR).
         if (_devDirectMode)
         {
-            SpawnGameplayCharacter(runner, _devDefaultJob);
+            SpawnGameplayCharacter(runner, _devDefaultJob, PlayMode.VR);
             return;
         }
 
@@ -303,18 +307,18 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         if (activeSceneName != targetSceneName) return;
 
         // LobbyPlayerState는 LoadGameplayScene()에서 이미 파괴됐으므로,
-        // 그때 미리 복사해 둔 값(_pendingJob)을 사용한다.
+        // 그때 미리 복사해 둔 값(_pendingJob/_pendingPlayMode)을 사용한다.
         PlayerJob job = _hasPendingJob ? _pendingJob : PlayerJob.Police; // 못 골랐을 경우를 대비한 안전한 기본값
 
-        SpawnGameplayCharacter(runner, job);
+        SpawnGameplayCharacter(runner, job, _pendingPlayMode);
     }
 
 
     /// <summary>
-    /// 실제 게임 캐릭터(gameplayPlayerPrefab)를 지정한 직업으로 스폰한다.
+    /// 실제 게임 캐릭터(gameplayPlayerPrefab)를 지정한 직업/플레이 모드로 스폰한다.
     /// 정상 흐름(OnSceneLoadDone)과 개발용 단독 실행(OnPlayerJoined) 양쪽에서 공용으로 쓴다.
     /// </summary>
-    private void SpawnGameplayCharacter(NetworkRunner runner, PlayerJob job)
+    private void SpawnGameplayCharacter(NetworkRunner runner, PlayerJob job, PlayMode playMode)
     {
         if (_gameplaySpawned) return;
 
@@ -351,6 +355,7 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
             {
                 var jobController = obj.GetComponent<PlayerJobController>();
                 jobController?.SetJob(job);
+                jobController?.SetPlayMode(playMode);
             });
     }
 

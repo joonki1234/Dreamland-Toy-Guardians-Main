@@ -19,6 +19,18 @@ public class PlayerJobController : NetworkBehaviour
     [Networked, OnChangedRender(nameof(OnJobChanged))]
     public PlayerJob CurrentJob { get; set; }
 
+    /// <summary>
+    /// 로비에서 고른 개인별 PC/VR 플레이 모드. 기본값은 PlayMode.VR(0)이라
+    /// 기존 씬/캐릭터를 그대로 써도 동작이 바뀌지 않는다.
+    /// PC를 고르면 팔 IK 없이 무기가 카메라 자식으로 고정된 예전(2026-08-20 무렵) 방식으로 동작한다.
+    /// </summary>
+    [Networked, OnChangedRender(nameof(OnPlayModeChanged))]
+    public PlayMode CurrentPlayMode { get; set; }
+
+    /// <summary>내 화면(입력 권한 보유)이면서 PC 모드를 골랐는지 여부.</summary>
+    private bool IsLocalPcMode =>
+        Object != null && Object.HasInputAuthority && CurrentPlayMode == PlayMode.PC;
+
 
     [Header("직업별 모델링 (Models)")]
     public GameObject modelPolice;
@@ -65,6 +77,25 @@ public class PlayerJobController : NetworkBehaviour
 
     public Vector3 weaponBuilderGripOffset = Vector3.zero;
     public Vector3 weaponBuilderGripRotationOffset = Vector3.zero;
+
+
+    [Header("PC 모드 무기 위치 (내 화면 전용, Camera 기준 로컬 오프셋)")]
+    [Tooltip(
+        "PlayMode.PC를 고른 플레이어 본인 화면에서만 쓰인다. VR 손 IK 대신 " +
+        "예전(2026-08-20 무렵) 시스템처럼 무기를 카메라의 자식으로 그대로 붙이고, " +
+        "이 오프셋으로 화면 안에 자연스럽게 보이도록 위치를 잡는다. " +
+        "무기마다 피벗이 달라 값 튜닝이 필요할 수 있다.")]
+    public Vector3 weaponPolicePcOffset = new Vector3(0.25f, -0.2f, 0.45f);
+    public Vector3 weaponPolicePcRotationOffset = Vector3.zero;
+
+    public Vector3 weaponFirefighterPcOffset = new Vector3(0.25f, -0.2f, 0.45f);
+    public Vector3 weaponFirefighterPcRotationOffset = Vector3.zero;
+
+    public Vector3 weaponChefPcOffset = new Vector3(0.25f, -0.2f, 0.45f);
+    public Vector3 weaponChefPcRotationOffset = Vector3.zero;
+
+    public Vector3 weaponBuilderPcOffset = new Vector3(0.25f, -0.2f, 0.45f);
+    public Vector3 weaponBuilderPcRotationOffset = Vector3.zero;
 
 
     [Header("건축가(Builder) 흙 발사 기본 설정")]
@@ -705,7 +736,26 @@ public class PlayerJobController : NetworkBehaviour
     }
 
 
+    /// <summary>
+    /// 로비에서 고른 PC/VR 플레이 모드를 실제로 적용한다.
+    /// State Authority(이 캐릭터를 스폰한 본인)만 바꿀 수 있다.
+    /// </summary>
+    public void SetPlayMode(PlayMode mode)
+    {
+        if (Object.HasStateAuthority)
+        {
+            CurrentPlayMode = mode;
+        }
+    }
+
+
     private void OnJobChanged()
+    {
+        ApplyJobSettings(CurrentJob);
+    }
+
+
+    private void OnPlayModeChanged()
     {
         ApplyJobSettings(CurrentJob);
     }
@@ -783,6 +833,12 @@ public class PlayerJobController : NetworkBehaviour
     {
         bool isLocalVrWeapon = Object != null && Object.HasInputAuthority;
 
+        if (isLocalVrWeapon && IsLocalPcMode)
+        {
+            AttachWeaponToPcCamera(weaponPolice, weaponPolicePcOffset, weaponPolicePcRotationOffset);
+            return;
+        }
+
         if (isLocalVrWeapon)
         {
             AttachLocalWeapon(weaponPolice,
@@ -807,6 +863,16 @@ public class PlayerJobController : NetworkBehaviour
 
         if (Object.HasInputAuthority)
         {
+            if (IsLocalPcMode)
+            {
+                Vector3 pcOffset = weapon == weaponFirefighter ? weaponFirefighterPcOffset
+                    : weapon == weaponChef ? weaponChefPcOffset : weaponBuilderPcOffset;
+                Vector3 pcRotationOffset = weapon == weaponFirefighter ? weaponFirefighterPcRotationOffset
+                    : weapon == weaponChef ? weaponChefPcRotationOffset : weaponBuilderPcRotationOffset;
+                AttachWeaponToPcCamera(weapon, pcOffset, pcRotationOffset);
+                return;
+            }
+
             LocalGripAdjustment adjustment = weapon == weaponFirefighter ? localFirefighterGrip
                 : weapon == weaponChef ? localChefGrip : localBuilderGrip;
             AttachLocalWeapon(weapon, adjustment.position, adjustment.rotation,
@@ -815,6 +881,45 @@ public class PlayerJobController : NetworkBehaviour
         }
 
         AttachWeaponToAnchor(weapon, ResolveHandGripAnchor(), positionOffset, rotationOffsetEuler);
+    }
+
+    private Camera cachedLocalPlayerCamera;
+
+    /// <summary>
+    /// PC 모드 전용: VR 손 IK/컨트롤러 트래킹을 전혀 거치지 않고, 예전(2026-08-20 무렵)
+    /// 시스템처럼 무기를 그냥 카메라의 자식으로 붙인다. 카메라가 시점을 따라 회전하면
+    /// 무기도 그대로 같이 따라온다 - 매 프레임 갱신이 필요 없는 단순한 부모-자식 관계다.
+    /// </summary>
+    private void AttachWeaponToPcCamera(GameObject weapon, Vector3 positionOffset, Vector3 rotationOffsetEuler)
+    {
+        if (weapon == null)
+        {
+            return;
+        }
+
+        if (cachedLocalPlayerCamera == null)
+        {
+            cachedLocalPlayerCamera = GetComponentInChildren<Camera>(true);
+        }
+
+        if (cachedLocalPlayerCamera == null)
+        {
+            Debug.LogWarning(
+                "[PlayerJobController] PC 모드 무기를 붙일 Camera를 찾지 못했습니다.",
+                this);
+            return;
+        }
+
+        Transform cameraTransform = cachedLocalPlayerCamera.transform;
+
+        if (weapon.transform.parent != cameraTransform)
+        {
+            weapon.transform.SetParent(cameraTransform, false);
+            weapon.transform.localScale = Vector3.one;
+        }
+
+        weapon.transform.localPosition = positionOffset;
+        weapon.transform.localRotation = Quaternion.Euler(rotationOffsetEuler);
     }
 
     [System.Serializable]
@@ -855,6 +960,14 @@ public class PlayerJobController : NetworkBehaviour
 
     private void LateUpdate()
     {
+        if (IsLocalPcMode)
+        {
+            // PC 모드는 무기가 카메라의 단순한 자식이라 VR 컨트롤러 트래킹/앵커
+            // 갱신이 전혀 필요 없다 - 매 프레임 아무것도 하지 않는다.
+            if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(false);
+            return;
+        }
+
         UpdateLocalWeaponTrackingMode();
         if (localWeaponAnchor != null)
             localWeaponAnchor.gameObject.SetActive(Object != null && Object.HasInputAuthority);
@@ -933,6 +1046,7 @@ public class PlayerJobController : NetworkBehaviour
 
     private void ApplyLocalWeaponAnchorPoseBeforeRender()
     {
+        if (IsLocalPcMode) return;
 #if UNITY_EDITOR
         // Capture after all LateUpdates so the first rendered tracking frame uses
         // the current HandTarget_R, regardless of the two scripts' execution order.
@@ -960,6 +1074,8 @@ public class PlayerJobController : NetworkBehaviour
 
     private void ApplyLocalWeaponAnchorPose()
     {
+        if (IsLocalPcMode) return;
+
         // Also run before rendering so this anchor sees HandTarget_R after all LateUpdates.
         if (Object == null || !Object.HasInputAuthority || activeLocalWeapon == null ||
             localWeaponAnchor == null || localTracking == null) return;

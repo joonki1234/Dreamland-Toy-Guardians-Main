@@ -109,6 +109,13 @@ public class VRHandTargetFollower : NetworkBehaviour
             return;
         }
 
+        if (IsLocalPcMode())
+        {
+            // PC 모드에서는 VR 컨트롤러 타깃이 없으니 IK를 걸지 않는다 - 팔은 기본(차렷) 포즈로
+            // 남고, 무기는 PlayerJobController가 카메라의 단순한 자식으로 직접 붙여준다.
+            return;
+        }
+
         RefreshJobBindingIfNeeded();
         HideLocalBodyFromCamera();
 
@@ -205,12 +212,33 @@ public class VRHandTargetFollower : NetworkBehaviour
             return;
         }
 
+        if (IsLocalPcMode())
+        {
+            // PC 모드에서는 컨트롤러 타깃 탐색/리깅 바인딩 자체가 필요 없다.
+            return;
+        }
+
         if (autoFindControllerTargets)
         {
             TryResolveControllerTargets();
         }
 
         RefreshJobBindingIfNeeded();
+    }
+
+    /// <summary>
+    /// 이 캐릭터를 조종하는 로컬 플레이어가 PC 모드를 골랐는지 확인한다.
+    /// PlayerJobController가 아직 없으면(초기화 순서상 드묾) 안전하게 false를 반환한다
+    /// (기존 VR 동작 유지).
+    /// </summary>
+    private bool IsLocalPcMode()
+    {
+        if (jobController == null)
+        {
+            jobController = GetJobController();
+        }
+
+        return jobController != null && jobController.CurrentPlayMode == PlayMode.PC;
     }
 
     private void RefreshJobBindingIfNeeded()

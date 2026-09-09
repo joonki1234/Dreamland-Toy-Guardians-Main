@@ -96,6 +96,19 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private TMP_Text difficultyText;
 
+    [Header("PC/VR 플레이 모드 선택 (개인별)")]
+    [Tooltip("플레이 모드를 VR 쪽으로 넘기는(왼쪽) 화살표 버튼")]
+    [SerializeField]
+    private Button playModeLeftArrowButton;
+
+    [Tooltip("플레이 모드를 컴퓨터 쪽으로 넘기는(오른쪽) 화살표 버튼")]
+    [SerializeField]
+    private Button playModeRightArrowButton;
+
+    [Tooltip("현재 플레이 모드(컴퓨터/VR)를 보여줄 텍스트")]
+    [SerializeField]
+    private TMP_Text playModeText;
+
     [Header("인원 설정")]
     [Tooltip("게임에 접속할 수 있는 최대 플레이어 수입니다.")]
     [SerializeField, Range(1, 8)]
@@ -195,6 +208,16 @@ public class LobbySelectionController : MonoBehaviour
         if (difficultyRightArrowButton != null)
         {
             difficultyRightArrowButton.onClick.AddListener(() => StepDifficulty(1));
+        }
+
+        if (playModeLeftArrowButton != null)
+        {
+            playModeLeftArrowButton.onClick.AddListener(() => StepPlayMode(-1));
+        }
+
+        if (playModeRightArrowButton != null)
+        {
+            playModeRightArrowButton.onClick.AddListener(() => StepPlayMode(1));
         }
     }
 
@@ -330,6 +353,7 @@ public class LobbySelectionController : MonoBehaviour
         }
 
         UpdateDifficultyUI();
+        UpdatePlayModeUI(state, ready);
     }
 
     /// <summary>
@@ -419,6 +443,73 @@ public class LobbySelectionController : MonoBehaviour
             default:
                 return "중";
         }
+    }
+
+    /// <summary>
+    /// 화살표를 눌렀을 때 내 플레이 모드(컴퓨터/VR)를 전환한다.
+    /// 방 전체가 공유하는 난이도와 달리 로컬 플레이어 개인의 LobbyPlayerState에 저장된다.
+    /// PlayMode는 VR=0, PC=1이라 direction -1(왼쪽)은 VR 방향, 1(오른쪽)은 컴퓨터 방향이다.
+    /// 양 끝에서는 순환하지 않고 멈춘다.
+    /// </summary>
+    private void StepPlayMode(int direction)
+    {
+        var state = GetLocalState();
+
+        if (state == null || state.IsReady)
+        {
+            return;
+        }
+
+        int nextValue =
+            Mathf.Clamp(
+                (int)state.SelectedPlayMode + direction,
+                0,
+                1
+            );
+
+        state.SetPlayMode((PlayMode)nextValue);
+    }
+
+    /// <summary>
+    /// 현재 플레이 모드 텍스트와 화살표 버튼의 활성/비활성 상태를 갱신한다.
+    /// Ready 완료 후에는 더 이상 바꿀 수 없도록 잠근다.
+    /// </summary>
+    private void UpdatePlayModeUI(LobbyPlayerState state, bool ready)
+    {
+        PlayMode playMode =
+            state != null
+                ? state.SelectedPlayMode
+                : PlayMode.VR;
+
+        if (playModeText != null)
+        {
+            playModeText.text =
+                state != null
+                    ? $"모드: {GetPlayModeName(playMode)}"
+                    : "모드: VR (연결 중...)";
+        }
+
+        bool locked = ready || state == null;
+
+        if (playModeLeftArrowButton != null)
+        {
+            playModeLeftArrowButton.interactable =
+                !locked && playMode != PlayMode.VR;
+        }
+
+        if (playModeRightArrowButton != null)
+        {
+            playModeRightArrowButton.interactable =
+                !locked && playMode != PlayMode.PC;
+        }
+    }
+
+    /// <summary>
+    /// 플레이 모드 값을 화면에 표시할 한글로 변환한다.
+    /// </summary>
+    private string GetPlayModeName(PlayMode mode)
+    {
+        return mode == PlayMode.PC ? "컴퓨터" : "VR";
     }
 
     /// <summary>
@@ -911,6 +1002,16 @@ public class LobbySelectionController : MonoBehaviour
         if (difficultyRightArrowButton != null)
         {
             difficultyRightArrowButton.onClick.RemoveAllListeners();
+        }
+
+        if (playModeLeftArrowButton != null)
+        {
+            playModeLeftArrowButton.onClick.RemoveAllListeners();
+        }
+
+        if (playModeRightArrowButton != null)
+        {
+            playModeRightArrowButton.onClick.RemoveAllListeners();
         }
     }
 }

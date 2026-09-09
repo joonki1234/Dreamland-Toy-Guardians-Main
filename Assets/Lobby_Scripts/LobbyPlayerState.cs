@@ -21,6 +21,13 @@ public class LobbyPlayerState : NetworkBehaviour
     [Networked] public NetworkBool IsReady { get; set; }
 
     /// <summary>
+    /// 플레이어 개인별 PC/VR 플레이 모드. 방 전체가 공유하는 난이도와 달리
+    /// 각자 자기 화면에서 어떻게 조작할지 고르는 값이라 개인 상태에 둔다.
+    /// 기본값은 PlayMode.VR(0) - 기존 VR 흐름을 그대로 유지한다.
+    /// </summary>
+    [Networked] public PlayMode SelectedPlayMode { get; set; }
+
+    /// <summary>
     /// 직업을 선택한다. 이미 준비 상태였다면 직업이 바뀌는 것이므로
     /// 준비 상태는 다시 눌러야 하도록 초기화한다.
     /// </summary>
@@ -53,5 +60,15 @@ public class LobbyPlayerState : NetworkBehaviour
         if (ready && !HasSelectedJob) return;
 
         IsReady = ready;
+    }
+
+    /// <summary>
+    /// PC/VR 플레이 모드를 선택한다. 직업 선택과 달리 준비 상태를 초기화하지 않는다.
+    /// </summary>
+    public void SetPlayMode(PlayMode mode)
+    {
+        if (!Object.HasStateAuthority) return;
+
+        SelectedPlayMode = mode;
     }
 }
