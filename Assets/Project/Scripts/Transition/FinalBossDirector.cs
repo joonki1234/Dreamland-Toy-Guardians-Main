@@ -351,6 +351,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     private GameObject bossObject;
     private EnemyHealth bossHealth;
     private FinalBossAttackController bossAttack;
+    private FinalBossFaceController bossFace;
     private bool bossDefeatedEventRaised;
     private bool bossFailedEventRaised;
     private bool firstPhaseAdvanceTriggered;
@@ -795,6 +796,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         EnsureBossHitbox();
         IgnorePlayerCollisionsWithBoss();
         bossAttack.PrepareCorruptedVisuals(core);
+        bossFace = bossObject.GetComponent<FinalBossFaceController>();
         SubscribeBossHealth();
     }
 
@@ -1066,6 +1068,8 @@ public sealed class FinalBossDirector : MonoBehaviour
         if (spawned != null)
         {
             bossSpawnedEnemies.Add(spawned);
+            // One face reaction for all successful spawns in this frame's burst.
+            bossFace?.PlaySummon();
         }
 
         bossAttack?.PlaySummonPulse();
@@ -1188,6 +1192,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         if (bossObject != null && defeatVisualDuration > 0f)
         {
+            bossFace?.BeginCleanse(defeatVisualDuration);
             Vector3 startScale = bossObject.transform.localScale;
             Vector3 startPosition = bossObject.transform.position;
             float elapsed = 0f;
@@ -2258,6 +2263,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         bossObject = null;
         bossHealth = null;
         bossAttack = null;
+        bossFace = null;
     }
 
     private static T GetOrAdd<T>(GameObject target)
