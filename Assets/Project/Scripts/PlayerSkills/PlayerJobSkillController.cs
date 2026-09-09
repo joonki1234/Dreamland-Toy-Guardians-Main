@@ -34,6 +34,7 @@ public sealed class PlayerJobSkillController : MonoBehaviour
     private float firefighterReadyTime;
     private float chefReadyTime;
     private float builderReadyTime;
+    private InputAction leftPrimaryAction;
 
     private void Awake()
     {
@@ -60,27 +61,29 @@ public sealed class PlayerJobSkillController : MonoBehaviour
 
     private void Update()
     {
-        PollKeyboardTestInput();
-    }
-
-    /// <summary>
-    /// PC 동작 확인만을 위한 임시 입력입니다.
-    /// XR 연결 시 이 메서드 호출을 제거하고 왼손 입력에서
-    /// TryUseCurrentJobSkill을 호출하면 됩니다.
-    /// </summary>
-    private void PollKeyboardTestInput()
-    {
-        if (Keyboard.current == null)
+        if (!CanUseLocalInput())
         {
             return;
         }
 
-        if (Keyboard.current.pKey.wasPressedThisFrame)
+        // Quest X and the simulator both feed the same left XR controller button.
+        // Own this action locally; do not enable or disable shared XRI action maps.
+        leftPrimaryAction ??= new InputAction(
+            "Left Primary Skill", InputActionType.Button,
+            "<XRController>{LeftHand}/primaryButton");
+        if (!leftPrimaryAction.enabled)
+        {
+            leftPrimaryAction.Enable();
+        }
+
+        // Preserve the existing P test fallback, with at most one request per frame.
+        bool keyboardSkillPressed = Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame;
+        if (leftPrimaryAction.WasPressedThisFrame() || keyboardSkillPressed)
         {
             TryUseCurrentJobSkill();
         }
 
-        if (Keyboard.current.eKey.wasPressedThisFrame)
+        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
         {
             CancelBuilderSkill();
         }
@@ -130,11 +133,14 @@ public sealed class PlayerJobSkillController : MonoBehaviour
 
     private void OnDisable()
     {
+        leftPrimaryAction?.Disable();
         CancelBuilderSkill();
     }
 
     private void OnDestroy()
     {
+        leftPrimaryAction?.Dispose();
+        leftPrimaryAction = null;
         CancelBuilderSkill();
     }
 

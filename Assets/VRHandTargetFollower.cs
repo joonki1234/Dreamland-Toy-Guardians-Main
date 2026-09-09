@@ -626,7 +626,9 @@ public class VRHandTargetFollower : NetworkBehaviour
             return;
         }
 
-        target.SetPositionAndRotation(source.position, source.rotation);
+        // Match the right hand's tracking-space to Player-space conversion, without grip offsets.
+        GetControllerPoseInPlayerSpace(source, out Vector3 controllerPosition, out Quaternion controllerRotation);
+        target.SetPositionAndRotation(controllerPosition, controllerRotation);
     }
 
     private void SetRightTargetPose(Transform target, Transform source)
