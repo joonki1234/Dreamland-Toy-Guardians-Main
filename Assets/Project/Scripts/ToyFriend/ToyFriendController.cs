@@ -403,7 +403,16 @@ namespace DreamGuardians
 
             if (storyFocusRequested)
             {
-                missionUI?.EndToyFriendStoryFocus();
+                // ?.(null 조건부 연산자)는 Unity가 "파괴된 오브젝트도 null처럼
+                // 취급"하도록 오버로드한 == 연산자를 건너뛴다. 그래서 씬 전환
+                // 등으로 missionUI가 이미 파괴된 뒤에도 ?.는 "살아있다"고
+                // 착각해 호출을 강행하다 MissingReferenceException이 났다.
+                // != null로 명시적으로 비교해야 오버로드된 연산자가 적용된다.
+                if (missionUI != null)
+                {
+                    missionUI.EndToyFriendStoryFocus();
+                }
+
                 storyFocusRequested = false;
             }
 
@@ -699,7 +708,16 @@ namespace DreamGuardians
 
             if (storyFocusRequested)
             {
-                missionUI?.EndToyFriendStoryFocus();
+                // ?.(null 조건부 연산자)는 Unity가 "파괴된 오브젝트도 null처럼
+                // 취급"하도록 오버로드한 == 연산자를 건너뛴다. 그래서 씬 전환
+                // 등으로 missionUI가 이미 파괴된 뒤에도 ?.는 "살아있다"고
+                // 착각해 호출을 강행하다 MissingReferenceException이 났다.
+                // != null로 명시적으로 비교해야 오버로드된 연산자가 적용된다.
+                if (missionUI != null)
+                {
+                    missionUI.EndToyFriendStoryFocus();
+                }
+
                 storyFocusRequested = false;
             }
 

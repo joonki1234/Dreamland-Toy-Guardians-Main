@@ -100,6 +100,80 @@ public sealed class FinalBossDirector : MonoBehaviour
     [SerializeField, Min(1)]
     private int castleDebrisCount = 48;
 
+    [Tooltip("성이 부서지는 순간 재생할 폭발음입니다.")]
+    [SerializeField]
+    private AudioClip castleExplosionSfx;
+
+    [SerializeField, Range(0f, 1f)]
+    private float castleExplosionSfxVolume = 0.85f;
+
+    [Tooltip(
+        "성이 부서지는 순간 잠깐 켜졌다 꺼지는 섬광용 라이트 " +
+        "프리팹입니다. 비워두면 섬광 없이 진행됩니다. " +
+        "예: Free Fire VFX URP의 'VFX_Point_Light'.")]
+    [SerializeField]
+    private GameObject castleExplosionFlashLightPrefab;
+
+    [Tooltip("섬광 라이트가 최대 밝기에서 꺼질 때까지 걸리는 시간입니다.")]
+    [SerializeField, Min(0.05f)]
+    private float castleExplosionFlashDuration = 0.4f;
+
+    [Tooltip("섬광 라이트 강도(Intensity) 배율입니다.")]
+    [SerializeField, Min(0.1f)]
+    private float castleExplosionFlashIntensityMultiplier = 3f;
+
+    [Tooltip("섬광 라이트가 비추는 범위(Range) 배율입니다. 키우면 더 넓은 영역이 확 밝아집니다.")]
+    [SerializeField, Min(0.1f)]
+    private float castleExplosionFlashRangeMultiplier = 1f;
+
+    [Tooltip(
+        "성이 부서지는 순간 추가로 재생할 폭발 이펙트 프리팹입니다. " +
+        "비워두면 기존 잔해 파티클만 재생됩니다. " +
+        "예: Hovl Studio/Magic effects pack의 'Ground AOE explosion' " +
+        "또는 Sherbbs Particle Collection의 'SmokeyExplosion'.")]
+    [SerializeField]
+    private GameObject castleExplosionEffectPrefab;
+
+    [Tooltip("castleExplosionEffectPrefab의 크기 배율입니다.")]
+    [SerializeField, Min(0.1f)]
+    private float castleExplosionEffectScale = 1f;
+
+    [Tooltip("castleExplosionEffectPrefab을 몇 초 뒤 자동으로 정리할지입니다.")]
+    [SerializeField, Min(0.5f)]
+    private float castleExplosionEffectLifetime = 5f;
+
+    [Tooltip(
+        "큰 폭발이 가라앉은 뒤 잔불처럼 남아서 계속 타오를 이펙트 " +
+        "프리팹입니다. 비워두면 잔불 없이 폭발만 재생됩니다. " +
+        "예: Free Fire VFX URP의 'VFX_Fire_01_Medium' / 'VFX_Fire_01_Small'.")]
+    [SerializeField]
+    private GameObject castleEmbersEffectPrefab;
+
+    [Tooltip("큰 폭발이 재생된 뒤 잔불 이펙트가 나타나기까지의 지연 시간입니다.")]
+    [SerializeField, Min(0f)]
+    private float castleEmbersEffectDelay = 1.2f;
+
+    [Tooltip(
+        "잔불을 몇 개 흩뿌릴지입니다. 하나만 성 한가운데 허공에 띄우면 " +
+        "붕 떠 있는 것처럼 부자연스러워 보여서, 여러 개를 잔해 바닥 " +
+        "근처에 흩어 놓습니다.")]
+    [SerializeField, Min(1)]
+    private int castleEmbersEffectCount = 5;
+
+    [Tooltip(
+        "잔불이 성 바운딩 박스 바닥 기준 XZ 평면에서 중심으로부터 " +
+        "흩어지는 범위(바운딩 박스 절반 크기에 곱하는 배율)입니다.")]
+    [SerializeField, Range(0f, 1f)]
+    private float castleEmbersScatterRadius = 0.85f;
+
+    [Tooltip("castleEmbersEffectPrefab 하나당 크기 배율입니다.")]
+    [SerializeField, Min(0.1f)]
+    private float castleEmbersEffectScale = 0.9f;
+
+    [Tooltip("잔불 이펙트가 얼마나 오래 타오르다 사라질지입니다.")]
+    [SerializeField, Min(0.5f)]
+    private float castleEmbersEffectLifetime = 8f;
+
     [SerializeField, Min(0.1f)]
     private float bossRevealDuration = 0.8f;
 
@@ -111,12 +185,46 @@ public sealed class FinalBossDirector : MonoBehaviour
     [SerializeField, Min(1f)]
     private float bossFocusTreeHideRadius = 20f;
 
+    [Header("Castle Break Camera Shake")]
+    [SerializeField, Min(0f)]
+    private float castleBreakShakeDuration = 0.5f;
+
+    [Tooltip("성이 부서질 때 카메라 흔들림 세기입니다. 보스 등장 흔들림보다 크게 잡아 더 웅장하게 느껴지도록 합니다.")]
+    [SerializeField, Min(0f)]
+    private float castleBreakShakeStrength = 0.16f;
+
     [Header("Boss Spawn Camera Shake")]
     [SerializeField, Min(0f)]
     private float bossSpawnShakeDuration = 0.58f;
 
     [SerializeField, Min(0f)]
     private float bossSpawnShakeStrength = 0.085f;
+
+    [Header("Boss Attack Effects - Slam")]
+    [Tooltip("내려찍기 공격이 착지하는 순간 재생할 흙먼지 이펙트입니다. 예: Hovl Studio 'Dust ground'.")]
+    [SerializeField]
+    private GameObject bossSlamDustEffectPrefab;
+
+    [Tooltip("내려찍기 착지 순간 재생할 원형 충격파 이펙트입니다. 예: Hovl Studio 'AoE slash purple'.")]
+    [SerializeField]
+    private GameObject bossSlamShockwaveEffectPrefab;
+
+    [Tooltip("내려찍기 착지음입니다.")]
+    [SerializeField]
+    private AudioClip bossSlamImpactSfx;
+
+    [Header("Boss Attack Effects - Spin")]
+    [Tooltip("회전 공격 시작 시 몸에 붙어서 같이 도는 차징 이펙트입니다. 예: Hovl Studio 'Charge slash purple'.")]
+    [SerializeField]
+    private GameObject bossSpinChargeEffectPrefab;
+
+    [Tooltip("회전 공격 중 몸 주변에 도는 소용돌이 바람 이펙트입니다. 예: Sherbbs Particle Collection 'Wind'.")]
+    [SerializeField]
+    private GameObject bossSpinWindEffectPrefab;
+
+    [Tooltip("회전 돌진 시작음입니다.")]
+    [SerializeField]
+    private AudioClip bossSpinWhooshSfx;
 
     [Header("Boss Stats")]
     [Min(1f)]
@@ -575,6 +683,10 @@ public sealed class FinalBossDirector : MonoBehaviour
         Bounds castleBounds = CalculateRendererBounds(castleAnchor);
 
         CreateCastleDebrisEffect(castleBounds, castleAnchor);
+        SpawnCastleExplosionEffect(castleBounds);
+        PlayCastleExplosionSfx(castleBounds.center);
+        SpawnCastleExplosionFlash(castleBounds.center);
+        StartCastleBreakCameraShake();
 
         Vector3 originalLocalPosition = castleAnchor.localPosition;
         Quaternion originalLocalRotation = castleAnchor.localRotation;
@@ -632,6 +744,7 @@ public sealed class FinalBossDirector : MonoBehaviour
                 rotation);
             instance.name = "FinalBoss";
             ApplyBossScale(instance.transform);
+            SnapBossToGround(instance.transform, position.y);
             instance.SetActive(true);
             return instance;
         }
@@ -646,6 +759,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         prototype.transform.SetPositionAndRotation(position, rotation);
         prototype.transform.localScale = prototypeBossScale;
         ApplyBossScale(prototype.transform);
+        SnapBossToGround(prototype.transform, position.y);
 
         ApplyPrototypeBossMaterial(prototype);
         AddPrototypeCrown(prototype);
@@ -668,6 +782,13 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         bossAttack = GetOrAdd<FinalBossAttackController>(bossObject);
         bossAttack.enabled = true;
+        bossAttack.ConfigureAttackEffects(
+            bossSlamDustEffectPrefab,
+            bossSlamShockwaveEffectPrefab,
+            bossSlamImpactSfx,
+            bossSpinChargeEffectPrefab,
+            bossSpinWindEffectPrefab,
+            bossSpinWhooshSfx);
 
         // 등장/스토리 연출 중에는 피격되지 않도록 막습니다.
         bossHealth.Configure(bossMaxHealth, false);
@@ -1319,6 +1440,31 @@ public sealed class FinalBossDirector : MonoBehaviour
         bossTransform.localScale *= scaleMultiplier;
     }
 
+    /// <summary>
+    /// ApplyBossScale()이 모델 피벗을 기준으로 위아래 동시에 커지기
+    /// 때문에, 피벗이 발밑이 아니라 몸통 중앙 쪽에 있는 모델은 커진
+    /// 만큼 바닥 아래로 파고들어 보인다. 스케일이 적용된 뒤 실제
+    /// 렌더러 바운드를 다시 측정해서, 바닥(min.y)이 원래 의도한
+    /// groundY에 오도록 위치를 위로 들어올려 보정한다.
+    /// </summary>
+    private void SnapBossToGround(Transform bossTransform, float groundY)
+    {
+        if (bossTransform == null)
+        {
+            return;
+        }
+
+        Bounds bounds = CalculateRendererBounds(bossTransform);
+        float verticalOffset = groundY - bounds.min.y;
+
+        if (Mathf.Abs(verticalOffset) <= 0.0001f)
+        {
+            return;
+        }
+
+        bossTransform.position += Vector3.up * verticalOffset;
+    }
+
     private void EnsureBossHitbox()
     {
         if (bossObject == null)
@@ -1504,17 +1650,27 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private void StartBossSpawnCameraShake()
     {
+        StartCameraShake(bossSpawnShakeDuration, bossSpawnShakeStrength);
+    }
+
+    private void StartCastleBreakCameraShake()
+    {
+        StartCameraShake(castleBreakShakeDuration, castleBreakShakeStrength);
+    }
+
+    private void StartCameraShake(float duration, float strength)
+    {
         StopCameraShake();
 
-        if (bossSpawnShakeDuration <= 0f || bossSpawnShakeStrength <= 0f)
+        if (duration <= 0f || strength <= 0f)
         {
             return;
         }
 
-        cameraShakeRoutine = StartCoroutine(BossSpawnCameraShakeRoutine());
+        cameraShakeRoutine = StartCoroutine(CameraShakeRoutine(duration, strength));
     }
 
-    private IEnumerator BossSpawnCameraShakeRoutine()
+    private IEnumerator CameraShakeRoutine(float duration, float strength)
     {
         Camera targetCamera = Camera.main;
         if (targetCamera == null)
@@ -1529,14 +1685,14 @@ public sealed class FinalBossDirector : MonoBehaviour
         shakenCameraOriginalLocalPosition = originalLocalPosition;
         hasCameraShakeOrigin = true;
         float elapsed = 0f;
-        float duration = Mathf.Max(0.05f, bossSpawnShakeDuration);
+        float safeDuration = Mathf.Max(0.05f, duration);
 
-        while (elapsed < duration && cameraTransform != null)
+        while (elapsed < safeDuration && cameraTransform != null)
         {
             elapsed += Time.deltaTime;
-            float normalized = Mathf.Clamp01(elapsed / duration);
-            float strength = bossSpawnShakeStrength * (1f - normalized);
-            Vector2 random = UnityEngine.Random.insideUnitCircle * strength;
+            float normalized = Mathf.Clamp01(elapsed / safeDuration);
+            float currentStrength = strength * (1f - normalized);
+            Vector2 random = UnityEngine.Random.insideUnitCircle * currentStrength;
 
             cameraTransform.localPosition =
                 originalLocalPosition + new Vector3(random.x, random.y, 0f);
@@ -1666,6 +1822,149 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         particles.Play();
         Destroy(debrisObject, Mathf.Max(2f, castleDebrisLifetime));
+    }
+
+    /// <summary>
+    /// 성이 부서지는 순간, 기존 잔해 파티클 위에 큰 폭발 이펙트를 즉시
+    /// 재생하고, 폭발이 가라앉을 즈음 그 자리에 잔불 이펙트를 이어서
+    /// 띄운다. castleExplosionEffectPrefab이 비어 있으면 아무 것도
+    /// 하지 않는다(기존 잔해 연출만으로도 동작함).
+    /// </summary>
+    private void SpawnCastleExplosionEffect(Bounds bounds)
+    {
+        if (castleExplosionEffectPrefab != null)
+        {
+            GameObject explosion = Instantiate(
+                castleExplosionEffectPrefab,
+                bounds.center,
+                Quaternion.identity);
+
+            explosion.transform.localScale *=
+                Mathf.Max(0.1f, castleExplosionEffectScale);
+
+            Destroy(explosion, Mathf.Max(0.5f, castleExplosionEffectLifetime));
+        }
+
+        if (castleEmbersEffectPrefab != null)
+        {
+            StartCoroutine(
+                SpawnCastleEmbersEffectAfterDelay(bounds));
+        }
+    }
+
+    /// <summary>
+    /// 잔불 하나만 성 바운딩 박스 한가운데 허공에 띄우면 둥둥 떠 있는
+    /// 것처럼 어색해 보이므로, 잔해가 쌓였을 법한 바닥 높이 근처에
+    /// 여러 개를 흩뿌려 놓는다.
+    /// </summary>
+    private IEnumerator SpawnCastleEmbersEffectAfterDelay(Bounds bounds)
+    {
+        yield return new WaitForSeconds(
+            Mathf.Max(0f, castleEmbersEffectDelay));
+
+        if (castleEmbersEffectPrefab == null)
+        {
+            yield break;
+        }
+
+        float groundY = bounds.min.y;
+        int count = Mathf.Max(1, castleEmbersEffectCount);
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 offset =
+                UnityEngine.Random.insideUnitCircle * castleEmbersScatterRadius;
+
+            Vector3 position = new Vector3(
+                bounds.center.x + offset.x * bounds.extents.x,
+                groundY,
+                bounds.center.z + offset.y * bounds.extents.z);
+
+            GameObject embers = Instantiate(
+                castleEmbersEffectPrefab,
+                position,
+                Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
+
+            embers.transform.localScale *=
+                Mathf.Max(0.1f, castleEmbersEffectScale) *
+                UnityEngine.Random.Range(0.75f, 1.15f);
+
+            Destroy(embers, Mathf.Max(0.5f, castleEmbersEffectLifetime));
+        }
+    }
+
+    private void PlayCastleExplosionSfx(Vector3 position)
+    {
+        if (castleExplosionSfx == null)
+        {
+            return;
+        }
+
+        AudioSource.PlayClipAtPoint(
+            castleExplosionSfx,
+            position,
+            castleExplosionSfxVolume);
+    }
+
+    /// <summary>
+    /// 폭발 순간 잠깐 밝아졌다 빠르게 꺼지는 섬광 라이트를 재생한다.
+    /// castleExplosionFlashLightPrefab이 비어 있으면 아무 것도 하지 않는다.
+    /// </summary>
+    private void SpawnCastleExplosionFlash(Vector3 position)
+    {
+        if (castleExplosionFlashLightPrefab == null)
+        {
+            return;
+        }
+
+        GameObject flashObject = Instantiate(
+            castleExplosionFlashLightPrefab,
+            position,
+            Quaternion.identity);
+
+        Light flashLight = flashObject.GetComponent<Light>();
+        if (flashLight == null)
+        {
+            flashLight = flashObject.GetComponentInChildren<Light>();
+        }
+
+        if (flashLight == null)
+        {
+            Destroy(flashObject);
+            return;
+        }
+
+        StartCoroutine(
+            FadeOutExplosionFlashRoutine(flashObject, flashLight));
+    }
+
+    private IEnumerator FadeOutExplosionFlashRoutine(
+        GameObject flashObject,
+        Light flashLight)
+    {
+        float startIntensity =
+            flashLight.intensity *
+            Mathf.Max(0.1f, castleExplosionFlashIntensityMultiplier);
+
+        flashLight.intensity = startIntensity;
+        flashLight.range *=
+            Mathf.Max(0.1f, castleExplosionFlashRangeMultiplier);
+
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.05f, castleExplosionFlashDuration);
+
+        while (elapsed < duration && flashLight != null)
+        {
+            elapsed += Time.deltaTime;
+            flashLight.intensity =
+                Mathf.Lerp(startIntensity, 0f, elapsed / duration);
+            yield return null;
+        }
+
+        if (flashObject != null)
+        {
+            Destroy(flashObject);
+        }
     }
 
     private static Mesh GetCubeMesh()
@@ -2002,8 +2301,23 @@ public sealed class FinalBossDirector : MonoBehaviour
         castleBreakDuration = Mathf.Max(0.1f, castleBreakDuration);
         castleDebrisLifetime = Mathf.Max(0f, castleDebrisLifetime);
         castleDebrisCount = Mathf.Max(1, castleDebrisCount);
+        castleExplosionSfxVolume = Mathf.Clamp01(castleExplosionSfxVolume);
+        castleExplosionFlashDuration = Mathf.Max(0.05f, castleExplosionFlashDuration);
+        castleExplosionFlashIntensityMultiplier =
+            Mathf.Max(0.1f, castleExplosionFlashIntensityMultiplier);
+        castleExplosionFlashRangeMultiplier =
+            Mathf.Max(0.1f, castleExplosionFlashRangeMultiplier);
+        castleExplosionEffectScale = Mathf.Max(0.1f, castleExplosionEffectScale);
+        castleExplosionEffectLifetime = Mathf.Max(0.5f, castleExplosionEffectLifetime);
+        castleEmbersEffectDelay = Mathf.Max(0f, castleEmbersEffectDelay);
+        castleEmbersEffectCount = Mathf.Max(1, castleEmbersEffectCount);
+        castleEmbersScatterRadius = Mathf.Clamp01(castleEmbersScatterRadius);
+        castleEmbersEffectScale = Mathf.Max(0.1f, castleEmbersEffectScale);
+        castleEmbersEffectLifetime = Mathf.Max(0.5f, castleEmbersEffectLifetime);
         bossRevealDuration = Mathf.Max(0.1f, bossRevealDuration);
         bossFocusTreeHideRadius = Mathf.Max(1f, bossFocusTreeHideRadius);
+        castleBreakShakeDuration = Mathf.Max(0f, castleBreakShakeDuration);
+        castleBreakShakeStrength = Mathf.Max(0f, castleBreakShakeStrength);
         bossSpawnShakeDuration = Mathf.Max(0f, bossSpawnShakeDuration);
         bossSpawnShakeStrength = Mathf.Max(0f, bossSpawnShakeStrength);
         bossMaxHealth = Mathf.Max(1f, bossMaxHealth);

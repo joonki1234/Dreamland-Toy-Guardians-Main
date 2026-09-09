@@ -68,6 +68,18 @@ public sealed class FinalBossAttackController : MonoBehaviour
     [SerializeField, Min(0f)]
     private float slamJumpHeight = 1.4f;
 
+    // 슬램/스핀 공격 이펙트 프리팹은 FinalBossDirector가 다른 보스
+    // VFX(성 폭발 등)와 같은 방식으로 Inspector에서 들고 있다가
+    // ConfigureAttackEffects()로 넘겨준다. 이 컴포넌트는 GetOrAdd로
+    // 런타임에 붙기 때문에(NetworkBehaviour가 아니라 가능함) 프리팹
+    // 자체에 직접 값을 넣어둘 수 없다.
+    private GameObject slamDustEffectPrefab;
+    private GameObject slamShockwaveEffectPrefab;
+    private AudioClip slamImpactSfx;
+    private GameObject spinChargeEffectPrefab;
+    private GameObject spinWindEffectPrefab;
+    private AudioClip spinWhooshSfx;
+
     [Header("회전 공격")]
     [SerializeField, Min(0f)]
     private float spinWindupDuration = 0.4f;
@@ -378,6 +390,27 @@ public sealed class FinalBossAttackController : MonoBehaviour
     }
 
     /// <summary>
+    /// FinalBossDirector가 슬램/스핀 공격에 재생할 이펙트·사운드
+    /// 프리팹을 넘겨줄 때 호출합니다. 비워두면(null) 해당 이펙트는
+    /// 재생되지 않습니다.
+    /// </summary>
+    public void ConfigureAttackEffects(
+        GameObject slamDust,
+        GameObject slamShockwave,
+        AudioClip slamImpact,
+        GameObject spinCharge,
+        GameObject spinWind,
+        AudioClip spinWhoosh)
+    {
+        slamDustEffectPrefab = slamDust;
+        slamShockwaveEffectPrefab = slamShockwave;
+        slamImpactSfx = slamImpact;
+        spinChargeEffectPrefab = spinCharge;
+        spinWindEffectPrefab = spinWind;
+        spinWhooshSfx = spinWhoosh;
+    }
+
+    /// <summary>
     /// 보스 HP 페이즈가 바뀔 때 호출됩니다.
     /// 1페이즈는 뛰어가고, 2페이즈는 회전하며 더 가까이 접근합니다.
     /// </summary>
@@ -609,12 +642,83 @@ public sealed class FinalBossAttackController : MonoBehaviour
         SetPosition(startPosition);
         transform.localScale = baseScale;
 
+        PlaySlamImpactEffects(startPosition);
+
         DamageCore(1f);
         FinishAttack();
     }
 
+    /// <summary>
+    /// 슬램 착지 순간 흙먼지·충격파 이펙트와 착지음을 재생한다.
+    /// </summary>
+    private void PlaySlamImpactEffects(Vector3 position)
+    {
+        if (slamDustEffectPrefab != null)
+        {
+            GameObject dust = Instantiate(
+                slamDustEffectPrefab,
+                position,
+                Quaternion.identity);
+            Destroy(dust, 4f);
+        }
+
+        if (slamShockwaveEffectPrefab != null)
+        {
+            GameObject shockwave = Instantiate(
+                slamShockwaveEffectPrefab,
+                position,
+                Quaternion.identity);
+            Destroy(shockwave, 4f);
+        }
+
+        if (slamImpactSfx != null)
+        {
+            AudioSource.PlayClipAtPoint(slamImpactSfx, position, 0.9f);
+        }
+    }
+
+    /// <summary>
+    /// 스핀 공격 시작 순간 차징 이펙트와 소용돌이 바람을 몸에 붙여
+    /// 재생하고(회전하는 동안 같이 따라 돎), 돌진 시작음을 재생한다.
+    /// 두 이펙트 모두 spinDuration 이후 자동으로 정리된다.
+    /// </summary>
+    private void PlaySpinChargeEffects()
+    {
+        float lifetime = Mathf.Max(0.1f, spinWindupDuration + spinDuration);
+
+        if (spinChargeEffectPrefab != null)
+        {
+            GameObject charge = Instantiate(
+                spinChargeEffectPrefab,
+                transform.position,
+                transform.rotation,
+                transform);
+            Destroy(charge, lifetime);
+        }
+
+        if (spinWindEffectPrefab != null)
+        {
+            GameObject wind = Instantiate(
+                spinWindEffectPrefab,
+                transform.position,
+                Quaternion.identity,
+                transform);
+            Destroy(wind, lifetime);
+        }
+
+        if (spinWhooshSfx != null)
+        {
+            AudioSource.PlayClipAtPoint(
+                spinWhooshSfx,
+                transform.position,
+                0.8f);
+        }
+    }
+
     private IEnumerator SpinAttackRoutine()
     {
+        PlaySpinChargeEffects();
+
         Vector3 startPosition =
             new Vector3(
                 transform.position.x,

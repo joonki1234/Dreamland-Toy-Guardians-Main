@@ -27970,11 +27970,34 @@ MonoBehaviour:
   castleBreakDuration: 0.65
   castleDebrisLifetime: 2.8
   castleDebrisCount: 48
+  castleExplosionSfx: {fileID: 8300000, guid: a723d4862fd52b84a8e29048ce3ab010, type: 3}
+  castleExplosionSfxVolume: 0.85
+  castleExplosionFlashLightPrefab: {fileID: 4952131365919966842, guid: 9f90aa15c6b14234ea7247f33f09e816, type: 3}
+  castleExplosionFlashDuration: 0.55
+  castleExplosionFlashIntensityMultiplier: 7
+  castleExplosionFlashRangeMultiplier: 4
+  castleExplosionEffectPrefab: {fileID: 4994997792314849709, guid: 3dd50886582244645be87adb42aa8528, type: 3}
+  castleExplosionEffectScale: 3
+  castleExplosionEffectLifetime: 5
+  castleEmbersEffectPrefab: {fileID: 0}
+  castleEmbersEffectDelay: 1.2
+  castleEmbersEffectCount: 5
+  castleEmbersScatterRadius: 0.85
+  castleEmbersEffectScale: 0.9
+  castleEmbersEffectLifetime: 8
   bossRevealDuration: 0.8
   hideTreesNearBoss: 1
   bossFocusTreeHideRadius: 20
+  castleBreakShakeDuration: 0.75
+  castleBreakShakeStrength: 0.26
   bossSpawnShakeDuration: 0.58
   bossSpawnShakeStrength: 0.085
+  bossSlamDustEffectPrefab: {fileID: 8230022441722461589, guid: 41494896fc96c9748b81d3356632794e, type: 3}
+  bossSlamShockwaveEffectPrefab: {fileID: 7647375919561907788, guid: 035ce8c9cfc34104991ce416daf8aebe, type: 3}
+  bossSlamImpactSfx: {fileID: 8300000, guid: 0e64b56fe3ef3f045bf726655fb0066e, type: 3}
+  bossSpinChargeEffectPrefab: {fileID: 2715471840370901047, guid: df9374346b76e444dbbb2b019de4da25, type: 3}
+  bossSpinWindEffectPrefab: {fileID: 1645123201969997353, guid: 292bfa542cd61114883916af45c0c4f3, type: 3}
+  bossSpinWhooshSfx: {fileID: 8300000, guid: 64bd1ca4e852e4b5cbdf4fbb5b06085b, type: 3}
   bossMaxHealth: 7600
   bossCoreDamage: 21
   bossAttackInterval: 2.5
