@@ -204,7 +204,16 @@ public class PlayerJobController : NetworkBehaviour
         if (localWeaponAnchor != null) localWeaponAnchor.gameObject.SetActive(false);
         if (firefighterTriggerHeld)
         {
+            // 다른 클라이언트에도 물줄기가 멈췄다는 걸 알려야 하지만, 컴포넌트가
+            // 비활성화/파괴되는 시점이라 RPC 전송이 안전하지 않을 수 있다 -
+            // 최소한 내 화면에서는 즉시 멈추고, 네트워크 전파는 시도만 한다.
             GetComponentInChildren<FireHoseController>(true)?.StopWater();
+
+            if (Object != null && Object.IsValid && Object.HasInputAuthority)
+            {
+                RPC_SetFirefighterWaterActive(false);
+            }
+
             firefighterTriggerHeld = false;
         }
 
@@ -228,27 +237,40 @@ public class PlayerJobController : NetworkBehaviour
         PollEditorJobDebugInput();
 #endif
 
-        xrActivateInput = ResolveXrActivateAction();
+        bool attackPressed;
+        bool attackPressedThisFrame;
 
-        // Quest와 Editor XR Device Simulator 모두 같은 XRI 오른손 Activate 액션을 사용한다.
-        bool xrPressed = xrActivateInput != null && xrActivateInput.IsPressed();
-        bool xrFire = xrActivateInput != null && xrActivateInput.WasPressedThisFrame();
+        if (CurrentPlayMode == PlayMode.PC)
+        {
+            // PC 모드: 시뮬레이터의 왼손/오른손 조작(스페이스바 등) 없이,
+            // 그냥 마우스 왼쪽 클릭만으로 바로 발사되게 한다.
+            attackPressed = Mouse.current != null && Mouse.current.leftButton.isPressed;
+            attackPressedThisFrame = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+        }
+        else
+        {
+            xrActivateInput = ResolveXrActivateAction();
+
+            // Quest와 Editor XR Device Simulator 모두 같은 XRI 오른손 Activate 액션을 사용한다.
+            attackPressed = xrActivateInput != null && xrActivateInput.IsPressed();
+            attackPressedThisFrame = xrActivateInput != null && xrActivateInput.WasPressedThisFrame();
+        }
 
         if (CurrentJob == PlayerJob.Firefighter)
         {
-            if (xrPressed && !firefighterTriggerHeld)
+            if (attackPressed && !firefighterTriggerHeld)
             {
-                GetComponentInChildren<FireHoseController>(true)?.StartWater();
+                RPC_SetFirefighterWaterActive(true);
             }
-            else if (!xrPressed && firefighterTriggerHeld)
+            else if (!attackPressed && firefighterTriggerHeld)
             {
-                GetComponentInChildren<FireHoseController>(true)?.StopWater();
+                RPC_SetFirefighterWaterActive(false);
             }
 
-            firefighterTriggerHeld = xrPressed;
+            firefighterTriggerHeld = attackPressed;
         }
 
-        if (xrFire && CurrentJob != PlayerJob.Firefighter)
+        if (attackPressedThisFrame && CurrentJob != PlayerJob.Firefighter)
         {
             Attack();
         }
@@ -316,31 +338,47 @@ public class PlayerJobController : NetworkBehaviour
             return;
         }
 
-        switch (CurrentJob)
+        lastAttackTime = Time.time;
+
+        // 예전에는 각 무기 컨트롤러(GunController 등)를 이 클라이언트에서만
+        // 직접 Instantiate()했다 - 그래서 총알/이펙트/모션이 쏜 사람 화면에만
+        // 보이고 다른 플레이어에게는 전혀 보이지 않았다. RPC로 모든 클라이언트에
+        // "이 직업이 공격했다"를 알려서 각자 자기 화면에 있는 같은 캐릭터의
+        // 무기 컴포넌트를 똑같이 실행하게 한다.
+        RPC_PlayAttackEffect(CurrentJob);
+    }
+
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void RPC_PlayAttackEffect(PlayerJob job)
+    {
+        // 이 RPC 코드는 모든 클라이언트에서 똑같이 실행된다. 하지만
+        // Object.HasInputAuthority는 클라이언트마다 다르게 평가된다 - 실제로
+        // 쏜 사람 화면에서만 true. 그래서 이 값으로 "진짜 피해를 줄지"를
+        // 갈라서, 각자 화면에 보여주기용 총알/음식/흙이 생겨도 피해가
+        // 인원수만큼 중복으로 들어가는 일이 없게 한다.
+        bool dealsDamage = Object != null && Object.HasInputAuthority;
+
+        switch (job)
         {
             case PlayerJob.Police:
-                lastAttackTime = Time.time;
-                weaponPolice?.GetComponentInChildren<GunController>(true)?.TriggerShoot();
+                weaponPolice?.GetComponentInChildren<GunController>(true)?.TriggerShoot(dealsDamage);
                 break;
 
             case PlayerJob.Firefighter:
-                lastAttackTime = Time.time;
                 weaponFirefighter?.GetComponentInChildren<FireHoseController>(true)?.StartWater();
                 break;
 
             case PlayerJob.Chef:
-                lastAttackTime = Time.time;
-                weaponChef?.GetComponentInChildren<ChefWeaponController>(true)?.TriggerAttack();
+                weaponChef?.GetComponentInChildren<ChefWeaponController>(true)?.TriggerAttack(dealsDamage);
                 break;
 
             case PlayerJob.Builder:
-                lastAttackTime = Time.time;
-
                 if (weaponBuilder != null &&
                     !isSwinging)
                 {
                     StartCoroutine(
-                        ShovelScoopRoutine()
+                        ShovelScoopRoutine(dealsDamage)
                     );
                 }
 
@@ -350,9 +388,34 @@ public class PlayerJobController : NetworkBehaviour
 
 
     /// <summary>
+    /// 소방관의 물줄기는 (한 번 쏘고 끝나는 공격이 아니라) 누르고 있는 동안
+    /// 계속 나오는 지속 효과라 RPC_PlayAttackEffect와 분리했다.
+    /// </summary>
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void RPC_SetFirefighterWaterActive(bool active)
+    {
+        FireHoseController hose = weaponFirefighter?.GetComponentInChildren<FireHoseController>(true);
+
+        if (hose == null)
+        {
+            return;
+        }
+
+        if (active)
+        {
+            hose.StartWater();
+        }
+        else
+        {
+            hose.StopWater();
+        }
+    }
+
+
+    /// <summary>
     /// 삽을 아래로 내렸다가 위로 퍼 올리는 공격 모션이다.
     /// </summary>
-    private IEnumerator ShovelScoopRoutine()
+    private IEnumerator ShovelScoopRoutine(bool dealsDamage)
     {
         isSwinging = true;
 
@@ -446,7 +509,7 @@ public class PlayerJobController : NetworkBehaviour
 
             if (!hasFired && t >= 0.65f)
             {
-                SpawnDirtCluster();
+                SpawnDirtCluster(dealsDamage);
                 hasFired = true;
             }
 
@@ -455,7 +518,7 @@ public class PlayerJobController : NetworkBehaviour
 
         if (!hasFired)
         {
-            SpawnDirtCluster();
+            SpawnDirtCluster(dealsDamage);
         }
 
         elapsed = 0f;
@@ -504,7 +567,7 @@ public class PlayerJobController : NetworkBehaviour
     /// 삽질 한 번에 여러 개의 작은 흙 파편을
     /// 처음부터 부채꼴로 흩뿌린다.
     /// </summary>
-    private void SpawnDirtCluster()
+    private void SpawnDirtCluster(bool dealsDamage)
     {
         if (dirtParticleSystem != null)
         {
@@ -630,10 +693,19 @@ public class PlayerJobController : NetworkBehaviour
 
             if (projectile != null)
             {
-                projectile.Initialize(
-                    shotContext,
-                    nextBuilderProjectileShotId++
-                );
+                if (dealsDamage)
+                {
+                    projectile.Initialize(
+                        shotContext,
+                        nextBuilderProjectileShotId++
+                    );
+                }
+                else
+                {
+                    // 다른 클라이언트에서 재생되는 보여주기용 흙 파편 - 충돌 콜백을
+                    // 꺼서 적에게 중복으로 피해가 들어가지 않게 한다.
+                    projectile.enabled = false;
+                }
             }
             else
             {

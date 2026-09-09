@@ -56,15 +56,15 @@ public class ChefWeaponController : MonoBehaviour
 
     }
 
-    public void TriggerAttack()
+    public void TriggerAttack(bool dealsDamage = true)
     {
         if (!isAttacking)
         {
-            StartCoroutine(WokSwingRoutine());
+            StartCoroutine(WokSwingRoutine(dealsDamage));
         }
     }
 
-    private IEnumerator WokSwingRoutine()
+    private IEnumerator WokSwingRoutine(bool dealsDamage)
     {
         isAttacking = true;
 
@@ -103,7 +103,7 @@ public class ChefWeaponController : MonoBehaviour
         }
 
         // 🍳 최정점에서 음식 발사
-        LaunchRandomFood();
+        LaunchRandomFood(dealsDamage);
         PlayPanSwingSfx();
 
         // [STEP 3] 복귀 동작 (손잡이 중심으로 부드럽게 복귀)
@@ -166,7 +166,7 @@ public class ChefWeaponController : MonoBehaviour
         }
     }
 
-    private void LaunchRandomFood()
+    private void LaunchRandomFood(bool dealsDamage)
     {
         if (foodPrefabs == null || foodPrefabs.Length == 0 || foodSpawnPoint == null)
         {
@@ -179,9 +179,18 @@ public class ChefWeaponController : MonoBehaviour
         GameObject spawnedFood = Instantiate(selectedFood, foodSpawnPoint.position, Random.rotation);
 
         // 생성된 모든 음식에 요리사 투사체 표시를 자동으로 붙인다.
-        if (spawnedFood.GetComponent<ChefFoodProjectile>() == null)
+        ChefFoodProjectile foodProjectile = spawnedFood.GetComponent<ChefFoodProjectile>();
+
+        if (foodProjectile == null)
         {
-            spawnedFood.AddComponent<ChefFoodProjectile>();
+            foodProjectile = spawnedFood.AddComponent<ChefFoodProjectile>();
+        }
+
+        if (!dealsDamage)
+        {
+            // 다른 클라이언트에서 재생되는 보여주기용 음식 - 충돌 콜백을 꺼서
+            // 적에게 중복으로 피해가 들어가지 않게 한다.
+            foodProjectile.enabled = false;
         }
 
         if (spawnedFood.TryGetComponent<Rigidbody>(out Rigidbody rb))

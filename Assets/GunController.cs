@@ -99,13 +99,19 @@ public class GunController : MonoBehaviour
 
     }
 
-    public void TriggerShoot()
+    public void TriggerShoot(bool dealsDamage = true)
     {
-        Shoot();
+        Shoot(dealsDamage);
     }
 
 
-    private void Shoot()
+    /// <summary>
+    /// dealsDamage가 false면(다른 클라이언트에서 재생되는 "보여주기용" 총알) 총알은
+    /// 그대로 날아가고 총구 이펙트/소리도 그대로 나지만, 충돌 시 실제 피해는 주지 않는다.
+    /// 진짜 피해는 쏜 사람 본인 화면에서만(dealsDamage=true) 적용된다 - 그래야 모든
+    /// 클라이언트가 각자 총알을 하나씩 만들어도 피해가 중복으로 들어가지 않는다.
+    /// </summary>
+    private void Shoot(bool dealsDamage)
     {
         if (Time.time < nextFireTime)
         {
@@ -159,10 +165,19 @@ public class GunController : MonoBehaviour
                 bullet.AddComponent<PoliceBulletProjectile>();
         }
 
-        projectile.Initialize(
-            bulletDamage,
-            nextPoliceShotId++
-        );
+        if (dealsDamage)
+        {
+            projectile.Initialize(
+                bulletDamage,
+                nextPoliceShotId++
+            );
+        }
+        else
+        {
+            // 다른 클라이언트에서 재생되는 보여주기용 총알 - 충돌 콜백 자체를 꺼서
+            // 적에게 중복으로 피해가 들어가지 않게 한다.
+            projectile.enabled = false;
+        }
 
         nextFireTime = Time.time + fireInterval;
 
