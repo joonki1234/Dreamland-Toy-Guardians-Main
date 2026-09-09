@@ -224,14 +224,16 @@ public class LobbySelectionController : MonoBehaviour
     private void Start()
     {
         maximumPlayerCount = Mathf.Clamp(maximumPlayerCount, 1, 8);
+        UpdateConnectedPlayerCount();
         UpdateUI();
     }
 
     private void Update()
     {
-        // 아직 네트워크 접속 전이면 할 일이 없다.
+        // 접속 전에도 인원수는 0으로 갱신한다.
         if (roomManager == null || roomManager.Runner == null)
         {
+            UpdateConnectedPlayerCount();
             return;
         }
 
@@ -741,6 +743,8 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private void UpdatePlayerStatusList()
     {
+        UpdateConnectedPlayerCount();
+
         if (playerStatusUI == null)
         {
             return;
@@ -791,11 +795,31 @@ public class LobbySelectionController : MonoBehaviour
             playerStatusUI.RemovePlayerStatus(i);
         }
 
-        if (connectedPlayerText != null)
+    }
+
+    private void UpdateConnectedPlayerCount()
+    {
+        if (connectedPlayerText == null)
         {
-            connectedPlayerText.text =
-                $"연결된 플레이어: {index} / {maximumPlayerCount}";
+            return;
         }
+
+        if (roomManager == null ||
+            roomManager.Runner == null ||
+            !roomManager.Runner.IsRunning)
+        {
+            connectedPlayerText.text = $"0/{maximumPlayerCount}";
+            return;
+        }
+
+        int count = 0;
+
+        foreach (var player in roomManager.Runner.ActivePlayers)
+        {
+            count++;
+        }
+
+        connectedPlayerText.text = $"{count}/{maximumPlayerCount}";
     }
 
     /// <summary>

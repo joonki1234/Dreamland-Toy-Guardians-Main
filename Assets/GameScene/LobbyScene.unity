@@ -3812,7 +3812,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uC5F0\uACB0\uB41C \uD50C\uB808\uC774\uC5B4: 1 / 8"
+  m_text: 0/8
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 346e82d34a0cf6c4dbf7d1a7563df9c3, type: 2}
   m_sharedMaterial: {fileID: -5553942460365081698, guid: 346e82d34a0cf6c4dbf7d1a7563df9c3, type: 2}
