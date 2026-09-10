@@ -191,9 +191,15 @@ public sealed class AllyPortalCoreRevealController : MonoBehaviour
     {
         if (roadRevealController == null)
         {
+            // 기본 FindAnyObjectByType<T>()는 FindObjectsInactive.Exclude라서
+            // Road_0/DreamRoadRevealController가 씬 로드 시점에 비활성 상태면
+            // null을 반환한다. 클라이언트마다 초기화 타이밍이 달라 한쪽
+            // 화면에서만 Road_0이 등장하지 않는 원인이 될 수 있어
+            // FindObjectsInactive.Include로 비활성 상태여도 찾도록 한다.
             roadRevealController =
                 UnityEngine.Object.FindAnyObjectByType
-                    <DreamRoadRevealController>();
+                    <DreamRoadRevealController>(
+                        FindObjectsInactive.Include);
         }
     }
 

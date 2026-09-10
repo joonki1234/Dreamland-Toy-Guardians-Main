@@ -213,7 +213,12 @@ namespace DreamGuardians
 
             if (toyFriend == null)
             {
-                toyFriend = FindAnyObjectByType<ToyFriendController>();
+                // 기본 FindAnyObjectByType<T>()는 비활성 오브젝트를 찾지 못해서,
+                // 로봇 친구가 씬 로드 시점에 꺼져 있으면(등장 연출 전) null이 되어
+                // 이후 진행 멘트가 재생되지 않는다. 다른 곳(NetworkPlayerMovement,
+                // TutorialStage1Director)과 동일하게 Include로 통일한다.
+                toyFriend = FindAnyObjectByType<ToyFriendController>(
+                    FindObjectsInactive.Include);
             }
         }
 

@@ -188,24 +188,34 @@ namespace DreamGuardians
         /// </summary>
         private void ResolveReferences()
         {
+            // 예전에는 FindAnyObjectByType<T>()를 인자 없이 호출했는데, 이 오버로드는
+            // 기본값이 FindObjectsInactive.Exclude라서 대상 GameObject가 씬 로드 순간에
+            // 비활성 상태면(등장 연출 전에는 꺼둔 상태로 배치되는 경우가 흔하다) 그냥
+            // null을 반환하고 만다. 클라이언트마다 씬 초기화 타이밍이 미세하게 달라
+            // "한 사람은 되고 한 사람은 안 되는" 것처럼 보이는 원인 중 하나였다.
+            // NetworkPlayerMovement.cs가 MissionBannerUI/CoreHealthHUD/ToyFriendController를
+            // 찾을 때 이미 쓰고 있는 FindObjectsInactive.Include와 동일하게 맞춘다.
             if (allyPortalCoreRevealController == null)
             {
                 allyPortalCoreRevealController =
                     UnityEngine.Object.FindAnyObjectByType
-                        <AllyPortalCoreRevealController>();
+                        <AllyPortalCoreRevealController>(
+                            FindObjectsInactive.Include);
             }
 
             if (toyFriendEntranceSequence == null)
             {
                 toyFriendEntranceSequence =
                     UnityEngine.Object.FindAnyObjectByType
-                        <ToyFriendEntranceSequence>();
+                        <ToyFriendEntranceSequence>(
+                            FindObjectsInactive.Include);
             }
 
             if (toyFriend == null)
             {
                 toyFriend = UnityEngine.Object.FindAnyObjectByType
-                    <ToyFriendController>();
+                    <ToyFriendController>(
+                        FindObjectsInactive.Include);
             }
 
             // 코어보다 먼저 등장하지 않도록 튜토리얼 진행이 시작 시점을 관리합니다.
