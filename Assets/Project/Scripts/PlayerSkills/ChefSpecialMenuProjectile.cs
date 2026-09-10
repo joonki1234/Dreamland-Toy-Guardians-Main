@@ -38,6 +38,7 @@ public sealed class ChefSpecialMenuProjectile : MonoBehaviour
     private AudioSource fallAudioSource;
     private float explosionTimer;
     private State state;
+    private bool dealsDamage = true;
 
     private static int nextShotId = 600000;
 
@@ -63,8 +64,10 @@ public sealed class ChefSpecialMenuProjectile : MonoBehaviour
         float audioDopplerLevel,
         GameObject explosionVfxPrefab,
         float explosionVfxScale,
-        float explosionVfxHeightOffset)
+        float explosionVfxHeightOffset,
+        bool dealsDamage = true)
     {
+        this.dealsDamage = dealsDamage;
         this.targetPoint = targetPoint;
         this.initialFallSpeed = Mathf.Max(0.01f, initialFallSpeed);
         currentFallSpeed = this.initialFallSpeed;
@@ -333,6 +336,13 @@ public sealed class ChefSpecialMenuProjectile : MonoBehaviour
 
     private void ApplyExplosionDamage()
     {
+        // 다른 클라이언트에서 재생되는 보여주기용 폭발 - 피해는 실제로 스킬을
+        // 쓴 사람(dealsDamage=true) 화면에서만 적용해 중복 피해를 막는다.
+        if (!dealsDamage)
+        {
+            return;
+        }
+
         Collider[] hits = Physics.OverlapSphere(
             targetPoint,
             explosionRadius,

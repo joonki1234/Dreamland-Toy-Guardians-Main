@@ -81,7 +81,7 @@ public sealed class ChefSkill : IJobSkill
     [SerializeField] private AudioClip explosionSound;
     [Range(0f, 1f)] [SerializeField] private float explosionSoundVolume = 0.5f;
 
-    public void Execute(JobSkillContext context)
+    public void Execute(JobSkillContext context, bool dealsDamage)
     {
         if (context.Origin == null)
         {
@@ -136,7 +136,8 @@ public sealed class ChefSkill : IJobSkill
             Mathf.Clamp(audioDopplerLevel, 0f, 0.2f),
             explosionVfxPrefab,
             Mathf.Max(0.01f, explosionVfxScale),
-            explosionVfxHeightOffset
+            explosionVfxHeightOffset,
+            dealsDamage
         );
 
         SetupFallAudio(spawnedFood);

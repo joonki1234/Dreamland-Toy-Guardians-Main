@@ -660,15 +660,34 @@ namespace DreamGuardians
 
         private void PlaceTutorialSpawnInFrontOfCamera()
         {
-            PrototypeRayWeapon weapon =
-                UnityEngine.Object
-                    .FindAnyObjectByType
-                        <PrototypeRayWeapon>();
-
+            // 이 메서드는 "Only the Master creates the enemy" 규칙에 따라
+            // Master(호스트) 클라이언트에서만 실행된다. 예전에는
+            // FindAnyObjectByType<PrototypeRayWeapon>()로 씬에서 "아무" 무기를
+            // 찾아 그 카메라를 썼는데, 맵에 플레이어가 2명 이상이면 씬에
+            // PrototypeRayWeapon/Camera 인스턴스가 여러 개 존재해서 Master
+            // 자신이 아니라 다른(참가한) 플레이어의 카메라를 잘못 집는 경우가
+            // 있었다. tutorialSpawnPoint는 맵에 하나뿐인 공유 Transform이고
+            // 그 위치가 네트워크 스폰 위치로 그대로 쓰이기 때문에, 엉뚱한
+            // 카메라를 기준으로 삼으면 참가자 화면에서 튜토리얼 로봇이
+            // 엉뚱한 위치(등 뒤 등)에 스폰되어 "안 보이는" 것처럼 보였다.
+            // NetworkPlayerMovement.LocalPlayerCamera(이 클라이언트, 즉
+            // Master 자신의 카메라)를 최우선으로 사용해 항상 Master 자신의
+            // 시점 기준으로 스폰 위치를 계산하게 한다.
             Camera camera =
-                weapon != null
-                    ? weapon.AimCamera
-                    : null;
+                NetworkPlayerMovement.LocalPlayerCamera;
+
+            if (camera == null)
+            {
+                PrototypeRayWeapon weapon =
+                    UnityEngine.Object
+                        .FindAnyObjectByType
+                            <PrototypeRayWeapon>();
+
+                camera =
+                    weapon != null
+                        ? weapon.AimCamera
+                        : null;
+            }
 
 
             if (camera == null)

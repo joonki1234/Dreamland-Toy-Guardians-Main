@@ -37,7 +37,17 @@ namespace DreamGuardians
 
         private void Start()
         {
-            targetCamera = Camera.main;
+            // 이 프로젝트는 어떤 카메라에도 MainCamera 태그를 쓰지 않아
+            // Camera.main이 항상 null이다(다른 HUD들에서 이미 겪은 것과
+            // 동일한 원인). NetworkPlayerMovement가 로컬 플레이어 스폰 시
+            // 채워두는 "내 카메라"를 최우선으로 쓴다 - 그래야 체력바가
+            // 매 프레임 카메라를 정확히 바라보게(billboard) 회전한다.
+            // (World Space Canvas라 카메라가 없어도 렌더링 자체는 되지만,
+            // 회전 갱신이 안 되면 접속한 클라이언트마다 보는 각도에 따라
+            // 체력바가 옆으로 납작하게 보여 사실상 안 보이는 것처럼 된다.)
+            targetCamera = NetworkPlayerMovement.LocalPlayerCamera != null
+                ? NetworkPlayerMovement.LocalPlayerCamera
+                : Camera.main;
             UpdatePlacement();
             UpdateBar(health != null ? health.NormalizedHealth : 1f);
 
@@ -66,7 +76,9 @@ namespace DreamGuardians
 
             if (targetCamera == null)
             {
-                targetCamera = Camera.main;
+                targetCamera = NetworkPlayerMovement.LocalPlayerCamera != null
+                    ? NetworkPlayerMovement.LocalPlayerCamera
+                    : Camera.main;
             }
 
             if (targetCamera != null)

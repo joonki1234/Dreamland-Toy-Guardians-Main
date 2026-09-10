@@ -93,7 +93,7 @@ public sealed class BuilderSkill : IJobSkill
 
     public bool IsActive => activeEffect != null;
 
-    public void Execute(JobSkillContext context)
+    public void Execute(JobSkillContext context, bool dealsDamage)
     {
         if (context.Origin == null || context.Direction == null || IsActive)
         {
@@ -120,7 +120,7 @@ public sealed class BuilderSkill : IJobSkill
             shockwaveDamage, stunDuration, knockbackForce, knockbackDuration,
             hammerImpactSound, hammerImpactVolume, boomImpactSound,
             boomImpactVolume, boomImpactDelay, audioMinDistance, audioMaxDistance,
-            HandleEffectFinished);
+            HandleEffectFinished, dealsDamage);
     }
 
     public void Cancel()

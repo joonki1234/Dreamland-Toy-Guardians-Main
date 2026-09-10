@@ -65,6 +65,7 @@ public sealed class BuilderEmergencyDemolitionEffect : MonoBehaviour
     private float audioMinDistance;
     private float audioMaxDistance;
     private Action<BuilderEmergencyDemolitionEffect> finished;
+    private bool dealsDamage = true;
     private GameObject hammerObject;
     private Transform hammerAnimationAnchor;
     private Transform hammerImpactPoint;
@@ -93,8 +94,10 @@ public sealed class BuilderEmergencyDemolitionEffect : MonoBehaviour
         float waveDamage, float stun, float knockback, float knockbackTime,
         AudioClip hammerSound, float hammerVolume, AudioClip boomSound,
         float boomVolume, float boomDelay, float minDistance, float maxDistance,
-        Action<BuilderEmergencyDemolitionEffect> onFinished)
+        Action<BuilderEmergencyDemolitionEffect> onFinished,
+        bool dealsDamage = true)
     {
+        this.dealsDamage = dealsDamage;
         origin = skillOrigin; directionSource = skillDirection;
         animatedHammerPrefab = animatedHammer; hammerAnimationClip = animationClip;
         animatedHammerMaterial = hammerMaterial;
@@ -482,6 +485,15 @@ public sealed class BuilderEmergencyDemolitionEffect : MonoBehaviour
         SpawnRockDebris(debrisPoint);
         SpawnTemporaryVfx(dustVfx, dustPoint, dustScale, 0.75f, true, VfxRole.Dust);
         PlayImpactSounds(point);
+
+        // 다른 클라이언트에서 재생되는 보여주기용 철거 연출 - 피해와 넉백/스턴은
+        // 실제로 스킬을 쓴 사람(dealsDamage=true) 화면에서만 적용해
+        // 중복 피해/중복 넉백이 들어가지 않게 한다. 연출(Flash/Debris/Dust/Sound)은
+        // 위에서 이미 모든 클라이언트에서 재생되었다.
+        if (!dealsDamage)
+        {
+            return;
+        }
 
         int count = Physics.OverlapSphereNonAlloc(point, impactRadius, hitBuffer,
             monsterMask, QueryTriggerInteraction.Collide);

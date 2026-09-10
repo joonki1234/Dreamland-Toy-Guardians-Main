@@ -32,6 +32,7 @@ public sealed class FireTruckSkillMover : MonoBehaviour
     private float nextImpactSoundTime;
     private float travelledDistance;
     private bool initialized;
+    private bool dealsDamage = true;
 
     public void Initialize(
         Vector3 direction,
@@ -53,8 +54,10 @@ public sealed class FireTruckSkillMover : MonoBehaviour
         float minimumImpactSoundInterval,
         float audioMinDistance,
         float audioMaxDistance,
-        float audioDopplerLevel)
+        float audioDopplerLevel,
+        bool dealsDamage = true)
     {
+        this.dealsDamage = dealsDamage;
         moveDirection = direction.normalized;
         moveSpeed = speed;
         cleanupDistance = distanceUntilCleanup;
@@ -212,6 +215,14 @@ public sealed class FireTruckSkillMover : MonoBehaviour
             }
 
             PlayImpactSound();
+
+            // 다른 클라이언트에서 재생되는 보여주기용 소방차 - 피해와 넉백은
+            // 실제로 스킬을 쓴 사람(dealsDamage=true) 화면에서만 적용해
+            // 중복 피해/중복 넉백이 들어가지 않게 한다.
+            if (!dealsDamage)
+            {
+                continue;
+            }
 
             Vector3 hitPoint = hit.ClosestPoint(GetHitboxCenter());
             DamageInfo damageInfo = new DamageInfo(

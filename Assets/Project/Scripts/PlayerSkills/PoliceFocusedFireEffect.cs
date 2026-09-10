@@ -44,6 +44,7 @@ public sealed class PoliceFocusedFireEffect : MonoBehaviour
     private float electricFireVolume;
     private float electricSoundMinDistance;
     private float electricSoundMaxDistance;
+    private bool dealsDamage = true;
     private AudioSource crackAudioSource;
     private AudioSource impactAudioSource;
     private AudioSource electricAudioSource;
@@ -75,8 +76,10 @@ public sealed class PoliceFocusedFireEffect : MonoBehaviour
         AudioClip electricFireSound,
         float electricFireVolume,
         float electricSoundMinDistance,
-        float electricSoundMaxDistance)
+        float electricSoundMaxDistance,
+        bool dealsDamage = true)
     {
+        this.dealsDamage = dealsDamage;
         this.targetPosition = targetPosition;
         this.aimForward = aimForward;
         this.gunVisualSource = gunVisualSource;
@@ -499,6 +502,13 @@ public sealed class PoliceFocusedFireEffect : MonoBehaviour
 
     private void ApplyDamageTick()
     {
+        // 다른 클라이언트에서 재생되는 보여주기용 연출 - 피해는 실제로 스킬을
+        // 쓴 사람(dealsDamage=true) 화면에서만 적용해 중복 피해를 막는다.
+        if (!dealsDamage)
+        {
+            return;
+        }
+
         enemiesInTick.Clear();
         Collider[] hits = Physics.OverlapSphere(
             targetPosition,

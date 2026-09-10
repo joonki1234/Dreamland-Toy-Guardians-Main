@@ -1,12 +1,19 @@
+using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
 /// 현재 직업에 맞는 스킬을 선택하고 쿨타임을 관리합니다.
 /// 입력 장치와 실제 스킬 효과 사이의 연결점은 TryUseCurrentJobSkill 하나뿐입니다.
+///
+/// 예전에는 GetSkill(job).Execute(context)를 이 클라이언트에서만 직접 호출했다 -
+/// 그래서 스킬 연출(꿈빛 총/소방차/특제 메뉴/망치)이 스킬을 쓴 사람 화면에만
+/// 보이고 다른 플레이어에게는 전혀 보이지 않았다. PlayerJobController.Attack()의
+/// RPC_PlayAttackEffect와 동일한 패턴으로, RPC로 모든 클라이언트에 "이 직업이
+/// 스킬을 썼다"를 알려서 각자 자기 화면에서 같은 캐릭터의 스킬을 재생하게 한다.
 /// </summary>
 [RequireComponent(typeof(PlayerJobController))]
-public sealed class PlayerJobSkillController : MonoBehaviour
+public sealed class PlayerJobSkillController : NetworkBehaviour
 {
     [Header("직업 정보")]
     [SerializeField] private PlayerJobController jobController;
@@ -108,10 +115,31 @@ public sealed class PlayerJobSkillController : MonoBehaviour
             return false;
         }
 
-        JobSkillContext context = new JobSkillContext(skillOrigin, skillDirection);
-        GetSkill(job).Execute(context);
+        // 쿨타임/IsActive 판정은 실제로 스킬을 쓴 사람의 클라이언트에서만
+        // 한 번 확인한다(로컬 전용). RPC 쪽에서 다시 검사하지 않는 이유는
+        // RPC가 이미 이 검사를 통과한 뒤에만 보내지기 때문이다.
+        RPC_ExecuteJobSkill(job);
         SetReadyTime(job, now + GetCooldown(job));
         return true;
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void RPC_ExecuteJobSkill(PlayerJob job)
+    {
+        // PlayerJobController.RPC_PlayAttackEffect와 동일한 패턴: 이 RPC는
+        // 모든 클라이언트에서 똑같이 실행되지만 Object.HasInputAuthority는
+        // 실제로 스킬을 쓴 사람 화면에서만 true다. 이 값으로 "진짜 피해를
+        // 줄지"를 갈라서, 각자 화면에 보여주기용 연출이 재생되어도 피해가
+        // 인원수만큼 중복으로 들어가지 않게 한다.
+        bool dealsDamage = Object != null && Object.HasInputAuthority;
+
+        if (skillOrigin == null || skillDirection == null)
+        {
+            return;
+        }
+
+        JobSkillContext context = new JobSkillContext(skillOrigin, skillDirection);
+        GetSkill(job).Execute(context, dealsDamage);
     }
 
     /// <summary>XR 입력과 분리된 건축가 긴급 철거 전용 진입점입니다.</summary>

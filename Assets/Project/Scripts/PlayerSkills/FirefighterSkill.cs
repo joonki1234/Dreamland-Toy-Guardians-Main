@@ -58,7 +58,7 @@ public sealed class FirefighterSkill : IJobSkill
     [Min(0.01f)] [SerializeField] private float audioMaxDistance = 30f;
     [Range(0f, 0.2f)] [SerializeField] private float audioDopplerLevel = 0.1f;
 
-    public void Execute(JobSkillContext context)
+    public void Execute(JobSkillContext context, bool dealsDamage)
     {
         if (fireTruckPrefab == null)
         {
@@ -142,7 +142,8 @@ public sealed class FirefighterSkill : IJobSkill
             Mathf.Max(0f, impactSoundMinInterval),
             Mathf.Max(0f, audioMinDistance),
             Mathf.Max(audioMinDistance + 0.01f, audioMaxDistance),
-            Mathf.Clamp(audioDopplerLevel, 0f, 0.2f)
+            Mathf.Clamp(audioDopplerLevel, 0f, 0.2f),
+            dealsDamage
         );
     }
 }
