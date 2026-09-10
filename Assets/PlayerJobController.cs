@@ -1092,6 +1092,18 @@ public class PlayerJobController : NetworkBehaviour
     private Vector3 pendingRemoteRotation;
     private GameObject activeLocalWeapon;
     private bool isLocalWeaponTrackingActive;
+#if UNITY_EDITOR
+#pragma warning disable CS0618 // Use the project's Classic XR Device Simulator.
+    private UnityEngine.XR.Interaction.Toolkit.Inputs.Simulation.XRDeviceSimulator editorWeaponSimulator;
+#pragma warning restore CS0618
+    private bool editorWeaponContinuity;
+    private bool editorWeaponBaselineCaptured;
+    private int editorWeaponBaselineFrame;
+    private Vector3 editorControllerStartPosition;
+    private Quaternion editorControllerStartRotation;
+    private Vector3 editorAnchorStartPosition;
+    private Quaternion editorAnchorStartRotation;
+#endif
     private Vector3 alignedLocalWeaponPosition;
     private Quaternion alignedLocalWeaponRotation;
 
@@ -1184,6 +1196,24 @@ public class PlayerJobController : NetworkBehaviour
     private void ApplyLocalWeaponAnchorPoseBeforeRender()
     {
         if (IsLocalPcMode) return;
+#if UNITY_EDITOR
+        // Capture after the follower's LateUpdate, without changing the displayed
+        // anchor on the activation frame. Both baselines use the same Rig_IK space.
+        if (editorWeaponContinuity && isLocalWeaponTrackingActive && !editorWeaponBaselineCaptured &&
+            Object != null && Object.HasInputAuthority && activeLocalWeapon != null &&
+            localWeaponAnchor != null && localTracking != null)
+        {
+            Transform target = localTracking.ResolveLocalWeaponTarget();
+            Transform space = localWeaponAnchor.parent;
+            if (target == null || space == null) return;
+            editorControllerStartPosition = space.InverseTransformPoint(target.position);
+            editorControllerStartRotation = Quaternion.Inverse(space.rotation) * target.rotation;
+            editorAnchorStartPosition = localWeaponAnchor.localPosition;
+            editorAnchorStartRotation = localWeaponAnchor.localRotation;
+            editorWeaponBaselineFrame = Time.frameCount;
+            editorWeaponBaselineCaptured = true;
+        }
+#endif
         ApplyLocalWeaponAnchorPose();
     }
 
@@ -1200,6 +1230,20 @@ public class PlayerJobController : NetworkBehaviour
         {
             Transform weaponTarget = localTracking.ResolveLocalWeaponTarget();
             if (weaponTarget == null) return;
+#if UNITY_EDITOR
+            if (editorWeaponContinuity)
+            {
+                if (!editorWeaponBaselineCaptured || editorWeaponBaselineFrame == Time.frameCount) return;
+                Transform space = localWeaponAnchor.parent;
+                if (space == null) return;
+                Vector3 position = space.InverseTransformPoint(weaponTarget.position);
+                Quaternion rotation = Quaternion.Inverse(space.rotation) * weaponTarget.rotation;
+                localWeaponAnchor.SetLocalPositionAndRotation(
+                    editorAnchorStartPosition + (position - editorControllerStartPosition),
+                    (rotation * Quaternion.Inverse(editorControllerStartRotation)) * editorAnchorStartRotation);
+                return;
+            }
+#endif
             localWeaponAnchor.SetPositionAndRotation(
                 weaponTarget.position, weaponTarget.rotation);
             return;
@@ -1222,6 +1266,21 @@ public class PlayerJobController : NetworkBehaviour
     {
         if (isLocalWeaponTrackingActive || Object == null || !Object.HasInputAuthority) return;
 
+#if UNITY_EDITOR
+#pragma warning disable CS0618
+        if (editorWeaponSimulator == null)
+            editorWeaponSimulator = FindFirstObjectByType<UnityEngine.XR.Interaction.Toolkit.Inputs.Simulation.XRDeviceSimulator>();
+#pragma warning restore CS0618
+        if (editorWeaponSimulator != null && editorWeaponSimulator.isActiveAndEnabled)
+        {
+            // HMD/FPS input can initialize tracking before Space. Keep the idle
+            // weapon until the right controller is explicitly selected (hold/toggle).
+            if (!editorWeaponSimulator.manipulatingRightController) return;
+            editorWeaponContinuity = true;
+            isLocalWeaponTrackingActive = true;
+            return;
+        }
+#endif
         // Quest and XR Device Simulator both follow the tracked XR controller.
         // Selecting a device with Space must not switch the weapon pose source.
         foreach (var device in InputSystem.devices)
