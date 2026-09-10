@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 406099990662878905}
   - component: {fileID: 218752009400101023}
   - component: {fileID: 538187098925314762}
+  - component: {fileID: 175099191063559490}
   m_Layer: 0
   m_Name: GameDifficultyState
   m_TagString: Untagged
@@ -52,6 +53,7 @@ MonoBehaviour:
   NestedObjects: []
   NetworkedBehaviours:
   - {fileID: 538187098925314762}
+  - {fileID: 175099191063559490}
   ForceRemoteRenderTimeframe: 0
 --- !u!114 &538187098925314762
 MonoBehaviour:
@@ -66,3 +68,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameDifficultyState
   _CurrentDifficulty: 0
+--- !u!114 &175099191063559490
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 976307760436495300}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbe53becb11346968e43303e447dbfe0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DreamlandProgressSync
+  _NetworkedCoreHealth: 0
+  _NetworkedGameFlowState: 0
+  _Initialized: 0

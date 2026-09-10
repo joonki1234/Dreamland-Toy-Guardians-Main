@@ -582,6 +582,42 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             return;
         }
 
+        // 이 메서드를 호출하는 Handle*Completed 콜백들은 "이 클라이언트가
+        // 실제로 그 전환 조건을 로컬에서 감지했을 때"만 실행된다. 그런데
+        // 조건을 감지하는 하위 시스템 중 일부(코어 피해로 인한 게임오버 등)
+        // 는 State Authority를 가진 클라이언트에서만 돌기 때문에, 여기서
+        // 곧바로 상태를 바꾸면 같은 방의 다른 플레이어는 전환 자체를 영영
+        // 받지 못해 미션 배너/맵 구성 요소가 처음 상태 그대로 멈춰 있는
+        // 것처럼 보인다.
+        //
+        // DreamlandProgressSync(방마다 하나씩 존재하는 네트워크 동기화
+        // 다리)가 있으면 실제 전환은 그쪽에 위임하고, 모든 클라이언트에
+        // 값이 복제된 뒤 ApplyNetworkedState()를 통해 동시에 적용되게
+        // 한다. 아직 그 다리가 없는 경우(오프라인 단독 테스트 등)에는
+        // 예전처럼 바로 적용한다.
+        if (DreamlandProgressSync.Instance != null)
+        {
+            DreamlandProgressSync.Instance.RequestSetGameFlowState(nextState);
+            return;
+        }
+
+        ApplyNetworkedState(nextState);
+    }
+
+    /// <summary>
+    /// 실제 상태 전환과 OnStateChanged 이벤트 발생은 이 메서드 하나로만
+    /// 이뤄진다. DreamlandProgressSync가 있으면 [Networked] 값이 바뀔
+    /// 때마다 모든 클라이언트에서 이 메서드가 동시에 호출되고, 다리가
+    /// 없으면(오프라인 단독 테스트) ChangeState()가 직접 호출한다.
+    /// </summary>
+    public void ApplyNetworkedState(
+        GameFlowState nextState)
+    {
+        if (currentState == nextState)
+        {
+            return;
+        }
+
         GameFlowState previousState =
             currentState;
 
