@@ -15584,6 +15584,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerJobController
   _CurrentJob: 0
+  _CurrentPlayMode: 0
   modelPolice: {fileID: 5744339855560737236}
   modelFirefighter: {fileID: 8146833931159017438}
   modelChef: {fileID: 8152597429451865991}
@@ -15603,6 +15604,14 @@ MonoBehaviour:
   weaponChefGripRotationOffset: {x: 0, y: -70, z: 0}
   weaponBuilderGripOffset: {x: 0.66, y: -1.6, z: 2.2}
   weaponBuilderGripRotationOffset: {x: 0, y: 0, z: 0}
+  weaponPolicePcOffset: {x: 0.25, y: -0.2, z: 0.45}
+  weaponPolicePcRotationOffset: {x: 0, y: 0, z: 0}
+  weaponFirefighterPcOffset: {x: 0.25, y: -0.2, z: 0.45}
+  weaponFirefighterPcRotationOffset: {x: 0, y: 0, z: 0}
+  weaponChefPcOffset: {x: 0.25, y: -0.2, z: 0.45}
+  weaponChefPcRotationOffset: {x: 0, y: 0, z: 0}
+  weaponBuilderPcOffset: {x: 0.25, y: -0.2, z: 0.45}
+  weaponBuilderPcRotationOffset: {x: 0, y: 0, z: 0}
   dirtPrefab: {fileID: 6378157156313051141, guid: a2bce693e5de14482bc5aa783a92cd6e, type: 3}
   shovelFirePoint: {fileID: 5664976912871970265}
   dirtParticleSystem: {fileID: 822629922512071290}
@@ -15614,6 +15623,10 @@ MonoBehaviour:
   dirtShardCount: 6
   horizontalSpreadAngle: 12
   verticalSpreadAngle: 5
+  dirtAimDistance: 20
+  dirtAimMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
   shardUpwardForce: 3
   shardScaleMultiplierRange: {x: 0.75, y: 1.05}
   firstShardDamage: 6
@@ -15621,6 +15634,15 @@ MonoBehaviour:
   maxShotDamagePerEnemy: 15
   xrActivateAction: {fileID: 0}
   xrInputActionAsset: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  localFirefighterGrip:
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+  localChefGrip:
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+  localBuilderGrip:
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
 --- !u!95 &6790173718373879798
 Animator:
   serializedVersion: 7
@@ -15681,6 +15703,7 @@ MonoBehaviour:
   - {fileID: 4808250408771500888}
   - {fileID: 4235806723926247938}
   - {fileID: 6807834408968592922}
+  - {fileID: 7315928461034278850}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &554572265021740435
 CharacterController:
@@ -18098,7 +18121,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5388885321838473145, guid: 164d1a1e0c76c47a1b6dd0845a841623, type: 3}
       propertyPath: playerCamera
-      value:
+      value: 
       objectReference: {fileID: 1580302067779740869}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
