@@ -67,6 +67,19 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
     {
         Instance = this;
 
+        // 이 오브젝트는 로비 씬에서 딱 한 번 스폰되고 Dreamland_map_3로 씬이
+        // 바뀐 뒤에도 계속 살아있어야 한다(그래야 두 씬의 CoreState/
+        // DreamlandGameFlowController를 계속 이어줄 수 있다). RoomManager와
+        // NetworkRunner는 DontDestroyOnLoad로 보호되는데 이 오브젝트는 그런
+        // 보호가 없어서, 씬 전환 때(Unity가 이전 씬을 언로드하면서) 파괴되고
+        // Instance가 null로 돌아가 버릴 수 있었다 - 그러면 아래 두 값이
+        // 조용히 "로컬 전용" 예전 동작으로 폴백해서, 이 오브젝트를 스폰한
+        // 클라이언트(주로 첫 번째로 들어온 플레이어) 화면만 정상 진행되고
+        // 나머지 플레이어는 게임 진행이 멈춘 것처럼 보이는 버그로 이어졌다.
+        // 매 클라이언트가 이 콜백을 받을 때(스폰한 쪽이든, 나중에 복제받은
+        // 쪽이든) 자기 로컬 인스턴스를 직접 보호해야 하므로 여기서 건다.
+        DontDestroyOnLoad(gameObject);
+
         // 로비에서 막 스폰된 시점에는 아직 게임플레이 씬(Dreamland_map_3)이
         // 아니라서 CoreState/DreamlandGameFlowController를 찾아도 없다.
         // OnEnteredGameplayScene()이 호출될 때 다시 찾는다.

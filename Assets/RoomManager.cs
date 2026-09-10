@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Fusion;
 using Fusion.Photon.Realtime;
@@ -313,13 +314,45 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         // 시작한다. 이게 없으면 코어 체력/게임 진행 단계(미션 배너, 맵
         // 구성 요소 등장 등)가 State Authority를 가진 클라이언트에서만
         // 바뀌고 다른 플레이어에게는 전혀 전달되지 않는다.
-        FindAnyObjectByType<DreamlandProgressSync>()?.OnEnteredGameplayScene();
+        StartCoroutine(ConnectProgressSyncWhenReady());
 
         // LobbyPlayerState는 LoadGameplayScene()에서 이미 파괴됐으므로,
         // 그때 미리 복사해 둔 값(_pendingJob/_pendingPlayMode)을 사용한다.
         PlayerJob job = _hasPendingJob ? _pendingJob : PlayerJob.Police; // 못 골랐을 경우를 대비한 안전한 기본값
 
         SpawnGameplayCharacter(runner, job, _pendingPlayMode);
+    }
+
+
+    /// <summary>
+    /// 씬 로드가 막 끝난 시점에는 DreamlandProgressSync의 네트워크 복제가
+    /// 아직 이 클라이언트에 도착 안 했을 수 있다(특히 나중에 합류한
+    /// 플레이어이거나 네트워크 지연이 있는 경우). 못 찾으면 몇 프레임
+    /// 재시도해서, 있는데 잠깐 못 찾은 경우까지 최대한 커버한다.
+    /// </summary>
+    private IEnumerator ConnectProgressSyncWhenReady()
+    {
+        const int maxAttempts = 30; // 약 0.5초(고정 프레임 기준) 정도까지 재시도.
+
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            DreamlandProgressSync sync =
+                FindAnyObjectByType<DreamlandProgressSync>(FindObjectsInactive.Include);
+
+            if (sync != null)
+            {
+                sync.OnEnteredGameplayScene();
+                yield break;
+            }
+
+            yield return null;
+        }
+
+        Debug.LogWarning(
+            "[RoomManager] DreamlandProgressSync를 찾지 못해 게임 진행 상태 동기화를 " +
+            "연결하지 못했습니다. 이 클라이언트는 코어 체력/게임 진행 단계가 " +
+            "다른 플레이어와 어긋날 수 있습니다.",
+            this);
     }
 
 
