@@ -164,9 +164,12 @@ public sealed class Stage2Director : MonoBehaviour
         completionEventRaised = false;
         currentPhaseLabel = "Stage 2 준비";
 
-        missionUI?.ClearPersistentText();
-        missionUI?.SetObjective(string.Empty);
-        missionUI?.SetProgress(string.Empty);
+        if (missionUI != null)
+        {
+            missionUI.ClearPersistentText();
+            missionUI.SetObjective(string.Empty);
+            missionUI.SetProgress(string.Empty);
+        }
     }
 
     private void Awake()
