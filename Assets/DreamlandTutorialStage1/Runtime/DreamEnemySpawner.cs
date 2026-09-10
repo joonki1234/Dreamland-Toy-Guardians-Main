@@ -8,7 +8,7 @@ namespace DreamGuardians
 {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(NetworkObject))]
-    public sealed class DreamEnemySpawner : NetworkBehaviour
+    public sealed partial class DreamEnemySpawner : NetworkBehaviour
     {
         // 협동 플레이 동기화: 몬스터는 이제 Runner.Spawn()으로 생성되는
         // 진짜 네트워크 오브젝트다(전에는 Instantiate로 각 클라이언트가

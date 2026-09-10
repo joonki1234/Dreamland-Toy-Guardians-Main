@@ -351,7 +351,6 @@ public sealed class FinalBossDirector : MonoBehaviour
     private GameObject bossObject;
     private EnemyHealth bossHealth;
     private FinalBossAttackController bossAttack;
-    private FinalBossFaceController bossFace;
     private bool bossDefeatedEventRaised;
     private bool bossFailedEventRaised;
     private bool firstPhaseAdvanceTriggered;
@@ -793,10 +792,10 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         // 등장/스토리 연출 중에는 피격되지 않도록 막습니다.
         bossHealth.Configure(bossMaxHealth, false);
+        enemySpawner?.BindBossFace(bossObject.GetComponent<FinalBossFaceController>());
         EnsureBossHitbox();
         IgnorePlayerCollisionsWithBoss();
         bossAttack.PrepareCorruptedVisuals(core);
-        bossFace = bossObject.GetComponent<FinalBossFaceController>();
         SubscribeBossHealth();
     }
 
@@ -990,7 +989,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     {
         if (firstMinionSpawnDelay > 0f)
         {
-            yield return new WaitForSeconds(firstMinionSpawnDelay);
+            yield return WaitForBossSummon(firstMinionSpawnDelay);
         }
 
         while (currentState == FinalBossState.Fighting &&
@@ -1008,17 +1007,48 @@ public sealed class FinalBossDirector : MonoBehaviour
             {
                 if (bossSpawnedEnemies.Count >= maxActiveMinions)
                 {
+                    // Capacity may change after the preparation cue.
+                    if (i == 0) bossObject.GetComponent<FinalBossFaceController>()?.CancelSummon();
                     break;
                 }
 
                 SpawnNextBossMinion();
             }
 
-            yield return new WaitForSeconds(
-                Mathf.Max(0.5f, droneBurstInterval));
+            yield return WaitForBossSummon(Mathf.Max(0.5f, droneBurstInterval));
         }
 
         minionRoutine = null;
+    }
+
+    private bool HasBossMinionCapacity()
+    {
+        int count = 0;
+        foreach (EnemyHealth enemy in bossSpawnedEnemies)
+            if (enemy != null && !enemy.IsDead) count++;
+        return count < maxActiveMinions;
+    }
+
+    private IEnumerator WaitForBossSummon(float duration)
+    {
+        // Keep the existing spawn deadline; prepare only in its final 0.8 seconds.
+        float deadline = Time.time + duration;
+        bool prepared = false;
+        while (Time.time < deadline)
+        {
+            if (!prepared && deadline - Time.time <= 0.8f && bossObject != null &&
+                droneEnemyPrefab != null && enemySpawner != null &&
+                HasBossMinionCapacity())
+            {
+                float angle = minionSpawnIndex * 137.5f * Mathf.Deg2Rad;
+                Vector3 target = bossObject.transform.position +
+                    new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * minionSpawnRadius +
+                    Vector3.up * droneSpawnHeight;
+                bossObject.GetComponent<FinalBossFaceController>()?.BeginSummonPrepare(target);
+                prepared = true;
+            }
+            yield return null;
+        }
     }
 
     private void SpawnNextBossMinion()
@@ -1059,6 +1089,8 @@ public sealed class FinalBossDirector : MonoBehaviour
                 ? Quaternion.LookRotation(faceDirection.normalized, Vector3.up)
                 : Quaternion.identity;
 
+        FinalBossFaceController face = bossObject.GetComponent<FinalBossFaceController>();
+        face?.SetExpression(FinalBossFaceController.Expression.SummonActivate);
         EnemyHealth spawned = enemySpawner.SpawnCombatEnemyAtPosition(
             spawnPosition,
             rotation,
@@ -1068,9 +1100,9 @@ public sealed class FinalBossDirector : MonoBehaviour
         if (spawned != null)
         {
             bossSpawnedEnemies.Add(spawned);
-            // One face reaction for all successful spawns in this frame's burst.
-            bossFace?.PlaySummon();
+            face?.SetExpression(FinalBossFaceController.Expression.SummonEnd);
         }
+        else face?.CancelSummon();
 
         bossAttack?.PlaySummonPulse();
         CreateSummonBurst(spawnPosition);
@@ -1154,6 +1186,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     private IEnumerator BossDefeatRoutine()
     {
         currentState = FinalBossState.Defeating;
+        bossObject?.GetComponent<FinalBossFaceController>()?.ShowDeath();
 
         DisableBossColliders();
         missionUI?.ClearPersistentText();
@@ -1192,7 +1225,8 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         if (bossObject != null && defeatVisualDuration > 0f)
         {
-            bossFace?.BeginCleanse(defeatVisualDuration);
+            FinalBossFaceController face = bossObject.GetComponent<FinalBossFaceController>();
+            face?.SetCleanseProgress(0f);
             Vector3 startScale = bossObject.transform.localScale;
             Vector3 startPosition = bossObject.transform.position;
             float elapsed = 0f;
@@ -1202,6 +1236,7 @@ public sealed class FinalBossDirector : MonoBehaviour
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / defeatVisualDuration);
                 float remaining = 1f - t;
+                face?.SetCleanseProgress(t);
 
                 bossObject.transform.localScale =
                     startScale * Mathf.Max(0.05f, remaining);
@@ -1494,6 +1529,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
+                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer ||
                 modelRenderer.name.Contains("Aura") ||
@@ -1746,6 +1782,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
+                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer)
             {
@@ -2242,6 +2279,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private void StopMinionRoutine()
     {
+        bossObject?.GetComponent<FinalBossFaceController>()?.CancelSummon();
         if (minionRoutine == null)
         {
             return;
@@ -2256,6 +2294,9 @@ public sealed class FinalBossDirector : MonoBehaviour
         UnsubscribeBossHealth();
 
         if (bossObject != null)
+            enemySpawner?.UnbindBossFace(bossObject.GetComponent<FinalBossFaceController>());
+
+        if (bossObject != null)
         {
             Destroy(bossObject);
         }
@@ -2263,7 +2304,6 @@ public sealed class FinalBossDirector : MonoBehaviour
         bossObject = null;
         bossHealth = null;
         bossAttack = null;
-        bossFace = null;
     }
 
     private static T GetOrAdd<T>(GameObject target)
