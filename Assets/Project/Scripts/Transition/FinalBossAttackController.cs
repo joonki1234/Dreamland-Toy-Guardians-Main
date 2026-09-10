@@ -94,21 +94,23 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private float spinLungeDistance = 0.8f;
 
     [Header("검은 에너지탄 (패턴 2, HP 2/3부터 등장)")]
-    [Tooltip("에너지탄이 소환되는 높이(상자 기준 위쪽 오프셋)")]
+    [Tooltip(
+        "에너지탄 소환 높이를 오라 높이(auraRuntimeHeightOffset, 이미 보스의 " +
+        "실제 렌더러 바운드 기준으로 보정된 값)에 곱하는 배율. 1이면 오라와 같은 높이.")]
     [SerializeField, Min(0f)]
-    private float boltSpawnHeightOffset = 1.2f;
+    private float boltSpawnHeightOffset = 1f;
 
-    [Tooltip("에너지탄 시각적 크기(반지름)")]
-    [SerializeField, Min(0.05f)]
-    private float boltVisualRadius = 0.32f;
+    [Tooltip("오라 반지름(auraRuntimeRadius) 대비 에너지탄 크기 비율")]
+    [SerializeField, Min(0.02f)]
+    private float boltVisualRadius = 0.15f;
 
     [Tooltip("발사 지점에서 목표(플레이어)까지 날아가는 시간")]
     [SerializeField, Min(0.1f)]
     private float boltTravelDuration = 1.05f;
 
-    [Tooltip("도착 시 코어에 들어가는 피해 배율. 1이면 슬램/스핀과 동일한 coreDamage.")]
+    [Tooltip("도착 시 코어에 들어가는 고정 피해량 (coreDamage와 무관한 절대값).")]
     [SerializeField, Min(0f)]
-    private float boltCoreDamageMultiplier = 0.6f;
+    private float boltCoreDamage = 5f;
 
     // 슬램/스핀 이펙트와 같은 이유로(런타임에 GetOrAdd로 붙는 컴포넌트라
     // 프리팹 자체에 직접 참조를 못 넣음) Director가 넘겨준다. 비워두면
@@ -116,6 +118,30 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private GameObject darkBoltImpactEffectPrefab;
     private AudioClip darkBoltLaunchSfx;
     private AudioClip darkBoltImpactSfx;
+    private GameObject activeDarkBolt;
+
+    [Header("박치기 돌진 (패턴 3, HP 1/3 이하 - 근접 로봇 적의 박치기를 그대로 가져옴)")]
+    [SerializeField, Min(0f)]
+    private float headbuttWindupDuration = 0.3f;
+
+    [SerializeField, Min(0.05f)]
+    private float headbuttLungeDuration = 0.22f;
+
+    [SerializeField, Min(0.05f)]
+    private float headbuttRecoverDuration = 0.5f;
+
+    [Tooltip("오라 반지름(auraRuntimeRadius) 대비 뒤로 빼는(윈드백) 거리 비율")]
+    [SerializeField, Min(0f)]
+    private float headbuttWindbackRadiusRatio = 0.25f;
+
+    [Tooltip("오라 반지름(auraRuntimeRadius) 대비 돌진 거리 비율. 코어와의 실제 거리보다 " +
+             "크면 코어를 지나치지 않도록 자동으로 줄어든다.")]
+    [SerializeField, Min(0.05f)]
+    private float headbuttLungeRadiusRatio = 0.6f;
+
+    [Tooltip("도착 시 코어에 들어가는 고정 피해량 (coreDamage와 무관한 절대값).")]
+    [SerializeField, Min(0f)]
+    private float headbuttCoreDamage = 5f;
 
     [Header("오염된 보스 색상")]
     [SerializeField]
@@ -357,16 +383,24 @@ public sealed class FinalBossAttackController : MonoBehaviour
         FaceDirection(toCore);
         UpdateRageMotion();
 
+        bool inMeleeRange = toCore.magnitude <= attackRange;
+
         // 기존처럼 전투 시작과 동시에 코어까지 자동 이동하지 않습니다.
         // HP가 1/3씩 감소할 때 Director가 AdvanceTowardCore를 호출합니다.
-        if (toCore.magnitude > attackRange)
+        // 순수 근접인 슬램/스핀(0페이즈)만 근접 범위(attackRange)가 필요하다.
+        // 검은 에너지탄(1페이즈, HP 2/3~1/3)은 원거리 공격이라 범위 밖에서도
+        // 나가야 하고, 박치기 돌진(2페이즈, HP 1/3 이하)은 스스로 코어 쪽으로
+        // 돌진해 거리를 좁히는 공격이라 마찬가지로 범위 제한이 필요 없다.
+        // phaseMinimumCoreDistance(7.5)가 attackRange(5.5)보다 커서, 순수 근접
+        // 공격만으로는 정상 플레이에서 아예 발동을 못 할 수 있기 때문이다.
+        if (!inMeleeRange && currentPhaseIndex < 1)
         {
             return;
         }
 
         if (Time.time >= nextAttackTime)
         {
-            StartNextAttack();
+            StartNextAttack(inMeleeRange);
         }
     }
 
@@ -486,6 +520,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
             attackRoutine = null;
             attacking = false;
             transform.localScale = baseScale;
+            DestroyActiveDarkBolt();
         }
 
         phaseRoutine = StartCoroutine(
@@ -633,7 +668,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 turnSpeed * Time.deltaTime);
     }
 
-    private void StartNextAttack()
+    private void StartNextAttack(bool inMeleeRange)
     {
         if (attackRoutine != null)
         {
@@ -647,10 +682,25 @@ public sealed class FinalBossAttackController : MonoBehaviour
             groundY,
             transform.position.z));
 
-        // 패턴 2(검은 에너지탄)는 HP 2/3(첫 페이즈 전환) 이후부터만 순환에
-        // 끼워넣는다 - 그 전까지는 기존 슬램/스핀 두 개만 번갈아 나온다.
-        int patternCount = currentPhaseIndex >= 1 ? 3 : 2;
+        // HP 1/3 이하(2페이즈)부터는 슬램/스핀/에너지탄 대신 박치기 돌진만 나간다.
+        if (currentPhaseIndex >= 2)
+        {
+            attackRoutine = StartCoroutine(HeadbuttLungeRoutine());
+            nextAttackIndex++;
+            return;
+        }
+
+        // 패턴 2(검은 에너지탄)는 HP 2/3~1/3 구간(currentPhaseIndex == 1)에서만
+        // 순환에 끼워넣는다 - 그 전(0)에는 기존 슬램/스핀 두 개만 번갈아 나온다.
+        int patternCount = currentPhaseIndex == 1 ? 3 : 2;
         int pattern = nextAttackIndex % patternCount;
+
+        // 슬램/스핀은 근접 공격이라 attackRange 밖에서는 낼 수 없다 - 그 경우
+        // (1페이즈라는 전제 하에) 원거리 공격인 에너지탄으로 강제 전환한다.
+        if (!inMeleeRange)
+        {
+            pattern = 2;
+        }
 
         if (pattern == 0)
         {
@@ -857,13 +907,17 @@ public sealed class FinalBossAttackController : MonoBehaviour
     {
         face?.PlaySummon();
 
-        // 오라와 같은 이유로(보스 모델이 인스펙터 기본값 기준보다 훨씬 크게
-        // 임포트돼 있음) auraRuntimeSizeScale로 보정하지 않으면 에너지탄이
-        // 거대한 몸체 크기에 비해 점만하게 작아서 거의 안 보인다.
+        // 오라(auraRuntimeHeightOffset/auraRuntimeRadius)는 이미 보스의 실제
+        // 렌더러 바운드를 기준으로 다시 계산된, 검증된 스케일 기준점이다.
+        // 에너지탄도 같은 기준을 그대로 물려받아야지, 별도로 스케일을
+        // 어림잡으면 거대한 몸체 크기에 비해 점만하게 작아 거의 안 보이거나
+        // 반대로 하늘 멀리 엉뚱한 곳에서 튀어나온다.
         Vector3 spawnPosition =
-            transform.position + Vector3.up * (boltSpawnHeightOffset * auraRuntimeSizeScale);
+            transform.position + Vector3.up * (auraRuntimeHeightOffset * boltSpawnHeightOffset);
 
-        GameObject bolt = CreateDarkBoltVisual(spawnPosition, auraRuntimeSizeScale);
+        float boltRadius = auraRuntimeRadius * boltVisualRadius;
+        GameObject bolt = CreateDarkBoltVisual(spawnPosition, boltRadius);
+        activeDarkBolt = bolt;
 
         if (darkBoltLaunchSfx != null)
         {
@@ -877,7 +931,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         Vector3 targetPosition =
             localViewer != null
                 ? localViewer.transform.position
-                : spawnPosition + transform.forward * (6f * auraRuntimeSizeScale);
+                : spawnPosition + transform.forward * (auraRuntimeRadius * 6f);
 
         float elapsed = 0f;
 
@@ -903,8 +957,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
             Destroy(bolt);
         }
 
+        activeDarkBolt = null;
+
         PlayDarkBoltImpactEffects(impactPosition);
-        DamageCore(boltCoreDamageMultiplier);
+        DamageCoreFlat(boltCoreDamage);
         FinishAttack();
     }
 
@@ -912,7 +968,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
     /// 전용 아트가 없어도 항상 뭔가는 보이도록, 검은/보라 발광 구체를
     /// 절차적으로 하나 만든다.
     /// </summary>
-    private GameObject CreateDarkBoltVisual(Vector3 position, float sizeScale)
+    private GameObject CreateDarkBoltVisual(Vector3 position, float worldRadius)
     {
         GameObject bolt = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         bolt.name = "FinalBoss_DarkEnergyBolt";
@@ -923,29 +979,24 @@ public sealed class FinalBossAttackController : MonoBehaviour
             Destroy(boltCollider);
         }
 
-        float scaledRadius = boltVisualRadius * sizeScale;
-
         bolt.transform.position = position;
-        bolt.transform.localScale = Vector3.one * (scaledRadius * 2f);
+        bolt.transform.localScale = Vector3.one * (worldRadius * 2f);
 
         MeshRenderer boltRenderer = bolt.GetComponent<MeshRenderer>();
         if (boltRenderer != null)
         {
             Material boltMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            // Unlit 셰이더는 라이팅/이머시브 계산이 없어서 색 자체를 밝게
-            // 잡아야 화면에서 보인다 - 너무 어두우면(검정에 가까우면) 배경과
-            // 구분이 안 돼서 사실상 안 보이는 것처럼 느껴진다.
-            boltMaterial.color = new Color(0.55f, 0.05f, 0.75f, 1f);
+            boltMaterial.color = new Color(0.02f, 0.02f, 0.02f, 1f);
             boltRenderer.sharedMaterial = boltMaterial;
         }
 
         TrailRenderer trail = bolt.AddComponent<TrailRenderer>();
         trail.time = 0.25f;
-        trail.startWidth = scaledRadius * 1.4f;
+        trail.startWidth = worldRadius * 1.4f;
         trail.endWidth = 0f;
         trail.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-        trail.startColor = new Color(0.55f, 0.05f, 0.75f, 0.8f);
-        trail.endColor = new Color(0.55f, 0.05f, 0.75f, 0f);
+        trail.startColor = new Color(0.02f, 0.02f, 0.02f, 0.85f);
+        trail.endColor = new Color(0.02f, 0.02f, 0.02f, 0f);
 
         return bolt;
     }
@@ -965,6 +1016,96 @@ public sealed class FinalBossAttackController : MonoBehaviour
         {
             AudioSource.PlayClipAtPoint(darkBoltImpactSfx, position, 0.9f);
         }
+    }
+
+    // DarkEnergyBoltRoutine이 외부에서(페이즈 전환, 사망 등) 강제 중단되면
+    // 코루틴 자신의 정리 코드(Destroy(bolt))가 안 돌기 때문에, 날아가던
+    // 구체가 허공에 영원히 남을 수 있다 - 중단하는 쪽에서 같이 치워준다.
+    private void DestroyActiveDarkBolt()
+    {
+        if (activeDarkBolt != null)
+        {
+            Destroy(activeDarkBolt);
+            activeDarkBolt = null;
+        }
+    }
+
+    /// <summary>
+    /// 패턴 3: HP 1/3 이하부터 나가는 최종 공격. EnemyCoreMover의 근접 로봇
+    /// "박치기"(윈드백 → 빠른 돌진 → 충격 → 복귀) 모션을 그대로 가져왔다.
+    /// 슬램/스핀과 달리 스스로 코어 쪽으로 돌진해 거리를 좁히므로 근접
+    /// 범위 밖에서도 발동할 수 있다.
+    /// </summary>
+    private IEnumerator HeadbuttLungeRoutine()
+    {
+        face?.BeginSlam();
+
+        Vector3 restPosition = new Vector3(
+            transform.position.x, groundY, transform.position.z);
+
+        Vector3 toCore = targetCore.transform.position - restPosition;
+        toCore.y = 0f;
+
+        Vector3 direction =
+            toCore.sqrMagnitude > 0.0001f
+                ? toCore.normalized
+                : transform.forward;
+        direction.y = 0f;
+
+        // 오라 반지름 기준으로 뒤로 빼는/돌진하는 거리를 잡되, 코어를 지나쳐
+        // 버리지 않도록 실제 코어까지 거리보다는 항상 작게 clamp한다.
+        float windback = auraRuntimeRadius * headbuttWindbackRadiusRatio;
+        float desiredLunge = auraRuntimeRadius * headbuttLungeRadiusRatio;
+        float safeLunge = Mathf.Max(0.25f, toCore.magnitude - attackRange * 0.5f);
+        float lungeDistance = Mathf.Min(desiredLunge, safeLunge);
+
+        Vector3 windbackPosition = restPosition - direction * windback;
+        Vector3 impactPosition = restPosition + direction * lungeDistance;
+
+        DreamlandCombatFx.SpawnChargeDust(restPosition);
+
+        float elapsed = 0f;
+        float windup = Mathf.Max(0.05f, headbuttWindupDuration);
+        while (elapsed < windup && CanContinueAttack())
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / windup);
+            SetPosition(Vector3.Lerp(restPosition, windbackPosition, t * t));
+            yield return null;
+        }
+
+        elapsed = 0f;
+        float lunge = Mathf.Max(0.05f, headbuttLungeDuration);
+        while (elapsed < lunge && CanContinueAttack())
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / lunge);
+            float fastT = 1f - Mathf.Pow(1f - t, 3f);
+            SetPosition(Vector3.Lerp(windbackPosition, impactPosition, fastT));
+            yield return null;
+        }
+
+        if (CanContinueAttack())
+        {
+            DamageCoreFlat(headbuttCoreDamage);
+            DreamlandCombatFx.SpawnHeadbuttImpact(
+                targetCore.transform.position, direction);
+        }
+
+        elapsed = 0f;
+        float recover = Mathf.Max(0.05f, headbuttRecoverDuration);
+        Vector3 recoverStart = transform.position;
+        while (elapsed < recover && CanContinueAttack())
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / recover);
+            float smooth = t * t * (3f - 2f * t);
+            SetPosition(Vector3.Lerp(recoverStart, restPosition, smooth));
+            yield return null;
+        }
+
+        SetPosition(restPosition);
+        FinishAttack();
     }
 
     private IEnumerator AnimateScale(
@@ -1014,6 +1155,26 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         Debug.Log(
             "[FinalBoss] 선물상자 보스가 코어에 " +
+            appliedDamage.ToString("0.#") +
+            " 피해를 가했습니다.",
+            this);
+    }
+
+    // 에너지탄은 coreDamage(슬램/스핀과 공유하는 값)의 배율이 아니라
+    // 독립적인 고정 피해량을 쓴다.
+    private void DamageCoreFlat(float amount)
+    {
+        if (!CanContinueAttack())
+        {
+            return;
+        }
+
+        float appliedDamage = Mathf.Max(0f, amount);
+
+        targetCore.TakeDamage(appliedDamage);
+
+        Debug.Log(
+            "[FinalBoss] 선물상자 보스가 에너지탄으로 코어에 " +
             appliedDamage.ToString("0.#") +
             " 피해를 가했습니다.",
             this);
@@ -1783,6 +1944,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         {
             StopCoroutine(attackRoutine);
             attackRoutine = null;
+            DestroyActiveDarkBolt();
         }
 
         if (phaseRoutine != null)
