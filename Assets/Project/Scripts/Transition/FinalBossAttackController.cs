@@ -905,8 +905,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
     /// </summary>
     private IEnumerator DarkEnergyBoltRoutine()
     {
-        face?.PlaySummon();
-
         // 오라(auraRuntimeHeightOffset/auraRuntimeRadius)는 이미 보스의 실제
         // 렌더러 바운드를 기준으로 다시 계산된, 검증된 스케일 기준점이다.
         // 에너지탄도 같은 기준을 그대로 물려받아야지, 별도로 스케일을
@@ -1038,7 +1036,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
     /// </summary>
     private IEnumerator HeadbuttLungeRoutine()
     {
-        face?.BeginSlam();
 
         Vector3 restPosition = new Vector3(
             transform.position.x, groundY, transform.position.z);
