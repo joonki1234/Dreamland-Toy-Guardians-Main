@@ -15703,7 +15703,6 @@ MonoBehaviour:
   - {fileID: 4808250408771500888}
   - {fileID: 4235806723926247938}
   - {fileID: 6807834408968592922}
-  - {fileID: 7315928461034278850}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &554572265021740435
 CharacterController:
