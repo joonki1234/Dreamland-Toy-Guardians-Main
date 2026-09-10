@@ -64,7 +64,12 @@ public class ChefWeaponController : MonoBehaviour
 
     public void TriggerAttack(bool dealsDamage = true)
     {
-        if (!isAttacking)
+        // 직업 동기화(OnJobChanged)가 아직 처리되기 전에 공격 RPC가 먼저
+        // 도착하면, 이 프리팹이 아직 비활성 상태라 StartCoroutine이 실패한다
+        // (Unity가 비활성 오브젝트에서는 코루틴을 못 돌림). isActiveAndEnabled로
+        // 그 순간을 걸러내고 조용히 무시한다 - 어차피 아직 준비 안 된 프레임의
+        // 공격이라 처리할 게 없다.
+        if (!isAttacking && isActiveAndEnabled)
         {
             StartCoroutine(WokSwingRoutine(dealsDamage));
         }
