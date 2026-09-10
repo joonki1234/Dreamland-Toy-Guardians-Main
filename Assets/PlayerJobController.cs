@@ -1176,8 +1176,22 @@ public class PlayerJobController : NetworkBehaviour
             // locomotion carries the baseline without becoming controller input.
             editorBaselineControllerPosition = space.InverseTransformPoint(controller.position);
             editorBaselineControllerRotation = Quaternion.Inverse(space.rotation) * controller.rotation;
-            editorBaselineWeaponPosition = localWeaponAnchor.localPosition;
-            editorBaselineWeaponRotation = localWeaponAnchor.localRotation;
+
+            // Weapon baseline must be captured in the SAME origin as the controller
+            // baseline above, not whatever pose the anchor happened to be showing a
+            // moment ago. Before tracking activates, the anchor follows the remote
+            // ("RightHandGripReference"-based) idle pose in ApplyLocalWeaponAnchorPose's
+            // else-branch - a completely different reference point from the controller.
+            // Reusing that stale pose as the weapon baseline while computing every
+            // subsequent delta from the controller's own frame mixed two unrelated
+            // origins: position deltas (near-zero for a rotation-only controller move)
+            // stayed pinned to the old remote-based point while rotation deltas were
+            // still applied on top of it, so the weapon orbited that old point instead
+            // of pivoting around the grip. AlignLocalWeaponToController() already
+            // calibrated the weapon's fixed local offset assuming anchor pose ==
+            // controller pose, so the baseline must match that same assumption here.
+            editorBaselineWeaponPosition = editorBaselineControllerPosition;
+            editorBaselineWeaponRotation = editorBaselineControllerRotation;
             editorWeaponPoseRebased = true;
             editorWeaponPoseRebaseFrame = Time.frameCount;
             // Do not write either Transform on the capture frame.
