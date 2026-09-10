@@ -27,6 +27,16 @@ namespace DreamGuardians
         [SerializeField]
         private Transform playerLookTarget;
 
+        [Header("Fixed Facing (시선 고정)")]
+        [Tooltip(
+            "체크하면 로봇이 '나를 보고 있는 플레이어 카메라' 쪽으로 매번 도는 대신, " +
+            "TalkPoint가 바라보는 방향(= 씬에 배치할 때 미리 정한 '가운데' 방향)을 " +
+            "항상 그대로 바라봅니다. 카메라 기준으로 돌면 플레이어마다 각자 다른 " +
+            "각도에서 로봇을 보게 되어 화면마다 로봇이 다르게 보였는데, 이걸 켜면 " +
+            "모든 플레이어가 같은 각도의 로봇을 보게 됩니다.")]
+        [SerializeField]
+        private bool useFixedFacingDirection = true;
+
         [SerializeField]
         private Transform spawnPoint;
 
@@ -208,15 +218,7 @@ namespace DreamGuardians
                 return;
             }
 
-            if (playerLookTarget == null && Camera.main != null)
-            {
-                playerLookTarget = Camera.main.transform;
-            }
-
-            if (playerLookTarget != null)
-            {
-                RotateTowards(playerLookTarget.position);
-            }
+            RotateTowards(GetBodyFacingTargetPosition());
         }
 
         private void LateUpdate()
@@ -267,6 +269,40 @@ namespace DreamGuardians
             {
                 playerLookTarget = target;
             }
+        }
+
+        /// <summary>
+        /// 로봇 "몸(머리/시선)"이 바라볼 위치를 계산합니다.
+        ///
+        /// useFixedFacingDirection이 켜져 있으면(기본값) 플레이어 카메라와
+        /// 무관하게 TalkPoint가 바라보는 방향을 그대로 사용한다 - 그래서
+        /// 여러 플레이어가 각자 다른 위치/각도에서 보더라도 모두 똑같이
+        /// "가운데(TalkPoint가 향한 방향)"를 보는 로봇을 보게 된다.
+        /// 꺼져 있으면 예전처럼 로컬 플레이어 카메라 쪽을 본다.
+        ///
+        /// 말풍선(Canvas) 자체의 billboard 회전(LateUpdate)은 이 메서드와
+        /// 무관하게 그대로 카메라를 향하게 남겨뒀다 - 말풍선 글자는 읽는
+        /// 사람 화면 기준으로 정면이어야 하기 때문이다.
+        /// </summary>
+        private Vector3 GetBodyFacingTargetPosition()
+        {
+            if (useFixedFacingDirection)
+            {
+                Transform facingReference =
+                    talkPoint != null ? talkPoint : transform;
+
+                return facingReference.position +
+                    facingReference.rotation * Vector3.forward * 10f;
+            }
+
+            if (playerLookTarget == null && Camera.main != null)
+            {
+                playerLookTarget = Camera.main.transform;
+            }
+
+            return playerLookTarget != null
+                ? playerLookTarget.position
+                : transform.position + transform.forward;
         }
 
         /// <summary>
@@ -324,7 +360,7 @@ namespace DreamGuardians
 
         public void LookAtPlayer()
         {
-            if (playerLookTarget == null)
+            if (!useFixedFacingDirection && playerLookTarget == null)
             {
                 return;
             }
@@ -333,7 +369,7 @@ namespace DreamGuardians
             currentRoutine =
                 StartCoroutine(
                     LookAtRoutine(
-                        playerLookTarget.position));
+                        GetBodyFacingTargetPosition()));
         }
 
         /// <summary>
@@ -580,18 +616,8 @@ namespace DreamGuardians
 
         private void FacePlayerImmediately()
         {
-            if (playerLookTarget == null && Camera.main != null)
-            {
-                playerLookTarget = Camera.main.transform;
-            }
-
-            if (playerLookTarget == null)
-            {
-                return;
-            }
-
             Vector3 lookDirection =
-                playerLookTarget.position - transform.position;
+                GetBodyFacingTargetPosition() - transform.position;
             lookDirection.y = 0f;
 
             if (lookDirection.sqrMagnitude > 0.0001f)
@@ -660,10 +686,7 @@ namespace DreamGuardians
             {
                 elapsed += Time.deltaTime;
 
-                if (playerLookTarget != null)
-                {
-                    RotateTowards(playerLookTarget.position);
-                }
+                RotateTowards(GetBodyFacingTargetPosition());
 
                 if (visualRoot != null)
                 {
@@ -1044,11 +1067,8 @@ namespace DreamGuardians
             yield return MoveToRoutine(
                 talkPoint.position);
 
-            if (playerLookTarget != null)
-            {
-                yield return LookAtRoutine(
-                    playerLookTarget.position);
-            }
+            yield return LookAtRoutine(
+                GetBodyFacingTargetPosition());
 
             SetBlend(idleBlend);
             currentRoutine = null;

@@ -181,32 +181,41 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
     private void ResolveReferences()
     {
+        // 기본 FindAnyObjectByType<T>()는 비활성 오브젝트를 찾지 못한다. Road_1~4를
+        // 여는 이 컨트롤러가 정작 Stage1WaveController/DreamRoadRevealController를
+        // 못 찾으면 EnvironmentPreparationRequested 구독 자체가 안 되어, 4방향 길이
+        // 그 클라이언트에서는 영원히 열리지 않는다. 다른 곳과 동일하게
+        // FindObjectsInactive.Include로 통일한다.
         if (stage1WaveController == null)
         {
             stage1WaveController =
                 UnityEngine.Object.FindAnyObjectByType
-                    <Stage1WaveController>();
+                    <Stage1WaveController>(
+                        FindObjectsInactive.Include);
         }
 
         if (stage2WaveController == null)
         {
             stage2WaveController =
                 UnityEngine.Object.FindAnyObjectByType
-                    <Stage2WaveController>();
+                    <Stage2WaveController>(
+                        FindObjectsInactive.Include);
         }
 
         if (roadRevealController == null)
         {
             roadRevealController =
                 UnityEngine.Object.FindAnyObjectByType
-                    <DreamRoadRevealController>();
+                    <DreamRoadRevealController>(
+                        FindObjectsInactive.Include);
         }
 
         if (worldRevealController == null)
         {
             worldRevealController =
                 UnityEngine.Object.FindAnyObjectByType
-                    <DreamWorldRevealController>();
+                    <DreamWorldRevealController>(
+                        FindObjectsInactive.Include);
         }
     }
 
