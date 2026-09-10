@@ -940,10 +940,13 @@ public class PlayerJobController : NetworkBehaviour
 
         if (isLocalVrWeapon && IsLocalPcMode)
         {
-            // 3인칭 카메라라 예전처럼 카메라 자식으로 붙이면 총이 손과 떨어져
-            // 허공에 떠 보인다. 다른 사람 화면에서 이미 잘 맞는 손 앵커에
-            // 그대로 붙여서 로컬 화면도 동일하게 손에 쥔 것처럼 보이게 한다.
-            AttachWeaponToAnchor(weaponPolice, ResolveHandGripAnchor(), weaponPoliceGripOffset, weaponPoliceGripRotationOffset);
+            // PC 모드는 1인칭 시점이다 - 무기를 손 IK 앵커가 아니라 카메라의
+            // 자식으로 그대로 붙여서, 시점이 어느 방향으로 돌아가든 항상 화면
+            // 우측 같은 자리에 무기가 고정되어 보이게 한다(2026-08-20 무렵
+            // 시스템과 동일). 이걸 손 앵커(AttachWeaponToAnchor)로 바꾸면
+            // VR 손 IK가 없는 PC 모드에서는 앵커가 안정적으로 움직이지 않아
+            // 시점을 돌릴 때마다 무기가 엉뚱하게 흔들리거나 안 따라온다.
+            AttachWeaponToPcCamera(weaponPolice, weaponPolicePcOffset, weaponPolicePcRotationOffset);
             return;
         }
 
@@ -973,9 +976,15 @@ public class PlayerJobController : NetworkBehaviour
         {
             if (IsLocalPcMode)
             {
-                // 3인칭 카메라라 카메라 자식으로 붙이면 무기가 손과 떨어져 떠
-                // 보인다. 다른 사람 화면에서 쓰는 손 앵커에 그대로 붙인다.
-                AttachWeaponToAnchor(weapon, ResolveHandGripAnchor(), positionOffset, rotationOffsetEuler);
+                // PC 모드는 1인칭 시점이라 무기를 카메라의 자식으로 붙인다 -
+                // 시점이 돌아가도 항상 같은 화면 위치(우측)에 무기가 고정된다.
+                // (손 앵커로 붙이면 VR IK가 없는 PC 모드에서 앵커가 제대로
+                // 움직이지 않아 시점 회전에 무기가 안 따라오거나 흔들린다.)
+                Vector3 pcOffset = weapon == weaponFirefighter ? weaponFirefighterPcOffset
+                    : weapon == weaponChef ? weaponChefPcOffset : weaponBuilderPcOffset;
+                Vector3 pcRotationOffset = weapon == weaponFirefighter ? weaponFirefighterPcRotationOffset
+                    : weapon == weaponChef ? weaponChefPcRotationOffset : weaponBuilderPcRotationOffset;
+                AttachWeaponToPcCamera(weapon, pcOffset, pcRotationOffset);
                 return;
             }
 
