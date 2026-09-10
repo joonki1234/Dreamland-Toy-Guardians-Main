@@ -15494,6 +15494,7 @@ MonoBehaviour:
   targetLayer:
     serializedVersion: 2
     m_Bits: 0
+  playerCamera: {fileID: 1580302067779740869}
 --- !u!1 &3076224963965821132
 GameObject:
   m_ObjectHideFlags: 0
@@ -18095,6 +18096,10 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5388885321838473145, guid: 164d1a1e0c76c47a1b6dd0845a841623, type: 3}
+      propertyPath: playerCamera
+      value:
+      objectReference: {fileID: 1580302067779740869}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

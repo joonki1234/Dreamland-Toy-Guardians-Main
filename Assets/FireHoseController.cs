@@ -13,6 +13,10 @@ public class FireHoseController : MonoBehaviour
     public float waterDamage = 10f;      // 물 데미지
     public LayerMask targetLayer;        // Everything 권장
 
+    [Header("조준 설정 (화면 중앙 크로스헤어 기준)")]
+    [Tooltip("비워두면 기존처럼 호스가 물리적으로 향한 방향(firePoint.forward)으로 물이 나갑니다.")]
+    public Camera playerCamera;
+
     private Coroutine stopRoutine;
     private float defaultSpeed;
     private bool isShooting = false;
@@ -108,9 +112,37 @@ public class FireHoseController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 화면 중앙(크로스헤어) 기준 조준 방향을 구한다. 카메라가 없으면
+    /// 기존처럼 호스가 향한 방향을 그대로 쓴다.
+    /// </summary>
+    private Vector3 ComputeAimShootDirection()
+    {
+        if (playerCamera == null)
+        {
+            return firePoint.forward;
+        }
+
+        Vector3 rayOrigin = playerCamera.transform.position;
+        Vector3 rayDirection = playerCamera.transform.forward;
+
+        Vector3 targetPoint = Physics.Raycast(rayOrigin, rayDirection, out RaycastHit camHit, maxDistance, targetLayer)
+            ? camHit.point
+            : rayOrigin + rayDirection * maxDistance;
+
+        return (targetPoint - firePoint.position).normalized;
+    }
+
     private void ProcessWaterHit()
     {
-        Vector3 shootDirection = firePoint.forward;
+        Vector3 shootDirection = ComputeAimShootDirection();
+
+        // 노즐(물 파티클)도 크로스헤어 방향으로 같이 회전시켜서 실제로
+        // 보이는 물줄기와 데미지 판정 방향을 일치시킨다.
+        if (waterParticle != null)
+        {
+            waterParticle.transform.rotation = Quaternion.LookRotation(shootDirection, Vector3.up);
+        }
 
         if (Physics.Raycast(firePoint.position, shootDirection, out RaycastHit hit, maxDistance, targetLayer))
         {

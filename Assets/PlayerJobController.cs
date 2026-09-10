@@ -137,6 +137,10 @@ public class PlayerJobController : NetworkBehaviour
     [Range(0f, 20f)]
     public float verticalSpreadAngle = 5f;
 
+    [Tooltip("화면 중앙(크로스헤어) 기준으로 흙을 던질 최대 거리/레이어. 산탄 부채꼴의 중심 방향 계산에 쓰인다.")]
+    public float dirtAimDistance = 20f;
+    public LayerMask dirtAimMask = ~0;
+
     [Tooltip("각 파편에 추가되는 위쪽 힘")]
     public float shardUpwardForce = 3f;
 
@@ -564,6 +568,33 @@ public class PlayerJobController : NetworkBehaviour
 
 
     /// <summary>
+    /// 화면 중앙(크로스헤어) 기준 조준 방향을 구한다. 카메라를 못 찾으면
+    /// 기존처럼 삽이 향한 방향을 그대로 쓴다.
+    /// </summary>
+    private Vector3 ComputeDirtAimDirection()
+    {
+        if (cachedLocalPlayerCamera == null)
+        {
+            cachedLocalPlayerCamera = GetComponentInChildren<Camera>(true);
+        }
+
+        if (cachedLocalPlayerCamera == null || shovelFirePoint == null)
+        {
+            return shovelFirePoint != null ? shovelFirePoint.forward : Vector3.forward;
+        }
+
+        Vector3 rayOrigin = cachedLocalPlayerCamera.transform.position;
+        Vector3 rayDirection = cachedLocalPlayerCamera.transform.forward;
+
+        Vector3 targetPoint = Physics.Raycast(rayOrigin, rayDirection, out RaycastHit camHit, dirtAimDistance, dirtAimMask)
+            ? camHit.point
+            : rayOrigin + rayDirection * dirtAimDistance;
+
+        return (targetPoint - shovelFirePoint.position).normalized;
+    }
+
+
+    /// <summary>
     /// 삽질 한 번에 여러 개의 작은 흙 파편을
     /// 처음부터 부채꼴로 흩뿌린다.
     /// </summary>
@@ -593,6 +624,8 @@ public class PlayerJobController : NetworkBehaviour
         }
 
         PlayDirtThrowSfx();
+
+        Vector3 aimDirection = ComputeDirtAimDirection();
 
         int shardCount =
             Mathf.Max(
@@ -644,19 +677,19 @@ public class PlayerJobController : NetworkBehaviour
             Quaternion horizontalRotation =
                 Quaternion.AngleAxis(
                     horizontalAngle,
-                    shovelFirePoint.up
+                    Vector3.up
                 );
 
             Quaternion verticalRotation =
                 Quaternion.AngleAxis(
                     verticalAngle,
-                    shovelFirePoint.right
+                    Vector3.Cross(Vector3.up, aimDirection)
                 );
 
             Vector3 launchDirection =
                 horizontalRotation *
                 verticalRotation *
-                shovelFirePoint.forward;
+                aimDirection;
 
             GameObject dirtShard =
                 Instantiate(
