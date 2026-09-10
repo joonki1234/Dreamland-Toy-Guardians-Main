@@ -25,6 +25,35 @@ public sealed class XRDeviceSimulatorDiagnostics : XRDeviceSimulator
     bool lastRightPressed;
     object lastSelection;
     bool wasSpaceMouseMoving;
+    [SerializeField, Tooltip("Read-only pose snapshots around Space and mouse input. Editor only; enable for reproduction.")]
+    bool tracePoseChain;
+    string previousRenderedPose;
+    int traceThroughFrame = -1;
+    float nextPoseLog;
+    bool explicitFpsPoseInput;
+
+    [ContextMenu("Start Space Down Pose Trace")]
+    void StartSpaceDownPoseTrace()
+    {
+        tracePoseChain = true;
+        previousRenderedPose = null;
+        traceThroughFrame = -1;
+    }
+
+    protected override void ProcessPoseInput()
+    {
+        // Classic defaults to FPS, including after releasing Space/Shift.
+        // That mode orbits both controllers on ordinary mouse movement.
+        // Only explicitly selected controllers/HMD should receive pose input.
+        // Keep base.Update running so device state and controller buttons still update.
+        // U explicitly selects body/FPS manipulation; Tab may explicitly cycle to it.
+        if (toggleManipulateBodyAction?.action?.WasPerformedThisFrame() == true ||
+            cycleDevicesAction?.action?.WasPerformedThisFrame() == true)
+            explicitFpsPoseInput = manipulatingFPS;
+        if (!manipulatingFPS) explicitFpsPoseInput = false;
+        if (!manipulatingFPS || explicitFpsPoseInput)
+            base.ProcessPoseInput();
+    }
 
     protected override void OnEnable()
     {
@@ -34,10 +63,35 @@ public sealed class XRDeviceSimulatorDiagnostics : XRDeviceSimulator
         lastSelection = Selection?.GetValue(this);
         wasSpaceMouseMoving = false;
         nextInputLog = 0f;
+        nextPoseLog = 0f;
+        explicitFpsPoseInput = false;
+        Application.onBeforeRender += TraceRenderedPose;
+    }
+
+    protected override void OnDisable()
+    {
+        Application.onBeforeRender -= TraceRenderedPose;
+        previousRenderedPose = null;
+        traceThroughFrame = -1;
+        base.OnDisable();
     }
 
     protected override void Update()
     {
+        if (tracePoseChain)
+        {
+            var space = Keyboard.current?.spaceKey;
+            bool edge = space != null && (space.wasPressedThisFrame || space.wasReleasedThisFrame);
+            bool mouseStarted = Mouse.current != null && Mouse.current.delta.ReadValue() != Vector2.zero &&
+                Time.unscaledTime >= nextPoseLog;
+            if (edge || mouseStarted)
+            {
+                traceThroughFrame = Time.frameCount + 1;
+                nextPoseLog = Time.unscaledTime + 0.5f;
+                Debug.Log($"[XRSimPose] previous-render {previousRenderedPose ?? "unavailable"}", this);
+            }
+            if (Time.frameCount <= traceThroughFrame) LogPoseChain("before-simulator");
+        }
         bool baseUpdateCompleted = false;
         try
         {
@@ -49,7 +103,81 @@ public sealed class XRDeviceSimulatorDiagnostics : XRDeviceSimulator
             // Observe after the original state application, also if base throws.
             // Do not catch/replace its exception or modify any Action/device state.
             LogInputFrame(baseUpdateCompleted);
+            if (tracePoseChain && Time.frameCount <= traceThroughFrame) LogPoseChain("after-simulator");
         }
+    }
+
+    [BeforeRenderOrder(int.MaxValue)]
+    void TraceRenderedPose()
+    {
+        if (!tracePoseChain) return;
+        previousRenderedPose = PoseChain();
+        if (Time.frameCount <= traceThroughFrame)
+            Debug.Log($"[XRSimPose] after-lateupdate-before-render {previousRenderedPose}", this);
+    }
+
+    void LogPoseChain(string phase) => Debug.Log($"[XRSimPose] {phase} {PoseChain()}", this);
+
+    string PoseChain()
+    {
+        var entries = new List<string>();
+        object internalState = RightState?.GetValue(this);
+        if (internalState is XRSimulatedControllerState rightPose)
+            entries.Add($"internalRight=[trackingP={rightPose.devicePosition.ToString("F5")} " +
+                $"trackingR={rightPose.deviceRotation.ToString("F5")} isTracked={rightPose.isTracked} trackingState={rightPose.trackingState}]");
+        foreach (var device in InputSystem.devices)
+        {
+            if (device is XRSimulatedController controller)
+                entries.Add($"simulated=[{DevicePose(controller)}]");
+            if (device is UnityEngine.InputSystem.XR.XRHMD hmd)
+                entries.Add($"HMDDevice=[deviceId={hmd.deviceId} enabled={hmd.enabled} added={hmd.added} " +
+                    $"trackingP={hmd.devicePosition.ReadValue().ToString("F5")} trackingR={hmd.deviceRotation.ReadValue().ToString("F5")} " +
+                    $"isTracked={hmd.isTracked.isPressed} trackingState={hmd.trackingState.ReadValue()}]");
+        }
+        foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            if (t.name == "Right Controller Target" || t.name == "Left Controller Target")
+                entries.Add($"candidate=[{TransformPose(t)}]");
+        foreach (var follower in Object.FindObjectsByType<VRHandTargetFollower>(FindObjectsInactive.Include))
+        {
+            if (follower.Object == null || !follower.Object.IsValid || !follower.Object.HasInputAuthority) continue;
+            entries.Add($"player=[{TransformPose(follower.transform)}]");
+            foreach (string field in new[] { "hmdTransform", "controllerTrackingOrigin", "rightControllerTarget", "leftControllerTarget", "handTarget", "leftHandTarget" })
+            {
+                var t = typeof(VRHandTargetFollower).GetField(field, PrivateInstance)?.GetValue(follower) as Transform;
+                entries.Add($"{field}=[{TransformPose(t)}]");
+            }
+            var job = follower.GetComponent<PlayerJobController>();
+            if (job != null)
+            {
+                var anchor = typeof(PlayerJobController).GetField("localWeaponAnchor", PrivateInstance)?.GetValue(job) as Transform;
+                var weapon = typeof(PlayerJobController).GetField("activeLocalWeapon", PrivateInstance)?.GetValue(job) as GameObject;
+                entries.Add($"anchor=[{TransformPose(anchor)}] weapon=[{TransformPose(weapon != null ? weapon.transform : null)}]");
+            }
+        }
+        return $"frame={Time.frameCount} spaceDown={Keyboard.current?.spaceKey.wasPressedThisFrame} " +
+            $"simulatorId={InstanceId(this)} simulatorEnabled={isActiveAndEnabled} mouseSpace={mouseTranslateSpace} keyboardSpace={keyboardTranslateSpace} " +
+            $"mode={mouseTransformationMode} selected={Read(Selection, this)} camera=[{TransformPose(cameraTransform)}] " +
+            string.Join(" | ", entries);
+    }
+
+    static string TransformPose(Transform t)
+    {
+        if (t == null) return "missing";
+        string path = t.name;
+        for (var parent = t.parent; parent != null; parent = parent.parent) path = parent.name + "/" + path;
+        var driver = t.GetComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
+        var controls = new List<string>();
+        var action = driver != null ? driver.positionInput.action : null;
+        if (action != null)
+            foreach (var control in action.controls) controls.Add($"{control.path}:deviceId={control.device.deviceId}");
+        return $"id={InstanceId(t)} scene={t.gameObject.scene.name} path={path} parentId={(t.parent != null ? InstanceId(t.parent) : 0)} " +
+            $"activeSelf={t.gameObject.activeSelf} activeInHierarchy={t.gameObject.activeInHierarchy} " +
+            $"cameraEnabled={(t.GetComponent<Camera>() != null ? t.GetComponent<Camera>().enabled.ToString() : "none")} " +
+            $"worldP={t.position.ToString("F5")} worldR={t.rotation.ToString("F5")} " +
+            $"localP={t.localPosition.ToString("F5")} localR={t.localRotation.ToString("F5")} " +
+            $"TPD={(driver != null ? driver.enabled.ToString() : "none")} " +
+            $"ignoreTrackingState={(driver != null ? driver.ignoreTrackingState.ToString() : "none")} " +
+            $"positionControls=[{string.Join(",", controls)}]";
     }
 
     void LogInputFrame(bool baseUpdateCompleted)
@@ -159,7 +287,8 @@ public sealed class XRDeviceSimulatorDiagnostics : XRDeviceSimulator
     }
 
     static string DevicePose(XRSimulatedController device) => device == null ? "missing"
-        : $"id={device.deviceId},name={device.name},added={device.added},rightUsage={HasRightUsage(device)}," +
+        : $"deviceId={device.deviceId},name={device.name},added={device.added},enabled={device.enabled},rightUsage={HasRightUsage(device)}," +
+          $"isTracked={device.isTracked.isPressed},trackingState={device.trackingState.ReadValue()}," +
           $"position={device.devicePosition.ReadValue().ToString("F5")},rotation={device.deviceRotation.ReadValue().ToString("F5")}";
 #endif
 }
