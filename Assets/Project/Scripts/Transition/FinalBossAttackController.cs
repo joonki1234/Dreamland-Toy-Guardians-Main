@@ -93,6 +93,30 @@ public sealed class FinalBossAttackController : MonoBehaviour
     [SerializeField, Min(0f)]
     private float spinLungeDistance = 0.8f;
 
+    [Header("검은 에너지탄 (패턴 2, HP 2/3부터 등장)")]
+    [Tooltip("에너지탄이 소환되는 높이(상자 기준 위쪽 오프셋)")]
+    [SerializeField, Min(0f)]
+    private float boltSpawnHeightOffset = 1.2f;
+
+    [Tooltip("에너지탄 시각적 크기(반지름)")]
+    [SerializeField, Min(0.05f)]
+    private float boltVisualRadius = 0.32f;
+
+    [Tooltip("발사 지점에서 목표(플레이어)까지 날아가는 시간")]
+    [SerializeField, Min(0.1f)]
+    private float boltTravelDuration = 1.05f;
+
+    [Tooltip("도착 시 코어에 들어가는 피해 배율. 1이면 슬램/스핀과 동일한 coreDamage.")]
+    [SerializeField, Min(0f)]
+    private float boltCoreDamageMultiplier = 0.6f;
+
+    // 슬램/스핀 이펙트와 같은 이유로(런타임에 GetOrAdd로 붙는 컴포넌트라
+    // 프리팹 자체에 직접 참조를 못 넣음) Director가 넘겨준다. 비워두면
+    // (null) 절차적으로 만든 기본 구체 하나로만 표현한다.
+    private GameObject darkBoltImpactEffectPrefab;
+    private AudioClip darkBoltLaunchSfx;
+    private AudioClip darkBoltImpactSfx;
+
     [Header("오염된 보스 색상")]
     [SerializeField]
     private Color corruptedBodyColor =
@@ -169,6 +193,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private float nextAttackTime;
     private float rageTime;
     private int nextAttackIndex;
+    private int currentPhaseIndex;
     private bool configured;
     private bool attacking;
     private bool phaseMoving;
@@ -422,11 +447,30 @@ public sealed class FinalBossAttackController : MonoBehaviour
     }
 
     /// <summary>
+    /// Director가 검은 에너지탄(패턴 2) 착탄 이펙트·사운드 프리팹을
+    /// 넘겨줄 때 호출한다. 비워두면 절차적으로 만든 기본 구체만 쓴다.
+    /// </summary>
+    public void ConfigureDarkBoltEffects(
+        GameObject impactEffect,
+        AudioClip launchSfx,
+        AudioClip impactSfx)
+    {
+        darkBoltImpactEffectPrefab = impactEffect;
+        darkBoltLaunchSfx = launchSfx;
+        darkBoltImpactSfx = impactSfx;
+    }
+
+    /// <summary>
     /// 보스 HP 페이즈가 바뀔 때 호출됩니다.
     /// 1페이즈는 뛰어가고, 2페이즈는 회전하며 더 가까이 접근합니다.
     /// </summary>
     public void AdvanceTowardCore(int phaseIndex)
     {
+        // HP 임계값을 넘었다는 사실 자체는 이동 연출이 스킵되더라도(이미
+        // 이동 중이었거나 등) 반영해둬야, 패턴 2(검은 에너지탄)가 그 뒤로
+        // 계속 잠겨있지 않는다.
+        currentPhaseIndex = Mathf.Max(currentPhaseIndex, phaseIndex);
+
         if (!configured ||
             isDead ||
             targetCore == null ||
@@ -603,13 +647,22 @@ public sealed class FinalBossAttackController : MonoBehaviour
             groundY,
             transform.position.z));
 
-        if (nextAttackIndex % 2 == 0)
+        // 패턴 2(검은 에너지탄)는 HP 2/3(첫 페이즈 전환) 이후부터만 순환에
+        // 끼워넣는다 - 그 전까지는 기존 슬램/스핀 두 개만 번갈아 나온다.
+        int patternCount = currentPhaseIndex >= 1 ? 3 : 2;
+        int pattern = nextAttackIndex % patternCount;
+
+        if (pattern == 0)
         {
             attackRoutine = StartCoroutine(SlamAttackRoutine());
         }
-        else
+        else if (pattern == 1)
         {
             attackRoutine = StartCoroutine(SpinAttackRoutine());
+        }
+        else
+        {
+            attackRoutine = StartCoroutine(DarkEnergyBoltRoutine());
         }
 
         nextAttackIndex++;
@@ -793,6 +846,125 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         DamageCore(0.8f);
         FinishAttack();
+    }
+
+    /// <summary>
+    /// 패턴 2: 상자 안에서 검은 에너지탄을 하나 띄워 로컬 플레이어 쪽으로
+    /// 날려보낸다. 실제 피해는 (다른 공격들처럼) 코어에 들어간다 - 플레이어를
+    /// 맞추는 것처럼 보이는 건 순전히 시각적 위협 연출이다.
+    /// </summary>
+    private IEnumerator DarkEnergyBoltRoutine()
+    {
+        face?.PlaySummon();
+
+        // 오라와 같은 이유로(보스 모델이 인스펙터 기본값 기준보다 훨씬 크게
+        // 임포트돼 있음) auraRuntimeSizeScale로 보정하지 않으면 에너지탄이
+        // 거대한 몸체 크기에 비해 점만하게 작아서 거의 안 보인다.
+        Vector3 spawnPosition =
+            transform.position + Vector3.up * (boltSpawnHeightOffset * auraRuntimeSizeScale);
+
+        GameObject bolt = CreateDarkBoltVisual(spawnPosition, auraRuntimeSizeScale);
+
+        if (darkBoltLaunchSfx != null)
+        {
+            AudioSource.PlayClipAtPoint(darkBoltLaunchSfx, spawnPosition, 0.8f);
+        }
+
+        // 잠깐 소환 연출을 보여준 뒤 날아가기 시작한다.
+        yield return new WaitForSeconds(0.25f);
+
+        Camera localViewer = NetworkPlayerMovement.LocalPlayerCamera;
+        Vector3 targetPosition =
+            localViewer != null
+                ? localViewer.transform.position
+                : spawnPosition + transform.forward * (6f * auraRuntimeSizeScale);
+
+        float elapsed = 0f;
+
+        while (elapsed < boltTravelDuration && CanContinueAttack())
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / boltTravelDuration);
+            t = t * t * (3f - 2f * t);
+
+            if (bolt != null)
+            {
+                bolt.transform.position =
+                    Vector3.Lerp(spawnPosition, targetPosition, t);
+            }
+
+            yield return null;
+        }
+
+        Vector3 impactPosition = bolt != null ? bolt.transform.position : targetPosition;
+
+        if (bolt != null)
+        {
+            Destroy(bolt);
+        }
+
+        PlayDarkBoltImpactEffects(impactPosition);
+        DamageCore(boltCoreDamageMultiplier);
+        FinishAttack();
+    }
+
+    /// <summary>
+    /// 전용 아트가 없어도 항상 뭔가는 보이도록, 검은/보라 발광 구체를
+    /// 절차적으로 하나 만든다.
+    /// </summary>
+    private GameObject CreateDarkBoltVisual(Vector3 position, float sizeScale)
+    {
+        GameObject bolt = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        bolt.name = "FinalBoss_DarkEnergyBolt";
+
+        Collider boltCollider = bolt.GetComponent<Collider>();
+        if (boltCollider != null)
+        {
+            Destroy(boltCollider);
+        }
+
+        float scaledRadius = boltVisualRadius * sizeScale;
+
+        bolt.transform.position = position;
+        bolt.transform.localScale = Vector3.one * (scaledRadius * 2f);
+
+        MeshRenderer boltRenderer = bolt.GetComponent<MeshRenderer>();
+        if (boltRenderer != null)
+        {
+            Material boltMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            // Unlit 셰이더는 라이팅/이머시브 계산이 없어서 색 자체를 밝게
+            // 잡아야 화면에서 보인다 - 너무 어두우면(검정에 가까우면) 배경과
+            // 구분이 안 돼서 사실상 안 보이는 것처럼 느껴진다.
+            boltMaterial.color = new Color(0.55f, 0.05f, 0.75f, 1f);
+            boltRenderer.sharedMaterial = boltMaterial;
+        }
+
+        TrailRenderer trail = bolt.AddComponent<TrailRenderer>();
+        trail.time = 0.25f;
+        trail.startWidth = scaledRadius * 1.4f;
+        trail.endWidth = 0f;
+        trail.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+        trail.startColor = new Color(0.55f, 0.05f, 0.75f, 0.8f);
+        trail.endColor = new Color(0.55f, 0.05f, 0.75f, 0f);
+
+        return bolt;
+    }
+
+    private void PlayDarkBoltImpactEffects(Vector3 position)
+    {
+        if (darkBoltImpactEffectPrefab != null)
+        {
+            GameObject impact = Instantiate(
+                darkBoltImpactEffectPrefab,
+                position,
+                Quaternion.identity);
+            Destroy(impact, 4f);
+        }
+
+        if (darkBoltImpactSfx != null)
+        {
+            AudioSource.PlayClipAtPoint(darkBoltImpactSfx, position, 0.9f);
+        }
     }
 
     private IEnumerator AnimateScale(

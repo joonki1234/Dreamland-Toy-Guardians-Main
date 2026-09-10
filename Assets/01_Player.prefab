@@ -15494,6 +15494,7 @@ MonoBehaviour:
   targetLayer:
     serializedVersion: 2
     m_Bits: 0
+  playerCamera: {fileID: 1580302067779740869}
 --- !u!1 &3076224963965821132
 GameObject:
   m_ObjectHideFlags: 0
@@ -15591,15 +15592,15 @@ MonoBehaviour:
   weaponFirefighter: {fileID: 2956109996102229455}
   weaponChef: {fileID: 7022664455085778667}
   weaponBuilder: {fileID: 201037810324020591}
-  weaponPoliceGripOffset: {x: 0.15, y: -0.2, z: 0.16}
+  weaponPoliceGripOffset: {x: 0.17, y: -0.242, z: 0.329}
   weaponPoliceGripRotationOffset: {x: 0, y: 0, z: 0}
   localVrPoliceGripPosition: {x: 0, y: 0, z: 0}
   localVrPoliceGripRotation: {x: 0, y: 0, z: 0}
   policeWeaponAnchor: {fileID: 910000000000000013}
   weaponFirefighterGripOffset: {x: 0.66, y: 0, z: 0.2}
   weaponFirefighterGripRotationOffset: {x: 0, y: 0, z: 0}
-  weaponChefGripOffset: {x: 0, y: 0, z: 0}
-  weaponChefGripRotationOffset: {x: 0, y: 0, z: 0}
+  weaponChefGripOffset: {x: 0.297, y: -0.281, z: 0.578}
+  weaponChefGripRotationOffset: {x: 0, y: -70, z: 0}
   weaponBuilderGripOffset: {x: 0.66, y: -1.6, z: 2.2}
   weaponBuilderGripRotationOffset: {x: 0, y: 0, z: 0}
   dirtPrefab: {fileID: 6378157156313051141, guid: a2bce693e5de14482bc5aa783a92cd6e, type: 3}
@@ -18095,6 +18096,10 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5388885321838473145, guid: 164d1a1e0c76c47a1b6dd0845a841623, type: 3}
+      propertyPath: playerCamera
+      value:
+      objectReference: {fileID: 1580302067779740869}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

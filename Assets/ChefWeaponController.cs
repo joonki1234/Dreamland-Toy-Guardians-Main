@@ -26,9 +26,15 @@ public class ChefWeaponController : MonoBehaviour
     public float attackCooldown = 0.5f;       // 공격 쿨타임
 
     [Header("음식 발사 물리 설정")]
-    public float launchForce = 14f;           
-    public float upwardForce = 8f;            
+    public float launchForce = 14f;
+    public float upwardForce = 8f;
     public float torqueAmount = 12f;
+
+    [Header("조준 설정 (화면 중앙 크로스헤어 기준)")]
+    [Tooltip("비워두면 기존처럼 foodSpawnPoint가 향한 방향으로 음식이 나갑니다.")]
+    public Camera playerCamera;
+    public float aimDistance = 20f;
+    public LayerMask aimMask = ~0;
 
     [Header("웍질 효과음")]
     [Tooltip("비워두면 Resources/SFX/Chef/pan_swing을 자동으로 불러온다.")]
@@ -166,6 +172,27 @@ public class ChefWeaponController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 화면 중앙(크로스헤어) 기준 조준 방향을 구한다. 카메라가 없으면
+    /// 기존처럼 foodSpawnPoint가 향한 방향을 그대로 쓴다.
+    /// </summary>
+    private Vector3 ComputeAimLaunchDirection()
+    {
+        if (playerCamera == null)
+        {
+            return foodSpawnPoint.forward;
+        }
+
+        Vector3 rayOrigin = playerCamera.transform.position;
+        Vector3 rayDirection = playerCamera.transform.forward;
+
+        Vector3 targetPoint = Physics.Raycast(rayOrigin, rayDirection, out RaycastHit camHit, aimDistance, aimMask)
+            ? camHit.point
+            : rayOrigin + rayDirection * aimDistance;
+
+        return (targetPoint - foodSpawnPoint.position).normalized;
+    }
+
     private void LaunchRandomFood(bool dealsDamage)
     {
         if (foodPrefabs == null || foodPrefabs.Length == 0 || foodSpawnPoint == null)
@@ -195,7 +222,8 @@ public class ChefWeaponController : MonoBehaviour
 
         if (spawnedFood.TryGetComponent<Rigidbody>(out Rigidbody rb))
         {
-            Vector3 launchDirection = (foodSpawnPoint.forward * launchForce) + (Vector3.up * upwardForce);
+            Vector3 aimDirection = ComputeAimLaunchDirection();
+            Vector3 launchDirection = (aimDirection * launchForce) + (Vector3.up * upwardForce);
             rb.AddForce(launchDirection, ForceMode.Impulse);
 
             Vector3 randomTorque = new Vector3(
