@@ -306,6 +306,15 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
         if (activeSceneName != targetSceneName) return;
 
+        // 로비에서 스폰되어 씬이 바뀌어도 유지되는 DreamlandProgressSync에게
+        // "이제 Dreamland_map_3에 도착했다"고 알려준다. 이 클라이언트가
+        // CoreState/DreamlandGameFlowController를 찾아 연결하고, 마스터
+        // 클라이언트라면 방금 로드된 맵의 초기값으로 네트워크 상태를
+        // 시작한다. 이게 없으면 코어 체력/게임 진행 단계(미션 배너, 맵
+        // 구성 요소 등장 등)가 State Authority를 가진 클라이언트에서만
+        // 바뀌고 다른 플레이어에게는 전혀 전달되지 않는다.
+        FindAnyObjectByType<DreamlandProgressSync>()?.OnEnteredGameplayScene();
+
         // LobbyPlayerState는 LoadGameplayScene()에서 이미 파괴됐으므로,
         // 그때 미리 복사해 둔 값(_pendingJob/_pendingPlayMode)을 사용한다.
         PlayerJob job = _hasPendingJob ? _pendingJob : PlayerJob.Police; // 못 골랐을 경우를 대비한 안전한 기본값
