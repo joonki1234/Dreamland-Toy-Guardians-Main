@@ -1,4 +1,3 @@
-using Fusion;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,12 +7,20 @@ using UnityEngine.InputSystem;
 ///
 /// 예전에는 GetSkill(job).Execute(context)를 이 클라이언트에서만 직접 호출했다 -
 /// 그래서 스킬 연출(꿈빛 총/소방차/특제 메뉴/망치)이 스킬을 쓴 사람 화면에만
-/// 보이고 다른 플레이어에게는 전혀 보이지 않았다. PlayerJobController.Attack()의
-/// RPC_PlayAttackEffect와 동일한 패턴으로, RPC로 모든 클라이언트에 "이 직업이
-/// 스킬을 썼다"를 알려서 각자 자기 화면에서 같은 캐릭터의 스킬을 재생하게 한다.
+/// 보이고 다른 플레이어에게는 전혀 보이지 않았다.
+///
+/// 이 클래스는 일부러 NetworkBehaviour가 아니라 그냥 MonoBehaviour로 둔다 -
+/// Photon Fusion은 NetworkObject 프리팹에 새 NetworkBehaviour를 추가하면
+/// 그 프리팹을 에디터에서 다시 열어 저장(bake)해야 하는데, 이 파일은 코드
+/// 편집만으로 반영되는 환경이라 그 bake가 이뤄지지 않는다. 그 상태로 실제로
+/// 실행하면 NetworkObject의 baked NetworkBehaviour 목록이 어긋나 스폰/매칭
+/// 자체가 깨질 수 있다(로비에서 상대방이 아예 인식되지 않는 등). 그래서 RPC는
+/// 이미 정상적으로 baked돼 있는 PlayerJobController(NetworkBehaviour)에게
+/// 맡기고, 이 클래스는 PlayerJobController.RequestJobSkillExecute(job)을
+/// 호출만 하는 순수 로컬 컨트롤러로 남긴다.
 /// </summary>
 [RequireComponent(typeof(PlayerJobController))]
-public sealed class PlayerJobSkillController : NetworkBehaviour
+public sealed class PlayerJobSkillController : MonoBehaviour
 {
     [Header("직업 정보")]
     [SerializeField] private PlayerJobController jobController;
@@ -116,23 +123,20 @@ public sealed class PlayerJobSkillController : NetworkBehaviour
         }
 
         // 쿨타임/IsActive 판정은 실제로 스킬을 쓴 사람의 클라이언트에서만
-        // 한 번 확인한다(로컬 전용). RPC 쪽에서 다시 검사하지 않는 이유는
-        // RPC가 이미 이 검사를 통과한 뒤에만 보내지기 때문이다.
-        RPC_ExecuteJobSkill(job);
+        // 한 번 확인한다(로컬 전용). jobController 쪽에서 다시 검사하지
+        // 않는 이유는 RPC가 이미 이 검사를 통과한 뒤에만 보내지기 때문이다.
+        jobController.RequestJobSkillExecute(job);
         SetReadyTime(job, now + GetCooldown(job));
         return true;
     }
 
-    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
-    private void RPC_ExecuteJobSkill(PlayerJob job)
+    /// <summary>
+    /// PlayerJobController의 RPC_PlayJobSkillEffect가 모든 클라이언트에서
+    /// 호출한다. dealsDamage는 호출한 클라이언트마다 다르게 평가된
+    /// Object.HasInputAuthority 값이다(실제로 스킬을 쓴 사람 화면에서만 true).
+    /// </summary>
+    public void ExecuteSkillLocally(PlayerJob job, bool dealsDamage)
     {
-        // PlayerJobController.RPC_PlayAttackEffect와 동일한 패턴: 이 RPC는
-        // 모든 클라이언트에서 똑같이 실행되지만 Object.HasInputAuthority는
-        // 실제로 스킬을 쓴 사람 화면에서만 true다. 이 값으로 "진짜 피해를
-        // 줄지"를 갈라서, 각자 화면에 보여주기용 연출이 재생되어도 피해가
-        // 인원수만큼 중복으로 들어가지 않게 한다.
-        bool dealsDamage = Object != null && Object.HasInputAuthority;
-
         if (skillOrigin == null || skillDirection == null)
         {
             return;

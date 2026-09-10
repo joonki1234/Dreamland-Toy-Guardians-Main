@@ -391,6 +391,39 @@ public class PlayerJobController : NetworkBehaviour
     }
 
 
+    private PlayerJobSkillController jobSkillController;
+
+    /// <summary>
+    /// PlayerJobSkillController(직업별 P키/Shift+X 스킬)가 호출하는 진입점이다.
+    /// PlayerJobSkillController는 일부러 일반 MonoBehaviour로 남겨뒀기 때문에
+    /// (같은 프리팹에 NetworkBehaviour를 새로 추가하면 Fusion이 프리팹을
+    /// 다시 bake해야 하는데, 코드만 수정하는 이 환경에서는 그게 안 되어
+    /// 매칭/스폰이 깨진다), 이미 정상적으로 동작 중인 PlayerJobController
+    /// (NetworkBehaviour)가 대신 RPC를 보낸다.
+    /// </summary>
+    public void RequestJobSkillExecute(PlayerJob job)
+    {
+        RPC_PlayJobSkillEffect(job);
+    }
+
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void RPC_PlayJobSkillEffect(PlayerJob job)
+    {
+        // RPC_PlayAttackEffect와 동일한 패턴: 모든 클라이언트에서 똑같이
+        // 실행되지만 Object.HasInputAuthority는 실제로 스킬을 쓴 사람
+        // 화면에서만 true라서, 이 값으로 "진짜 피해를 줄지"를 가른다.
+        bool dealsDamage = Object != null && Object.HasInputAuthority;
+
+        if (jobSkillController == null)
+        {
+            jobSkillController = GetComponent<PlayerJobSkillController>();
+        }
+
+        jobSkillController?.ExecuteSkillLocally(job, dealsDamage);
+    }
+
+
     /// <summary>
     /// 소방관의 물줄기는 (한 번 쏘고 끝나는 공격이 아니라) 누르고 있는 동안
     /// 계속 나오는 지속 효과라 RPC_PlayAttackEffect와 분리했다.
