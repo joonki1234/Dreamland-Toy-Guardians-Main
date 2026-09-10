@@ -105,9 +105,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cfa271b89e174ea6b58493d570728a64, type: 3}
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::FinalBossFaceController
-  faceAtlas: {fileID: 0}
-  faceMaterial: {fileID: 0}
+  faceAtlas: {fileID: 2800000, guid: 8f790bdc38d14fb6a31954c9136c49ea, type: 3}
+  faceMaterial: {fileID: 2100000, guid: 3e98f646842d449db07a4ee290308551, type: 2}
   atlasGrid: {x: 4, y: 4}
   faceSize: {x: 0.85, y: 0.8}
   faceOffset: {x: 0, y: 0, z: 0}
-  surfaceOffset: 0.008
+  surfaceOffset: 0.05
