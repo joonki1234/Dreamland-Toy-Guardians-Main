@@ -187,44 +187,7 @@ public class VRHandTargetFollower : NetworkBehaviour
 
         ResolveBodyTransforms();
 
-        // 프리팹에 weight=1로 박혀 있는 팔 IK를 기본값으로 꺼둔다. 로컬 VR
-        // 플레이어만 BindCurrentJobModelIK()/RebindTwoBoneIK()에서 매 프레임
-        // 실제 컨트롤러 타깃으로 다시 켠다. 꺼두지 않으면 PC 모드나 다른
-        // 사람 화면에서 보이는 원격 캐릭터는 아무도 갱신하지 않는 고정된
-        // HandTarget_R 기본 위치로 손목이 계속 당겨져 손목이 꺾여 보인다.
-        DisableHandIkByDefault();
-
         // autoFindControllerTargets and job binding are handled in Spawned().
-    }
-
-    private void DisableHandIkByDefault()
-    {
-        if (rigRoot == null)
-        {
-            return;
-        }
-
-        if (rightHandIkConstraint == null)
-        {
-            Transform t = FindTransformByName(rigRoot, rightHandIkName);
-            if (t != null) rightHandIkConstraint = t.GetComponent<TwoBoneIKConstraint>();
-        }
-
-        if (rightHandIkConstraint != null)
-        {
-            rightHandIkConstraint.weight = 0f;
-        }
-
-        if (leftHandIkConstraint == null)
-        {
-            Transform t = FindTransformByName(rigRoot, leftHandIkName);
-            if (t != null) leftHandIkConstraint = t.GetComponent<TwoBoneIKConstraint>();
-        }
-
-        if (leftHandIkConstraint != null)
-        {
-            leftHandIkConstraint.weight = 0f;
-        }
     }
 
     public override void Spawned()

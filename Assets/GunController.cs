@@ -136,11 +136,10 @@ public class GunController : MonoBehaviour
             return;
         }
 
-        // 3인칭에서는 총구(firePoint)가 화면 중앙 크로스헤어와 다른 곳을
-        // 향할 수 있다 (무기가 손 위치에 붙어있으므로). 카메라 중앙에서
-        // 레이캐스트로 조준점을 구하고, 총구에서 그 지점을 향하도록 방향을
-        // 계산해야 크로스헤어가 가리키는 곳으로 총알이 날아간다.
-        Vector3 shootDirection = ComputeAimShootDirection();
+        // VR에서는 HMD가 아니라 오른손에 고정된 총구가 조준 기준이다.
+        // FirePoint는 Weapon_Police의 자식이므로 Controller -> HandTarget_R ->
+        // Weapon_Police의 회전을 그대로 이어받는다.
+        Vector3 shootDirection = firePoint.forward;
 
         Quaternion bulletRotation =
             Quaternion.LookRotation(
@@ -209,28 +208,6 @@ public class GunController : MonoBehaviour
             bullet,
             Mathf.Max(0.1f, bulletLifetime)
         );
-    }
-
-
-    /// <summary>
-    /// 화면 중앙(크로스헤어) 기준 조준 방향을 구한다. 카메라가 없으면
-    /// 기존처럼 총구가 향한 방향을 그대로 쓴다.
-    /// </summary>
-    private Vector3 ComputeAimShootDirection()
-    {
-        if (playerCamera == null)
-        {
-            return firePoint.forward;
-        }
-
-        Vector3 rayOrigin = playerCamera.transform.position;
-        Vector3 rayDirection = playerCamera.transform.forward;
-
-        Vector3 targetPoint = Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit, aimDistance, aimMask)
-            ? hit.point
-            : rayOrigin + rayDirection * aimDistance;
-
-        return (targetPoint - firePoint.position).normalized;
     }
 
 

@@ -1,78 +1,39 @@
-# Final Boss Face 설정
+# Boss_GiftBox face setup
 
-얼굴은 `FinalBossFaceController`의 로컬 Presentation 기능이다. HP, 데미지,
-판정, 타이밍, 소환, 이동, Fusion 및 사망/클리어 흐름을 변경하지 않는다.
-보스 프리팹 루트에 컴포넌트가 추가되어 있으며 Atlas/Material은 직접 연결한다.
+No placeholder artwork is included. Until both required assets are assigned, the runtime BossFace Quad exists but its Renderer is disabled. The previous sphere eyes and eye Point Light are removed.
 
-## Atlas 제작
+## Assets to supply
 
-- 권장 1024×1024, 4×4, 셀 256×256, RGBA PNG.
-- 배경은 실제 알파 0. 체크무늬나 회색 배경을 픽셀에 굽지 않는다.
-- 눈/입은 흰색 또는 회색조. 셀 경계에 투명 여백을 둔다.
-- 15, 16번 셀은 완전 투명. enum 값은 0~13만 사용한다.
-- 왼쪽 위부터 오른쪽으로, 다음 행으로 읽는다. 재배열하지 않는다.
+- One RGBA face atlas, 4 columns by 4 rows. Suggested size: 1024 x 1024 (256 x 256 per cell).
+- Transparent background; white/grayscale eyes, mouth and teeth so runtime tint can change red to gentle cyan. Keep all expressions aligned with identical face proportions. Leave transparent padding inside each cell to avoid filtering bleed.
+- Import as Texture2D (Default is sufficient), sRGB on, Alpha Is Transparency on, Wrap Clamp, Filter Bilinear. Use Android ASTC with alpha; check readability and mip bleeding on Quest before choosing final compression/mip settings.
+- One material using Universal Render Pipeline/Unlit: Surface Transparent, Alpha blending, Base Color white, Render Face Front, Alpha Clipping off. No lighting, emission feature, Bloom or Point Light is required. Brightness comes from the unlit base color; it does not illuminate nearby objects.
 
-| | 열 1 | 열 2 | 열 3 | 열 4 |
-|---|---|---|---|---|
-| 행 1 | 01 IdlePhase1 | 02 Summon | 03 ApproachPhase2 | 04 IdlePhase2 |
-| 행 2 | 05 ApproachPhase3 | 06 IdlePhase3 | 07 SlamWindup | 08 SlamImpact |
-| 행 3 | 09 Spin | 10 Hit | 11 DeathShock | 12 DeathWeak |
-| 행 4 | 13 CleanseTransition | 14 CleanseGentle | 15 Empty | 16 Empty |
+Cells are read left to right, starting at the TOP row:
 
-UV scale `(0.25, 0.25)`, offset `(index % 4 / 4, (3 - index / 4) / 4)`.
-여기서 index는 0부터 시작하며 행 계산은 정수 나눗셈이다.
+| Row | Column 1 | Column 2 | Column 3 | Column 4 |
+| --- | --- | --- | --- | --- |
+| 1 | IdlePhase1: sharp eyes, evil grin | Summon: wide eyes, broad toothy grin | ApproachPhase2: angry squint, clenched teeth | IdlePhase2: sharper eyes/grin |
+| 2 | ApproachPhase3: asymmetric eyes, manic open grin | IdlePhase3: sustained manic grin | SlamWindup: narrow eyes, clenched teeth | SlamImpact: wide eyes, open mouth |
+| 3 | Spin: one narrow eye, crooked grin | Hit: short wince | DeathShock: startled eyes, broken smile | DeathWeak: drooping eyes, slack mouth |
+| 4 | CleanseTransition: rounded eyes, small mouth | CleanseGentle: soft curved eyes, gentle smile | Unused | Unused |
 
-## Unity 연결
+## Inspector
 
-1. 예: `Assets/Project/Textures/Bosses/FinalBossFaceAtlas.png`에 원본을 추가한다.
-2. Import: Texture Type **Default**, Shape **2D**, sRGB On,
-   Alpha Source **Input Texture Alpha**, Alpha Is Transparency On,
-   Wrap **Clamp**, Filter **Bilinear**, Max Size **1024**, Read/Write Off,
-   Mipmap 우선 **Off**, 원본 검수 Compression **None**. 플랫폼 override도 확인한다.
-3. Material 생성: Shader **Universal Render Pipeline/Unlit**, Surface Transparent,
-   Blending Alpha, Render Face Front, Alpha Clipping Off, Base Color White `(1,1,1,1)`.
-   Base Map에 Atlas를 지정한다.
-4. `Boss_GiftBox.prefab` 루트의 `FinalBossFaceController`에서 Face Atlas와
-   Face Material을 연결한다. Atlas Grid는 `(4,4)`로 고정한다.
-5. Face Local Euler `(90,0,0)`은 기존 모델 pitch `-90`을 보정한다.
-   얼굴은 모델 로컬 -Y 방향(기존 보스 회전 보정 후 앞쪽)을 향한다.
-   카메라를 바라보지 않고 회전/점프/스케일을 부모와 함께 따른다.
+Open Boss_GiftBox.prefab and use its FinalBossFaceController component:
 
-초기값: Face Offset `(0,-0.08,0)`, Face Size `(0.8,0.65)`, Surface Offset `0.015`.
-위치/크기는 모델을 얼굴 좌표계로 변환한 bounds의 비율이다. 리본과 겹치면
-Face Offset의 X/Y 또는 Face Size를 조정하고, 표면에 묻히면 Surface Offset을 조정한다.
-실제 Atlas 연결 후 정면 및 리본 겹침을 플레이 화면에서 검수해야 한다.
+1. Assign Face Atlas and Face Material. The component clones the material once at runtime; it does not modify the asset.
+2. Keep Atlas Grid at 4 x 4 for the layout above.
+3. Face Size is a fraction of the existing root BoxCollider's local X/Z size. Face Offset is a fraction of its local X/Y/Z size. Surface Offset moves the face outward from local -Y. Defaults account for GiftBox's -90-degree X rotation and large import scale.
+4. In Play mode inspect FinalBoss/BossFace. It has one MeshRenderer, no active collider and no light. It follows the box, not the camera. Tune placement from front and side views with the final artwork; runtime Inspector tuning must be copied back to the prefab.
 
-## 동작 및 연결 위치
+## Behavior and validation
 
-- `EnemyHealth.NormalizedHealth` 읽기: HP > 2/3 IdlePhase1,
-  1/3 < HP <= 2/3 IdlePhase2, HP <= 1/3 IdlePhase3.
-- `EnemyHealth.HitRegistered`: Hit 0.12초. `Died`: DeathShock 0.35초 후 DeathWeak.
-- `FinalBossAttackController.PhaseAdvanceRoutine`: 첫/두 번째 접근 시작과 종료.
-- `SlamAttackRoutine`: 준비 시작 및 실제 착지 이펙트 위치에서 SlamImpact 0.12초.
-- `SpinAttackRoutine`: 준비부터 공격 종료까지 Spin.
-- `FinishAttack`, `StopOwnedRoutines`: 공격 표정 해제. 새 접근은 기존 공격 표정을 덮는다.
-- `FinalBossDirector.SpawnNextBossMinion`: spawned != null일 때만 Summon 0.6초.
-  등장/접근 시 재사용되는 PlaySummonPulse에는 연결하지 않는다.
-- `BossDefeatRoutine`: 기존 축소/상승 정화 연출 시작 시 CleanseTransition,
-  해당 연출 진행률 50% 이상에서 CleanseGentle. 기존 연출 시간은 늘리지 않는다.
-  정화가 즉시 시작되거나 연출 시간이 0이면 일부 사망/정화 표정은 보이지 않을 수 있다.
-- 우선순위: Cleanse/Death > SlamImpact/Approach/Attack/Summon > Hit > HP Idle.
-  낮은 우선순위 타이머도 실제 시간에 만료되므로 뒤늦게 재생하지 않는다.
-
-새 얼굴은 런타임 자식 `BossFace`, MeshRenderer 1개, Material 인스턴스 1개,
-Quad mesh 1개를 사용하며 종료 시 정리한다. Collider/Light는 생성하지 않는다.
-새 컴포넌트가 있는 보스에서는 기존 Billboard 눈과 EyeGlowLight를 생성하지 않는다.
-Atlas 또는 Material이 비어 있거나 URP/Unlit이 아니면 얼굴만 숨긴다.
-모델 전용 bounds/색상/히트박스 순회에서는 얼굴을 제외한다.
-RPC나 Networked 필드를 추가하지 않는다. 기존 로컬 보스 이벤트와 EnemyHealth의
-기존 동기화 결과를 표시하며 새로운 공격 이벤트 네트워크 전달을 제공하지 않는다.
-
-## 플레이 검수
-
-- PNG 알파 채널을 확인하고 유색 배경 위에서 눈/입만 보이는지 확인한다.
-- 14개 셀의 위치와 표정이 위 표와 맞고 15/16이 비어 있는지 확인한다.
-- 보스 정면, 리본 겹침, 회전 시 부모 추종, 그림자/빛 미생성을 확인한다.
-- 소환 성공/실패, 두 접근, Slam/Spin, 피격, 사망/정화를 실행한다.
-- 공격 중 Hit가 공격 표정을 덮지 않고 정화 중 다른 이벤트가 덮지 않는지 확인한다.
-- Atlas/Material을 각각 비웠을 때 예외 없이 얼굴만 숨는지 확인한다.
+- Successful minion spawns in the same frame produce one 0.6-second summon response.
+- Actual approach begin/end controls the approach expression; no separate 2.15-second timer predicts movement.
+- Slam windup/impact and spin use existing routine boundaries. Impact lasts 0.12 seconds.
+- Priority: death/cleanse > approach/attack (including summon) > 0.12-second hit > HP idle. Hits do not interrupt an active attack expression; their timer still expires. No delayed hit is replayed after it expires.
+- Death shock lasts 0.18 seconds, then weak face. At the existing defeat shrink loop, cleanse becomes gentle within the first 20% (at most 0.3 seconds), before removal.
+- Verify 2/3 and 1/3 crossings, simultaneous hit/attack, rapid fatal damage, interrupted approach, six-minion bursts, disabled/destroyed boss, and cleanse before shrink makes the face unreadable.
+- Existing combat ranges/timing/networking are unchanged. In the current configuration the approach minimum distance (7.5) exceeds the direct attack range (5.5), so normal play may not reach slam/spin. Do not change combat settings merely to make expressions fire in production.
+- Check Quest 3 stereo visibility, front/back orientation, ribbon overlap, z-fighting, atlas padding, color readability and GPU cost on device. This change does not add network synchronization to existing local boss spawning/events.

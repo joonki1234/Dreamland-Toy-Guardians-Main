@@ -124,28 +124,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
     [SerializeField, Min(0.02f)]
     private float hitFlashDuration = 0.12f;
 
-    [Header("고오스풍 흰 눈")]
-    [SerializeField]
-    private Color eyeColor = new Color(1f, 1f, 1f, 1f);
-
-    [SerializeField, Min(0.05f)]
-    private float eyeSize = 1.3f;
-
-    [Tooltip("눈 크기를 상자 크기의 몇 배까지 키울지입니다. 값을 올리면 상자보다 크고 넓게 벌어질 수 있습니다.")]
-    [SerializeField, Range(0.1f, 0.6f)]
-    private float eyeSizeRatio = 0.28f;
-
-    [Tooltip("두 눈 사이 간격입니다. 1.0을 넘으면 상자 폭보다 넓게 벌어집니다.")]
-    [SerializeField, Range(0.1f, 2f)]
-    private float eyeSpacingRatio = 0.7f;
-
-    [SerializeField, Range(-0.25f, 0.35f)]
-    private float eyeVerticalRatio = 0.08f;
-
-    [Tooltip("눈을 좌우로 반대 방향(\\ /)으로 얼마나 기울일지입니다. 클수록 바깥쪽이 위로 더 치켜올라간 사나운 눈매가 됩니다.")]
-    [SerializeField, Range(0f, 60f)]
-    private float eyeTiltAngle = 25f;
-
     [Header("Director에서 전달되는 전투 수치")]
     [SerializeField]
     private CoreState targetCore;
@@ -183,11 +161,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private ParticleSystem auraParticles;
     private Material auraMaterial;
 
-    private GameObject eyeRoot;
-    private Transform leftEye;
-    private Transform rightEye;
-    private Material eyeMaterial;
-    private Light eyeLight;
+    private FinalBossFaceController face;
 
     // 오라의 실제 크기/위치. auraRadius/auraHeightOffset은 인스펙터 기본값(작은 상자
     // 기준)일 뿐이고, 보스 모델은 매우 큰 스케일로 임포트되어 있어(눈알 배치 주석 참고)
@@ -197,17 +171,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private float auraRuntimeRadius;
     private float auraRuntimeSizeScale = 1f;
 
-    // Camera.main은 이 프로젝트 어디에도 MainCamera 태그가 없어 항상 null입니다.
-    // NetworkPlayerMovement.Spawned()에서 로컬 플레이어의 카메라를 직접 넘겨받아
-    // 눈이 실제 보는 사람을 향하도록 합니다.
-    private static Camera localViewerCamera;
-
-    public static void SetLocalViewerCamera(Camera camera)
-    {
-        localViewerCamera = camera;
-    }
-
-    private FinalBossFaceController Face => GetComponent<FinalBossFaceController>();
+    // Compatibility for the existing player camera registration; faces are model-local now.
+    public static void SetLocalViewerCamera(Camera camera) { }
 
     public bool IsPhaseMoving => phaseMoving;
 
@@ -243,6 +208,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private void OnEnable()
     {
+        if (face != null) face.enabled = true;
         CacheReferences();
         SubscribeToHealth();
 
@@ -251,11 +217,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
         if (auraObject != null)
         {
             auraObject.SetActive(true);
-        }
-
-        if (eyeRoot != null && !isDead)
-        {
-            eyeRoot.SetActive(true);
         }
 
         if (configured)
@@ -267,6 +228,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private void OnDisable()
     {
+        if (face != null) face.enabled = false;
         UnsubscribeFromHealth();
         StopOwnedRoutines();
         RestoreVisualState(false);
@@ -276,10 +238,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
             auraObject.SetActive(false);
         }
 
-        if (eyeRoot != null)
-        {
-            eyeRoot.SetActive(false);
-        }
     }
 
     private void OnDestroy()
@@ -294,22 +252,11 @@ public sealed class FinalBossAttackController : MonoBehaviour
             Destroy(auraMaterial);
         }
 
-        if (eyeRoot != null)
-        {
-            Destroy(eyeRoot);
-        }
-
-        if (eyeMaterial != null)
-        {
-            Destroy(eyeMaterial);
-        }
     }
 
     private void Update()
     {
         UpdateAuraPosition();
-        UpdateEyePresentation();
-        UpdateEyePulse();
 
         if (!configured ||
             isDead ||
@@ -346,19 +293,16 @@ public sealed class FinalBossAttackController : MonoBehaviour
     }
 
     /// <summary>
-    /// 보스가 실제 전투를 시작하기 전, 등장 연출 단계에서 붉은 눈을 먼저 준비합니다.
+    /// 등장 연출 단계에서 상자 앞면에 고정된 얼굴을 준비합니다.
     /// </summary>
     public void PrepareCorruptedVisuals(CoreState core)
     {
         targetCore = core;
         CacheReferences();
         ApplyCorruptedPalette();
-        CreateCorruptedEyes();
-
-        if (eyeRoot != null)
-        {
-            eyeRoot.SetActive(true);
-        }
+        face ??= GetComponent<FinalBossFaceController>();
+        if (face == null) face = gameObject.AddComponent<FinalBossFaceController>();
+        face.Initialize();
     }
 
     /// <summary>
@@ -389,7 +333,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         nextAttackTime = Time.time + firstAttackDelay;
 
-        CreateCorruptedEyes();
+        face ??= GetComponent<FinalBossFaceController>();
+        if (face == null) face = gameObject.AddComponent<FinalBossFaceController>();
+        face.Initialize();
 
         if (targetCore == null)
         {
@@ -463,8 +409,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private IEnumerator PhaseAdvanceRoutine(int phaseIndex)
     {
-        Face?.BeginAction(phaseIndex == 1 ? FinalBossFaceController.Expression.ApproachPhase2 : FinalBossFaceController.Expression.ApproachPhase3);
         phaseMoving = true;
+        face?.BeginApproach(phaseIndex);
         transform.localScale = baseScale;
 
         Vector3 startPosition = transform.position;
@@ -535,8 +481,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
         finalToCore.y = 0f;
         FaceDirection(finalToCore);
 
-        Face?.EndAction();
         phaseMoving = false;
+        face?.EndAction();
         phaseRoutine = null;
         nextAttackTime = Time.time + attackInterval;
     }
@@ -617,7 +563,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private IEnumerator SlamAttackRoutine()
     {
-        Face?.BeginAction(FinalBossFaceController.Expression.SlamWindup);
+        face?.BeginSlam();
         Vector3 startPosition =
             new Vector3(
                 transform.position.x,
@@ -656,7 +602,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         SetPosition(startPosition);
         transform.localScale = baseScale;
 
-        Face?.ShowSlamImpact();
+        face?.SlamImpact();
         PlaySlamImpactEffects(startPosition);
 
         DamageCore(1f);
@@ -732,7 +678,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private IEnumerator SpinAttackRoutine()
     {
-        Face?.BeginAction(FinalBossFaceController.Expression.Spin);
+        face?.BeginSpin();
         PlaySpinChargeEffects();
 
         Vector3 startPosition =
@@ -849,7 +795,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private void FinishAttack()
     {
-        Face?.EndAction();
+        face?.EndAction();
         attackRoutine = null;
         attacking = false;
         nextAttackTime = Time.time + attackInterval;
@@ -941,11 +887,13 @@ public sealed class FinalBossAttackController : MonoBehaviour
             StopCoroutine(flashRoutine);
         }
 
+        face?.PlayHit(hitFlashDuration);
         flashRoutine = StartCoroutine(HitFlashRoutine());
     }
 
     private void HandleDied(EnemyHealth _, DamageInfo __)
     {
+        face?.BeginDeath();
         isDead = true;
         configured = false;
         StopOwnedRoutines();
@@ -958,10 +906,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
             auraParticles.Emit(40);
         }
 
-        if (eyeRoot != null)
-        {
-            eyeRoot.SetActive(false);
-        }
     }
 
     private IEnumerator HitFlashRoutine()
@@ -984,9 +928,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
-                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
-                modelRenderer is LineRenderer)
+                modelRenderer is LineRenderer || modelRenderer.gameObject.name == "BossFace")
             {
                 continue;
             }
@@ -1056,9 +999,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
-                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
-                modelRenderer is LineRenderer)
+                modelRenderer is LineRenderer || modelRenderer.gameObject.name == "BossFace")
             {
                 continue;
             }
@@ -1131,264 +1073,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
     }
 
-    private void CreateCorruptedEyes()
-    {
-        // The atlas overlay replaces the legacy billboard eyes and their light.
-        if (Face != null) return;
-
-        if (eyeRoot != null)
-        {
-            UpdateEyePresentation();
-            return;
-        }
-
-        // Keep the eye rig in world space. The gift-box model is imported with
-        // a very large scale, so parenting the eyes directly to the boss can
-        // make their size or position effectively disappear.
-        eyeRoot = new GameObject("FinalBoss_RedEyes");
-        eyeRoot.layer = gameObject.layer;
-
-        leftEye = CreateEye("LeftEye");
-        rightEye = CreateEye("RightEye");
-
-        GameObject lightObject = new GameObject("EyeGlowLight");
-        lightObject.layer = gameObject.layer;
-        lightObject.transform.SetParent(eyeRoot.transform, false);
-        eyeLight = lightObject.AddComponent<Light>();
-        eyeLight.type = LightType.Point;
-        eyeLight.color = eyeColor;
-        eyeLight.intensity = 2.6f;
-        eyeLight.shadows = LightShadows.None;
-
-        UpdateEyePresentation();
-    }
-
-    private static Mesh cachedSlitEyeMesh;
-
-    /// <summary>
-    /// 둥근 구체 대신, 포켓몬 고오스 같은 뾰족하고 각진 슬릿 모양 눈을
-    /// 절차적으로 만든다. 평평한 카드 형태라 항상 뷰어 카메라를 보도록
-    /// 회전하는 eyeRoot(UpdateEyePresentation)에 얹혀서 정면으로 보인다.
-    /// </summary>
-    private Transform CreateEye(string eyeName)
-    {
-        GameObject eye = new GameObject(eyeName);
-        eye.layer = gameObject.layer;
-        eye.transform.SetParent(eyeRoot.transform, false);
-
-        MeshFilter meshFilter = eye.AddComponent<MeshFilter>();
-        meshFilter.sharedMesh = GetSlitEyeMesh();
-
-        MeshRenderer eyeRenderer = eye.AddComponent<MeshRenderer>();
-        eyeRenderer.sharedMaterial = GetEyeMaterial();
-        eyeRenderer.shadowCastingMode =
-            UnityEngine.Rendering.ShadowCastingMode.Off;
-        eyeRenderer.receiveShadows = false;
-
-        return eye.transform;
-    }
-
-    private static Mesh GetSlitEyeMesh()
-    {
-        if (cachedSlitEyeMesh != null)
-        {
-            return cachedSlitEyeMesh;
-        }
-
-        // 곡선으로 이어지는 초승달/쐐기 모양은 두 눈이 가까워지면
-        // 가운데서 곡선끼리 맞닿아 하트/미소처럼 보이는 문제가 있었다.
-        // 대신 직선 변만 있는 뾰족한 마름모(다이아몬드)로 단순화한다.
-        // 이 모양을 CreateEye()에서 좌우로 반대 방향(예: \ / )으로
-        // 기울여서 사납게 치켜올라간 인상을 낸다. eyeRoot가 항상
-        // 카메라를 보도록 회전하므로 로컬 XY 평면에 평평하게(Z=0)
-        // 만들어도 항상 정면으로 보인다.
-        Vector3[] vertices =
-        {
-            new Vector3(0.6f, 0f, 0f),    // 0: 바깥쪽 뾰족한 끝
-            new Vector3(0.05f, 0.5f, 0f), // 1: 위
-            new Vector3(-0.6f, 0f, 0f),   // 2: 안쪽 뾰족한 끝
-            new Vector3(-0.05f, -0.5f, 0f), // 3: 아래
-        };
-
-        int[] triangles =
-        {
-            0, 1, 2,
-            0, 2, 3,
-        };
-
-        Vector3[] normals = new Vector3[vertices.Length];
-        for (int i = 0; i < normals.Length; i++)
-        {
-            normals[i] = Vector3.back;
-        }
-
-        Mesh mesh = new Mesh { name = "FinalBoss_SlitEye" };
-        mesh.vertices = vertices;
-        mesh.triangles = triangles;
-        mesh.normals = normals;
-        mesh.RecalculateBounds();
-
-        cachedSlitEyeMesh = mesh;
-        return cachedSlitEyeMesh;
-    }
-
-    private void UpdateEyePresentation()
-    {
-        if (eyeRoot == null || leftEye == null || rightEye == null)
-        {
-            return;
-        }
-
-        Bounds bounds = CalculateBossVisualBounds();
-
-        // Prefer the player's view direction so the red eyes are always placed
-        // on the visible face of the box. Fall back to the core direction.
-        Vector3 forward = Vector3.zero;
-        Camera viewerCamera = localViewerCamera;
-        if (viewerCamera != null)
-        {
-            forward = viewerCamera.transform.position - bounds.center;
-        }
-        else if (targetCore != null)
-        {
-            forward = targetCore.AttackTargetPosition - bounds.center;
-        }
-
-        forward.y = 0f;
-        if (forward.sqrMagnitude <= 0.0001f)
-        {
-            forward = transform.forward;
-            forward.y = 0f;
-        }
-        if (forward.sqrMagnitude <= 0.0001f)
-        {
-            forward = Vector3.forward;
-        }
-        forward.Normalize();
-
-        Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
-
-        float faceDepth =
-            Mathf.Abs(forward.x) * bounds.extents.x +
-            Mathf.Abs(forward.z) * bounds.extents.z;
-        float horizontalHalfSpan =
-            Mathf.Abs(right.x) * bounds.extents.x +
-            Mathf.Abs(right.z) * bounds.extents.z;
-
-        float referenceSize = Mathf.Max(
-            0.1f,
-            Mathf.Min(
-                bounds.size.y,
-                Mathf.Max(bounds.size.x, bounds.size.z)));
-        float resolvedEyeSize = Mathf.Max(eyeSize, referenceSize * eyeSizeRatio);
-
-        // eyeSpacingRatio가 1.0을 넘으면 두 눈이 상자 절반 폭(horizontalHalfSpan)보다
-        // 더 넓게 벌어질 수 있다 - 고오스처럼 눈이 몸통 경계를 넘어서는 느낌을 내기 위함.
-        // 마름모 메시는 중심에서 좌우로 0.6*resolvedEyeSize까지 뻗어 있으므로,
-        // 최소 간격을 1.6배로 잡아 둘이 서로 닿지 않게 여유를 둔다.
-        float spacing = Mathf.Max(
-            resolvedEyeSize * 1.6f,
-            horizontalHalfSpan * eyeSpacingRatio);
-
-        float eyeY =
-            bounds.center.y + bounds.extents.y * eyeVerticalRatio;
-        Vector3 eyeCenter =
-            new Vector3(bounds.center.x, eyeY, bounds.center.z) +
-            forward * (faceDepth + resolvedEyeSize * 0.55f + 0.04f);
-
-        eyeRoot.transform.position = eyeCenter;
-        eyeRoot.transform.rotation = Quaternion.LookRotation(forward, Vector3.up);
-
-        leftEye.localPosition = Vector3.left * spacing * 0.5f;
-        rightEye.localPosition = Vector3.right * spacing * 0.5f;
-
-        // 마름모를 좌우로 반대 방향(\ /)으로 기울여서, 바깥쪽이 위로
-        // 치켜올라간 사나운 눈매를 만든다.
-        leftEye.localRotation = Quaternion.Euler(0f, 0f, -eyeTiltAngle);
-        rightEye.localRotation = Quaternion.Euler(0f, 0f, eyeTiltAngle);
-
-        Vector3 eyeScale = new Vector3(
-            resolvedEyeSize,
-            resolvedEyeSize * 0.58f,
-            resolvedEyeSize * 0.34f);
-        // 마름모는 좌우 대칭이라 X 반전은 실루엣에 영향이 없지만,
-        // 관례상 오른쪽 눈을 반전시켜 둔다(비대칭 모양으로 바뀌어도
-        // 자동으로 거울 대칭이 맞도록).
-        leftEye.localScale = eyeScale;
-        rightEye.localScale = new Vector3(-eyeScale.x, eyeScale.y, eyeScale.z);
-
-        if (eyeLight != null)
-        {
-            eyeLight.transform.localPosition =
-                Vector3.forward * resolvedEyeSize * 0.2f;
-            eyeLight.range = Mathf.Max(3f, resolvedEyeSize * 8f);
-        }
-    }
-
-    private Material GetEyeMaterial()
-    {
-        if (eyeMaterial != null)
-        {
-            return eyeMaterial;
-        }
-
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        shader ??= Shader.Find("Unlit/Color");
-        shader ??= Shader.Find("Universal Render Pipeline/Lit");
-        shader ??= Shader.Find("Standard");
-
-        if (shader == null)
-        {
-            return null;
-        }
-
-        eyeMaterial = new Material(shader)
-        {
-            name = "FinalBoss_RedEyes_Runtime",
-            color = eyeColor
-        };
-
-        if (eyeMaterial.HasProperty("_BaseColor"))
-        {
-            eyeMaterial.SetColor("_BaseColor", eyeColor);
-        }
-        if (eyeMaterial.HasProperty("_Color"))
-        {
-            eyeMaterial.SetColor("_Color", eyeColor);
-        }
-        if (eyeMaterial.HasProperty("_EmissionColor"))
-        {
-            eyeMaterial.EnableKeyword("_EMISSION");
-            eyeMaterial.SetColor("_EmissionColor", eyeColor * 7.5f);
-        }
-
-        // 눈이 평평한 슬릿 메시라서, 오른쪽 눈을 좌우 반전(음수 스케일)
-        // 시키면 삼각형 감기 순서가 뒤집혀 뒷면 컬링에 걸려 안 보일 수
-        // 있다. 항상 양면을 그리도록 컬링을 끈다.
-        if (eyeMaterial.HasProperty("_Cull"))
-        {
-            eyeMaterial.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
-        }
-
-        return eyeMaterial;
-    }
-
-    private void UpdateEyePulse()
-    {
-        if (eyeRoot == null)
-        {
-            return;
-        }
-
-        float pulse = 0.94f + Mathf.Sin(Time.time * 7.5f) * 0.06f;
-        eyeRoot.transform.localScale = Vector3.one * pulse;
-
-        if (eyeLight != null)
-        {
-            eyeLight.intensity = 2.3f + Mathf.Sin(Time.time * 8f) * 0.45f;
-        }
-    }
-
     private Bounds CalculateBossVisualBounds()
     {
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
@@ -1397,16 +1081,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         foreach (Renderer modelRenderer in renderers)
         {
-            bool isEyeRenderer =
-                eyeRoot != null &&
-                modelRenderer != null &&
-                modelRenderer.transform.IsChildOf(eyeRoot.transform);
-
             if (modelRenderer == null ||
-                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer ||
-                isEyeRenderer)
+                modelRenderer.gameObject.name == "BossFace")
             {
                 continue;
             }
@@ -1606,7 +1284,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
     private void StopOwnedRoutines()
     {
-        Face?.EndAction();
+        face?.StopCombatPresentation();
         if (attackRoutine != null)
         {
             StopCoroutine(attackRoutine);
@@ -1669,10 +1347,6 @@ public sealed class FinalBossAttackController : MonoBehaviour
         auraRadius = Mathf.Max(0f, auraRadius);
         auraEmissionRate = Mathf.Max(1f, auraEmissionRate);
         hitFlashDuration = Mathf.Max(0.02f, hitFlashDuration);
-        eyeSize = Mathf.Max(0.05f, eyeSize);
-        eyeSizeRatio = Mathf.Clamp(eyeSizeRatio, 0.1f, 0.6f);
-        eyeSpacingRatio = Mathf.Clamp(eyeSpacingRatio, 0.1f, 2f);
-        eyeTiltAngle = Mathf.Clamp(eyeTiltAngle, 0f, 60f);
         coreDamage = Mathf.Max(0f, coreDamage);
         attackInterval = Mathf.Max(0.1f, attackInterval);
         firstAttackDelay = Mathf.Max(0f, firstAttackDelay);

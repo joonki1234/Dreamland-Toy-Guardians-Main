@@ -940,10 +940,7 @@ public class PlayerJobController : NetworkBehaviour
 
         if (isLocalVrWeapon && IsLocalPcMode)
         {
-            // 3인칭 카메라라 예전처럼 카메라 자식으로 붙이면 총이 손과 떨어져
-            // 허공에 떠 보인다. 다른 사람 화면에서 이미 잘 맞는 손 앵커에
-            // 그대로 붙여서 로컬 화면도 동일하게 손에 쥔 것처럼 보이게 한다.
-            AttachWeaponToAnchor(weaponPolice, ResolveHandGripAnchor(), weaponPoliceGripOffset, weaponPoliceGripRotationOffset);
+            AttachWeaponToPcCamera(weaponPolice, weaponPolicePcOffset, weaponPolicePcRotationOffset);
             return;
         }
 
@@ -973,9 +970,11 @@ public class PlayerJobController : NetworkBehaviour
         {
             if (IsLocalPcMode)
             {
-                // 3인칭 카메라라 카메라 자식으로 붙이면 무기가 손과 떨어져 떠
-                // 보인다. 다른 사람 화면에서 쓰는 손 앵커에 그대로 붙인다.
-                AttachWeaponToAnchor(weapon, ResolveHandGripAnchor(), positionOffset, rotationOffsetEuler);
+                Vector3 pcOffset = weapon == weaponFirefighter ? weaponFirefighterPcOffset
+                    : weapon == weaponChef ? weaponChefPcOffset : weaponBuilderPcOffset;
+                Vector3 pcRotationOffset = weapon == weaponFirefighter ? weaponFirefighterPcRotationOffset
+                    : weapon == weaponChef ? weaponChefPcRotationOffset : weaponBuilderPcRotationOffset;
+                AttachWeaponToPcCamera(weapon, pcOffset, pcRotationOffset);
                 return;
             }
 
@@ -1308,12 +1307,6 @@ public class PlayerJobController : NetworkBehaviour
         return null;
     }
 
-    // 무기 프리팹마다 원래 만들어질 때의 스케일이 다르다(예: Chef 프라이팬은
-    // 자식 메시가 40배로 보정돼 있어서 루트 자체는 0.025). 처음 붙는 시점의
-    // 스케일을 기억해뒀다가 그대로 복원해야지, Vector3.one으로 밀어버리면
-    // 그 보정이 깨져서 무기가 엉뚱한 크기로 보인다.
-    private static readonly Dictionary<Transform, Vector3> originalWeaponLocalScales = new Dictionary<Transform, Vector3>();
-
     private static void AttachWeaponToAnchor(
         GameObject weapon,
         Transform gripAnchor,
@@ -1325,16 +1318,10 @@ public class PlayerJobController : NetworkBehaviour
             return;
         }
 
-        if (!originalWeaponLocalScales.TryGetValue(weapon.transform, out Vector3 originalScale))
-        {
-            originalScale = weapon.transform.localScale;
-            originalWeaponLocalScales[weapon.transform] = originalScale;
-        }
-
         if (weapon.transform.parent != gripAnchor)
         {
             weapon.transform.SetParent(gripAnchor, false);
-            weapon.transform.localScale = originalScale;
+            weapon.transform.localScale = Vector3.one;
         }
 
         // 무기마다 원래 피벗 위치가 달라서 (0,0,0)만으로는 다 안 맞는다.

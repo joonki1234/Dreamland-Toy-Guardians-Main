@@ -351,6 +351,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     private GameObject bossObject;
     private EnemyHealth bossHealth;
     private FinalBossAttackController bossAttack;
+    private FinalBossFaceController bossFace;
     private bool bossDefeatedEventRaised;
     private bool bossFailedEventRaised;
     private bool firstPhaseAdvanceTriggered;
@@ -795,6 +796,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         EnsureBossHitbox();
         IgnorePlayerCollisionsWithBoss();
         bossAttack.PrepareCorruptedVisuals(core);
+        bossFace = bossObject.GetComponent<FinalBossFaceController>();
         SubscribeBossHealth();
     }
 
@@ -1066,7 +1068,8 @@ public sealed class FinalBossDirector : MonoBehaviour
         if (spawned != null)
         {
             bossSpawnedEnemies.Add(spawned);
-            bossObject.GetComponent<FinalBossFaceController>()?.ShowSummon();
+            // One face reaction for all successful spawns in this frame's burst.
+            bossFace?.PlaySummon();
         }
 
         bossAttack?.PlaySummonPulse();
@@ -1151,7 +1154,6 @@ public sealed class FinalBossDirector : MonoBehaviour
     private IEnumerator BossDefeatRoutine()
     {
         currentState = FinalBossState.Defeating;
-        bossObject?.GetComponent<FinalBossFaceController>()?.ShowDeath();
 
         DisableBossColliders();
         missionUI?.ClearPersistentText();
@@ -1190,8 +1192,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         if (bossObject != null && defeatVisualDuration > 0f)
         {
-            FinalBossFaceController face = bossObject.GetComponent<FinalBossFaceController>();
-            face?.SetCleanseProgress(0f);
+            bossFace?.BeginCleanse(defeatVisualDuration);
             Vector3 startScale = bossObject.transform.localScale;
             Vector3 startPosition = bossObject.transform.position;
             float elapsed = 0f;
@@ -1201,7 +1202,6 @@ public sealed class FinalBossDirector : MonoBehaviour
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / defeatVisualDuration);
                 float remaining = 1f - t;
-                face?.SetCleanseProgress(t);
 
                 bossObject.transform.localScale =
                     startScale * Mathf.Max(0.05f, remaining);
@@ -1494,7 +1494,6 @@ public sealed class FinalBossDirector : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
-                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer ||
                 modelRenderer.name.Contains("Aura") ||
@@ -1747,7 +1746,6 @@ public sealed class FinalBossDirector : MonoBehaviour
         foreach (Renderer modelRenderer in renderers)
         {
             if (modelRenderer == null ||
-                FinalBossFaceController.IsFaceRenderer(modelRenderer) ||
                 modelRenderer is ParticleSystemRenderer ||
                 modelRenderer is LineRenderer)
             {
@@ -2265,6 +2263,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         bossObject = null;
         bossHealth = null;
         bossAttack = null;
+        bossFace = null;
     }
 
     private static T GetOrAdd<T>(GameObject target)

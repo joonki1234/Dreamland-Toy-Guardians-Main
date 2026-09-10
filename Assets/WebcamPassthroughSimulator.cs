@@ -60,18 +60,10 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     [Tooltip("씬을 시작하자마자 자동으로 MR 모드(웹캠 배경)를 켤지 여부")]
     [SerializeField] private bool startEnabledOnAwake = true;
 
-#if UNITY_EDITOR
-    [Tooltip("사용 가능한 PC 웹캠을 확인한 경우에만 켜세요. 기본값은 Editor 웹캠 시작 차단이며 기기 빌드에는 적용되지 않습니다.")]
-    [SerializeField] private bool allowEditorWebcam;
-#endif
-
     private WebCamTexture webCamTexture;
     private CameraClearFlags originalGameCameraClearFlags;
     private bool originalFlagsCached;
     private bool isRunning;
-    private bool isStarting;
-    private bool startupFailed;
-    private bool nativeStreamError;
 
 
     private void Start()
@@ -89,24 +81,16 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     /// </summary>
     public void EnableMrBackground()
     {
-        if (isRunning || isStarting || startupFailed || !isActiveAndEnabled)
+        if (isRunning)
         {
             return;
         }
-
-#if UNITY_EDITOR
-        // Device enumeration cannot establish that a listed/virtual camera can stream.
-        // Require explicit opt-in before calling the native Play API in the Editor.
-        if (!allowEditorWebcam)
-        {
-            FailStartup("Editor 웹캠 시작을 건너뜁니다. 사용 가능한 장치를 확인한 뒤 Allow Editor Webcam을 켜세요.");
-            return;
-        }
-#endif
 
         if (backgroundImage == null)
         {
-            FailStartup("backgroundImage가 연결되지 않았습니다.");
+            Debug.LogError(
+                "[WebcamPassthroughSimulator] backgroundImage가 연결되지 않았습니다. " +
+                "Inspector에서 화면 전체 크기의 RawImage를 연결하세요.");
             return;
         }
 
@@ -114,7 +98,9 @@ public class WebcamPassthroughSimulator : MonoBehaviour
 
         if (devices.Length == 0)
         {
-            FailStartup("이 PC에서 웹캠을 찾지 못했습니다.");
+            Debug.LogWarning(
+                "[WebcamPassthroughSimulator] 이 PC에서 웹캠을 찾지 못했습니다. " +
+                "웹캠 배경 없이 기존 화면 그대로 진행합니다.");
             return;
         }
 
@@ -132,71 +118,14 @@ public class WebcamPassthroughSimulator : MonoBehaviour
             }
         }
 
-        isStarting = true;
-        Application.logMessageReceived += HandleStartupLog;
-        try
-        {
-            webCamTexture = new WebCamTexture(deviceName, requestedWidth, requestedHeight);
-            webCamTexture.Play();
-        }
-        catch (System.Exception exception)
-        {
-            FailStartup(exception.Message);
-            return;
-        }
-        StartCoroutine(WaitForFirstFrame());
-    }
+        webCamTexture = new WebCamTexture(deviceName, requestedWidth, requestedHeight);
+        backgroundImage.texture = webCamTexture;
+        webCamTexture.Play();
 
-    // Unity's native stream failure is logged rather than necessarily thrown.
-    // Record it only; release the texture outside the logging callback.
-    private void HandleStartupLog(string message, string stackTrace, LogType type)
-    {
-        if (isStarting && message.Contains("Couldn't config the stream") &&
-            (stackTrace.Contains("WebCamTexture") || stackTrace.Contains(nameof(WebcamPassthroughSimulator))))
-            nativeStreamError = true;
-    }
+        isRunning = true;
 
-    private System.Collections.IEnumerator WaitForFirstFrame()
-    {
-        float deadline = Time.realtimeSinceStartup + 5f;
-        while (!nativeStreamError && webCamTexture != null && Time.realtimeSinceStartup < deadline)
-        {
-            if (webCamTexture.isPlaying && webCamTexture.didUpdateThisFrame &&
-                webCamTexture.width > 16 && webCamTexture.height > 16)
-            {
-                Application.logMessageReceived -= HandleStartupLog;
-                isStarting = false;
-                isRunning = true;
-                backgroundImage.texture = webCamTexture;
-                StartCoroutine(FitBackgroundAspectWhenReady());
-                StartCoroutine(ResolveGameCameraAndSetUpUrpStack());
-                yield break;
-            }
-            yield return null;
-        }
-        FailStartup("웹캠 스트림의 첫 프레임을 받지 못했습니다.");
-    }
-
-    private void FailStartup(string reason)
-    {
-        Application.logMessageReceived -= HandleStartupLog;
-        isStarting = false;
-        if (!startupFailed && !nativeStreamError)
-            Debug.LogWarning($"[WebcamPassthroughSimulator] {reason} MR 배경 없이 진행합니다.");
-        startupFailed = true; // Do not retry a failed device on subsequent enable requests.
-        ReleaseWebcam();
-        if (backgroundImage != null) backgroundImage.enabled = false;
-        if (backgroundCamera != null) backgroundCamera.enabled = false;
-        // The game camera has not been changed yet: stacking starts only after a frame arrives.
-    }
-
-    private void ReleaseWebcam()
-    {
-        if (backgroundImage != null) backgroundImage.texture = null;
-        if (webCamTexture == null) return;
-        webCamTexture.Stop();
-        Destroy(webCamTexture);
-        webCamTexture = null;
+        StartCoroutine(FitBackgroundAspectWhenReady());
+        StartCoroutine(ResolveGameCameraAndSetUpUrpStack());
     }
 
 
@@ -334,13 +263,15 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     /// </summary>
     public void EndMrAndSwitchToFullVr()
     {
-        Application.logMessageReceived -= HandleStartupLog;
-        StopAllCoroutines();
-        isStarting = false;
-        ReleaseWebcam();
         if (!isRunning)
         {
             return;
+        }
+
+        if (webCamTexture != null)
+        {
+            webCamTexture.Stop();
+            webCamTexture = null;
         }
 
         if (backgroundImage != null)
@@ -381,8 +312,11 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     }
 
 
-    private void OnDisable()
+    private void OnDestroy()
     {
-        EndMrAndSwitchToFullVr();
+        if (webCamTexture != null)
+        {
+            webCamTexture.Stop();
+        }
     }
 }

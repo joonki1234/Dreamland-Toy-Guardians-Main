@@ -62,10 +62,10 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ae941a212fc22de40b47a60933de5481, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 6109940123412345678}
+      addedObject: {fileID: 8325932977901420293}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ae941a212fc22de40b47a60933de5481, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 8325932977901420293}
+      addedObject: {fileID: 7813451092251892641}
   m_SourcePrefab: {fileID: 100100000, guid: ae941a212fc22de40b47a60933de5481, type: 3}
 --- !u!1 &3477862570842861952 stripped
 GameObject:
@@ -93,7 +93,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.01998034, y: 0.01998034, z: 0.019980337}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &6109940123412345678
+--- !u!114 &7813451092251892641
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -102,13 +102,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 3477862570842861952}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c6d9608daf0147bcb89cd672f3930139, type: 3}
+  m_Script: {fileID: 11500000, guid: cfa271b89e174ea6b58493d570728a64, type: 3}
   m_Name:
-  m_EditorClassIdentifier:
-  faceAtlas: {fileID: 2800000, guid: 8f790bdc38d14fb6a31954c9136c49ea, type: 3}
-  faceMaterial: {fileID: 2100000, guid: 3e98f646842d449db07a4ee290308551, type: 2}
+  m_EditorClassIdentifier: Assembly-CSharp::FinalBossFaceController
+  faceAtlas: {fileID: 0}
+  faceMaterial: {fileID: 0}
   atlasGrid: {x: 4, y: 4}
-  faceLocalEuler: {x: 90, y: 0, z: 0}
-  faceOffset: {x: 0, y: -0.08, z: 0}
-  faceSize: {x: 0.8, y: 0.65}
-  surfaceOffset: 0.015
+  faceSize: {x: 0.85, y: 0.8}
+  faceOffset: {x: 0, y: 0, z: 0}
+  surfaceOffset: 0.008

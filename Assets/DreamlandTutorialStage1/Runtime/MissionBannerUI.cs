@@ -154,8 +154,6 @@ namespace DreamGuardians
 
         public void Configure(Camera targetCamera)
         {
-            if (this == null) return;
-
             uiCamera = targetCamera;
             EnsureUI();
             ApplyCamera();
@@ -166,8 +164,6 @@ namespace DreamGuardians
             string subtitle = "",
             float duration = -1f)
         {
-            if (this == null) return;
-
             EnsureUI();
 
             if (bannerRoutine != null)
@@ -191,8 +187,6 @@ namespace DreamGuardians
             string message,
             float duration = 3f)
         {
-            if (this == null) return;
-
             ShowQuickGuide(speaker, message, duration);
         }
 
@@ -201,8 +195,6 @@ namespace DreamGuardians
             string message,
             float duration = 3f)
         {
-            if (this == null) return;
-
             EnsureUI();
 
             if (guideRoutine != null)
@@ -216,8 +208,6 @@ namespace DreamGuardians
 
         public void SetToyFriendPortrait(Sprite portrait)
         {
-            if (this == null) return;
-
             toyFriendPortrait = portrait;
             if (guidePortrait != null)
             {
@@ -233,8 +223,6 @@ namespace DreamGuardians
 
         public void SetObjective(string message)
         {
-            if (this == null) return;
-
             EnsureUI();
             bool visible = !string.IsNullOrWhiteSpace(message);
             missionPanel.SetActive(visible);
@@ -288,8 +276,6 @@ namespace DreamGuardians
         /// </summary>
         public void SetProgress(string message)
         {
-            if (this == null) return;
-
             EnsureUI();
 
             if (string.IsNullOrWhiteSpace(message))
@@ -349,8 +335,6 @@ namespace DreamGuardians
             int enemyCount,
             string detail = null)
         {
-            if (this == null) return;
-
             EnsureUI();
             combatPanel.SetActive(true);
 
@@ -386,8 +370,6 @@ namespace DreamGuardians
             float current,
             float maximum)
         {
-            if (this == null) return;
-
             EnsureUI();
 
             float safeMax = Mathf.Max(1f, maximum);
@@ -416,8 +398,6 @@ namespace DreamGuardians
 
         public void HideBossHealth()
         {
-            if (this == null) return;
-
             if (bossPanel != null)
             {
                 bossPanel.SetActive(false);
@@ -431,8 +411,6 @@ namespace DreamGuardians
         /// </summary>
         public void SetNextWaveCountdown(float remainingSeconds)
         {
-            if (this == null) return;
-
             EnsureUI();
             waveCountdownPanel.SetActive(true);
             int wholeSeconds = Mathf.Max(0, Mathf.CeilToInt(remainingSeconds));
@@ -441,8 +419,6 @@ namespace DreamGuardians
 
         public void HideNextWaveCountdown()
         {
-            if (this == null) return;
-
             if (waveCountdownPanel != null)
             {
                 waveCountdownPanel.SetActive(false);
@@ -451,8 +427,6 @@ namespace DreamGuardians
 
         public void SetRole(PlayerRole role)
         {
-            if (this == null) return;
-
             // 플레이 화면 하단의 "현재 직업" HUD는 사용하지 않습니다.
             // 기존 호출부와의 호환성을 위해 메서드는 유지하되 화면에는 표시하지 않습니다.
             EnsureUI();
@@ -538,8 +512,6 @@ namespace DreamGuardians
 
         public void ClearPersistentText()
         {
-            if (this == null) return;
-
             SetObjective(string.Empty);
             SetProgress(string.Empty);
             HideBossHealth();
@@ -552,8 +524,6 @@ namespace DreamGuardians
         /// </summary>
         public void HideTransientMessages()
         {
-            if (this == null) return;
-
             if (dialogueRoutine != null)
             {
                 StopCoroutine(dialogueRoutine);
@@ -584,8 +554,6 @@ namespace DreamGuardians
         /// </summary>
         public void BeginToyFriendStoryFocus()
         {
-            if (this == null) return;
-
             EnsureUI();
 
             if (storyFocusRestoreRoutine != null)
@@ -621,8 +589,6 @@ namespace DreamGuardians
         /// </summary>
         public void EndToyFriendStoryFocus(float restoreDelay = 0.40f)
         {
-            if (this == null) return;
-
             if (!storyFocusActive)
             {
                 return;
