@@ -15641,7 +15641,7 @@ MonoBehaviour:
     position: {x: 0, y: 0, z: 0}
     rotation: {x: 0, y: 0, z: 0}
   localBuilderGrip:
-    position: {x: 0, y: 0, z: 0}
+    position: {x: 0, y: 0, z: -0.7006}
     rotation: {x: 0, y: 0, z: 0}
 --- !u!95 &6790173718373879798
 Animator:
