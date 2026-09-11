@@ -17,6 +17,165 @@ namespace DreamGuardians
         // 클라이언트는 그 결과를 그대로 받아서 보게 된다 - 그래야
         // 인원수만큼 몬스터가 중복 생성되지 않는다.
         private RoomManager roomManager;
+        public event Action SkillTutorialRequested;
+        public event Action<bool> SkillTutorialSkipped;
+        private bool skillTutorialTargetsClosed;
+        private bool skillTutorialSpawnErrorLogged;
+
+        public bool TryRequestSkillTutorialSkip(bool startStage1)
+        {
+            if (!IsTutorialSessionReady || !HasRequestedSkillTutorial || skillTutorialTargetsClosed) return false;
+            RPC_RequestSkillTutorialSkip(startStage1);
+            return true;
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_RequestSkillTutorialSkip(bool startStage1)
+        {
+            if (!HasRequestedSkillTutorial || skillTutorialTargetsClosed) return;
+            RPC_CloseSkillTutorialTargets();
+            DespawnSkillTutorialTargets();
+            RPC_ApplySkillTutorialSkip(startStage1);
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_ApplySkillTutorialSkip(bool startStage1)
+        {
+            SkillTutorialSkipped?.Invoke(startStage1);
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_CloseSkillTutorialTargets()
+        {
+            skillTutorialTargetsClosed = true;
+        }
+
+        public bool HasRequestedSkillTutorial { get; private set; }
+        private readonly Dictionary<PlayerRef, Coroutine> skillTargetBindingRoutines =
+            new Dictionary<PlayerRef, Coroutine>();
+
+        public void BeginSkillTutorialAfterPurification()
+        {
+            if (CanSpawnTutorialEnemy && !HasRequestedSkillTutorial)
+                RPC_BeginSkillTutorialAfterPurification();
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_BeginSkillTutorialAfterPurification()
+        {
+            if (HasRequestedSkillTutorial) return;
+            HasRequestedSkillTutorial = true;
+            SkillTutorialRequested?.Invoke();
+        }
+
+        private readonly Dictionary<PlayerRef, NetworkId> skillTutorialTargets =
+            new Dictionary<PlayerRef, NetworkId>();
+
+        public bool HasSkillTutorialTarget(PlayerRef player)
+        {
+            return skillTutorialTargets.TryGetValue(player, out NetworkId id) &&
+                   IsTutorialSessionReady && Runner.TryFindObject(id, out _);
+        }
+
+        public bool HasSkillTutorialTargets => skillTutorialTargets.Count > 0;
+
+        public void SpawnSkillTutorialTarget(PlayerRef player, Vector3 groundPosition)
+        {
+            if (!CanSpawnTutorialEnemy || !HasRequestedSkillTutorial || skillTutorialTargetsClosed) return;
+            if (skillTutorialTargets.TryGetValue(player, out NetworkId existingId))
+            {
+                if (Runner.TryFindObject(existingId, out _)) return;
+                // The previous master may have left before its target replicated.
+                RPC_ForgetSkillTutorialTarget(player);
+            }
+            if (enemyPrefab == null || enemyPrefab.GetComponent<EnemyHealth>() == null ||
+                enemyPrefab.GetComponent<NetworkObject>() == null)
+            {
+                if (!skillTutorialSpawnErrorLogged)
+                    Debug.LogError("[SkillTutorial] Tutorial enemy prefab requires EnemyHealth and NetworkObject.", this);
+                skillTutorialSpawnErrorLogged = true;
+                return;
+            }
+            EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
+                Quaternion.identity, true, 0.4f, null, null, false);
+            if (target == null)
+            {
+                if (!skillTutorialSpawnErrorLogged)
+                    Debug.LogError("[SkillTutorial] Could not spawn the network tutorial target.", this);
+                skillTutorialSpawnErrorLogged = true;
+                return;
+            }
+            RPC_RegisterSkillTutorialTarget(player, target.Object.Id);
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_RegisterSkillTutorialTarget(PlayerRef player, NetworkId id)
+        {
+            if (skillTutorialTargets.ContainsKey(player)) return;
+            skillTutorialTargets[player] = id;
+            skillTargetBindingRoutines[player] = StartCoroutine(BindSkillTutorialTarget(player, id));
+        }
+
+        private IEnumerator BindSkillTutorialTarget(PlayerRef player, NetworkId id)
+        {
+            // RPC and object replication can arrive in either order. Configure only this instance.
+            while (skillTutorialTargets.ContainsKey(player) && IsTutorialSessionReady)
+            {
+                if (Runner.TryFindObject(id, out NetworkObject target))
+                {
+                    EnemyHealth health = target.GetComponent<EnemyHealth>();
+                    if (health != null) health.Configure(baseEnemyHealth * 0.4f, false);
+                    EnemyCoreMover mover = target.GetComponent<EnemyCoreMover>();
+                    if (mover != null)
+                    {
+                        mover.Configure(targetCore, 0f, 0f, attackInterval);
+                        mover.enabled = false;
+                    }
+                    if (!target.HasStateAuthority) MakeTutorialEnemyHighlyVisible(target.gameObject);
+                    yield break;
+                }
+                yield return null;
+            }
+        }
+
+        public void DespawnSkillTutorialTarget(PlayerRef player)
+        {
+            if (!CanSpawnTutorialEnemy || !skillTutorialTargets.TryGetValue(player, out NetworkId id)) return;
+            if (Runner.TryFindObject(id, out NetworkObject target))
+            {
+                if (!target.HasStateAuthority) return;
+                EnemyPurification purification = target.GetComponent<EnemyPurification>();
+                if (purification != null)
+                {
+                    purification.Completed -= HandlePurificationCompleted;
+                    activeEnemies.Remove(purification);
+                    SyncActiveEnemyCount();
+                }
+                Runner.Despawn(target);
+            }
+            RPC_ForgetSkillTutorialTarget(player);
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_ForgetSkillTutorialTarget(PlayerRef player)
+        {
+            skillTutorialTargets.Remove(player);
+            if (skillTargetBindingRoutines.TryGetValue(player, out Coroutine routine))
+            {
+                if (routine != null) StopCoroutine(routine);
+                skillTargetBindingRoutines.Remove(player);
+            }
+        }
+
+        public void DespawnSkillTutorialTargets()
+        {
+            if (!CanSpawnTutorialEnemy) return;
+            if (HasRequestedSkillTutorial && !skillTutorialTargetsClosed)
+                RPC_CloseSkillTutorialTargets();
+            foreach (PlayerRef player in new List<PlayerRef>(skillTutorialTargets.Keys))
+                DespawnSkillTutorialTarget(player);
+        }
+
 
         [Networked] public NetworkId TutorialEnemyId { get; private set; }
         // Retain the attempt even if Spawn throws or the enemy later disappears.
@@ -43,6 +202,15 @@ namespace DreamGuardians
                 !Runner.TryFindObject(TutorialEnemyId, out var networkObject)) return false;
             enemy = networkObject.GetComponent<EnemyHealth>();
             return enemy != null;
+        }
+
+        private void OnDisable()
+        {
+            DespawnSkillTutorialTargets();
+            foreach (Coroutine routine in skillTargetBindingRoutines.Values)
+                if (routine != null) StopCoroutine(routine);
+            skillTargetBindingRoutines.Clear();
+            skillTutorialTargets.Clear();
         }
 
         private NetworkRunner GetRunner()
@@ -605,7 +773,7 @@ namespace DreamGuardians
 
             try
             {
-                return SpawnEnemy(position, rotation, true, 1f, tutorialSpawnPoint, null);
+                return SpawnEnemy(position, rotation, true, 0.4f, tutorialSpawnPoint, null);
             }
             catch (Exception exception)
             {
@@ -737,7 +905,8 @@ namespace DreamGuardians
             bool tutorialEnemy,
             float healthMultiplier,
             Transform spawnPoint,
-            GameObject prefabOverride)
+            GameObject prefabOverride,
+            bool registerTutorialEnemy = true)
         {
             GameObject selectedPrefab =
                 prefabOverride != null
@@ -798,7 +967,7 @@ namespace DreamGuardians
                         spawnPoint);
                 });
 
-            if (tutorialEnemy && spawnedObject != null)
+            if (tutorialEnemy && registerTutorialEnemy && spawnedObject != null)
             {
                 TutorialEnemyId = spawnedObject.Id;
                 Debug.Log($"[TutorialNetwork] Spawn master={runner.LocalPlayer}, enemy={TutorialEnemyId}", this);
@@ -1038,7 +1207,9 @@ namespace DreamGuardians
                 baseEnemyHealth *
                 Mathf.Max(
                     0.1f,
-                    healthMultiplier);
+                    tutorialEnemy || droneEnemy != null || rangedEnemy != null
+                        ? healthMultiplier
+                        : 1f);
 
             health.Configure(
                 configuredHealth,

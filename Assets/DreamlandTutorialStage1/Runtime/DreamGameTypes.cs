@@ -29,7 +29,8 @@ namespace DreamGuardians
         PurifyTutorialEnemy = 5,
         TutorialClear = 6,
         Wave1 = 7,
-        Complete = 8
+        Complete = 8,
+        SkillPractice = 9
     }
 
     [Serializable]

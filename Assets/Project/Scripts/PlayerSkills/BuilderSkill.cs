@@ -92,12 +92,13 @@ public sealed class BuilderSkill : IJobSkill
     [NonSerialized] private BuilderEmergencyDemolitionEffect activeEffect;
 
     public bool IsActive => activeEffect != null;
+    internal Vector3 TutorialTargetOffset => swingVfxEndOffset;
 
-    public void Execute(JobSkillContext context, bool dealsDamage)
+    public bool Execute(JobSkillContext context, bool dealsDamage)
     {
         if (context.Origin == null || context.Direction == null || IsActive)
         {
-            return;
+            return false;
         }
 
         GameObject effectObject = new GameObject("Builder_EmergencyDemolition_Effect");
@@ -121,6 +122,7 @@ public sealed class BuilderSkill : IJobSkill
             hammerImpactSound, hammerImpactVolume, boomImpactSound,
             boomImpactVolume, boomImpactDelay, audioMinDistance, audioMaxDistance,
             HandleEffectFinished, dealsDamage);
+        return IsActive;
     }
 
     public void Cancel()

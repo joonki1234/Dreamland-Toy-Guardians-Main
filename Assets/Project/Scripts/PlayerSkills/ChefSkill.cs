@@ -81,19 +81,19 @@ public sealed class ChefSkill : IJobSkill
     [SerializeField] private AudioClip explosionSound;
     [Range(0f, 1f)] [SerializeField] private float explosionSoundVolume = 0.5f;
 
-    public void Execute(JobSkillContext context, bool dealsDamage)
+    public bool Execute(JobSkillContext context, bool dealsDamage)
     {
         if (context.Origin == null)
         {
             Debug.LogWarning("[ChefSkill] 스페셜 메뉴: Origin Transform이 비어 있습니다.");
-            return;
+            return false;
         }
 
         GameObject selectedFood = GetSpecialMenuFoodPrefab(context);
         if (selectedFood == null)
         {
             Debug.LogWarning("[ChefSkill] 스페셜 메뉴: 현재 프로젝트에 실제 Burger/Hamburger Prefab이 없습니다. Inspector에서 실제 햄버거 Prefab을 직접 연결해 주세요.");
-            return;
+            return false;
         }
 
         Vector3 groundPoint = FindTargetGroundPoint(context);
@@ -157,6 +157,7 @@ public sealed class ChefSkill : IJobSkill
         }
 
         Debug.Log($"[ChefSkill] 스페셜 메뉴 발동: {selectedFood.name} -> {groundPoint} / Damage {explosionDamage}");
+        return true;
     }
 
     private GameObject GetSpecialMenuFoodPrefab(JobSkillContext context)
@@ -169,7 +170,7 @@ public sealed class ChefSkill : IJobSkill
         return null;
     }
 
-    private Vector3 FindTargetGroundPoint(JobSkillContext context)
+    internal Vector3 FindTargetGroundPoint(JobSkillContext context)
     {
         Vector3 rootPosition = context.Origin.root.position;
         Vector3 viewForward = context.Forward;

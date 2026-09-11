@@ -58,12 +58,14 @@ public sealed class FirefighterSkill : IJobSkill
     [Min(0.01f)] [SerializeField] private float audioMaxDistance = 30f;
     [Range(0f, 0.2f)] [SerializeField] private float audioDopplerLevel = 0.1f;
 
-    public void Execute(JobSkillContext context, bool dealsDamage)
+    internal float TutorialTargetDistance => Mathf.Max(0f, spawnDistance) + hitboxLength;
+
+    public bool Execute(JobSkillContext context, bool dealsDamage)
     {
         if (fireTruckPrefab == null)
         {
             Debug.LogWarning("소방차 출동!: Fire Truck Prefab이 연결되지 않았습니다.");
-            return;
+            return false;
         }
 
         Vector3 forward = Vector3.ProjectOnPlane(context.Forward, Vector3.up);
@@ -145,5 +147,6 @@ public sealed class FirefighterSkill : IJobSkill
             Mathf.Clamp(audioDopplerLevel, 0f, 0.2f),
             dealsDamage
         );
+        return true;
     }
 }

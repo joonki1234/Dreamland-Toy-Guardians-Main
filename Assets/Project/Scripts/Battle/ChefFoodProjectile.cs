@@ -11,7 +11,7 @@ using DreamGuardians;
 public class ChefFoodProjectile : MonoBehaviour
 {
     [Header("공격 설정")]
-    [SerializeField] private float damage = 14f;
+    [SerializeField] private float damage = 35f;
     [SerializeField, Min(0f)] private float splashDamage = 7f;
     [SerializeField, Min(0.01f)] private float splashRadius = 2.5f;
 

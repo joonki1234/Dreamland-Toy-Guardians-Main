@@ -392,6 +392,40 @@ public class PlayerJobController : NetworkBehaviour
 
 
     private PlayerJobSkillController jobSkillController;
+    public bool SkillTutorialCompleted { get; private set; }
+    private DreamGuardians.DreamEnemySpawner skillTutorialSpawner;
+
+    public void RequestTutorialSkillTarget(Vector3 groundPosition)
+    {
+        if (Object != null && Object.IsValid && Object.HasInputAuthority)
+            RPC_RequestTutorialSkillTarget(groundPosition);
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void RPC_RequestTutorialSkillTarget(Vector3 groundPosition)
+    {
+        if (!Runner.IsSharedModeMasterClient) return;
+        skillTutorialSpawner ??= FindAnyObjectByType<DreamGuardians.DreamEnemySpawner>();
+        if (skillTutorialSpawner == null)
+        {
+            Debug.LogError("[SkillTutorial] DreamEnemySpawner reference is missing.", this);
+            return;
+        }
+        skillTutorialSpawner.SpawnSkillTutorialTarget(Object.InputAuthority, groundPosition);
+    }
+
+    public void ReportTutorialSkillUsed()
+    {
+        if (Object != null && Object.IsValid && Object.HasInputAuthority)
+            RPC_ReportTutorialSkillUsed();
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void RPC_ReportTutorialSkillUsed()
+    {
+        SkillTutorialCompleted = true;
+    }
+
 
     /// <summary>
     /// PlayerJobSkillController(직업별 P키/Shift+X 스킬)가 호출하는 진입점이다.

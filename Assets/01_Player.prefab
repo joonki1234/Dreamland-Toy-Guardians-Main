@@ -10396,7 +10396,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2c9b97dc06a0a15469bf58a1a062109f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WaterParticleHit
-  damagePerTick: 3.4
+  damagePerTick: 2.428571
   hitInterval: 0.1
   maximumSustainedMultiplier: 1.4
   sustainedRampDuration: 1.75
@@ -15629,9 +15629,9 @@ MonoBehaviour:
     m_Bits: 4294967295
   shardUpwardForce: 3
   shardScaleMultiplierRange: {x: 0.75, y: 1.05}
-  firstShardDamage: 6
-  additionalShardDamage: 1.8
-  maxShotDamagePerEnemy: 15
+  firstShardDamage: 19.2
+  additionalShardDamage: 5.76
+  maxShotDamagePerEnemy: 48
   xrActivateAction: {fileID: 0}
   xrInputActionAsset: {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   localFirefighterGrip:
@@ -15832,10 +15832,10 @@ MonoBehaviour:
   jobController: {fileID: 4808250408771500888}
   skillOrigin: {fileID: 1194774703862181001}
   skillDirection: {fileID: 1194774703862181001}
-  policeCooldown: 17
-  firefighterCooldown: 19
-  chefCooldown: 11
-  builderCooldown: 15
+  policeCooldown: 12
+  firefighterCooldown: 16
+  chefCooldown: 14
+  builderCooldown: 12
   policeSkill:
     maxTargetDistance: 30
     targetMask:

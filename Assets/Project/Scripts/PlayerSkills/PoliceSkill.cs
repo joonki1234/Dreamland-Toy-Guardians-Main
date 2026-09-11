@@ -52,7 +52,9 @@ public sealed class PoliceSkill : IJobSkill
     [Min(0f)] [SerializeField] private float electricSoundMinDistance = 7f;
     [Min(0.01f)] [SerializeField] private float electricSoundMaxDistance = 25f;
 
-    public void Execute(JobSkillContext context, bool dealsDamage)
+    internal float TutorialTargetDistance => Mathf.Min(6f, maxTargetDistance);
+
+    public bool Execute(JobSkillContext context, bool dealsDamage)
     {
         Vector3 targetPosition = FindTargetPosition(context);
 
@@ -88,6 +90,7 @@ public sealed class PoliceSkill : IJobSkill
             Mathf.Max(electricSoundMinDistance + 0.01f, electricSoundMaxDistance),
             dealsDamage
         );
+        return true;
     }
 
     private Vector3 FindTargetPosition(JobSkillContext context)

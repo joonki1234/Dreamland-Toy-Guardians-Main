@@ -87,6 +87,65 @@ namespace DreamGuardians
         private TextMeshProUGUI guideSpeaker;
         private TextMeshProUGUI guideMessage;
 
+        private GameObject skillTutorialPanel;
+        private TextMeshProUGUI skillTutorialTitle;
+        private TextMeshProUGUI skillTutorialDescription;
+        private TextMeshProUGUI skillTutorialInput;
+
+        public void ShowSkillTutorial(PlayerJobController localPlayer, bool completed)
+        {
+            if (localPlayer == null || localPlayer.Object == null ||
+                !localPlayer.Object.HasInputAuthority) return;
+            EnsureUI();
+            switch (localPlayer.CurrentJob)
+            {
+                case PlayerJob.Police:
+                    skillTutorialTitle.text = "집중포화";
+                    skillTutorialDescription.text = "전방의 적에게 강력한 집중 사격을 퍼붓습니다.";
+                    break;
+                case PlayerJob.Firefighter:
+                    skillTutorialTitle.text = "소방차 출동";
+                    skillTutorialDescription.text = "소방차의 지원으로 넓은 범위의 적을 공격합니다.";
+                    break;
+                case PlayerJob.Chef:
+                    skillTutorialTitle.text = "스페셜 메뉴";
+                    skillTutorialDescription.text = "거대한 음식을 떨어뜨려 범위 안의 적을 공격합니다.";
+                    break;
+                case PlayerJob.Builder:
+                    skillTutorialTitle.text = "긴급 철거";
+                    skillTutorialDescription.text = "거대한 망치로 적을 강하게 공격합니다.";
+                    break;
+            }
+            skillTutorialInput.text = completed
+                ? "스킬 사용 성공! 친구의 연습을 기다려 주세요."
+                : "앞의 연습용 적을 바라보고 왼손 X 버튼을 누르세요.";
+            skillTutorialPanel.SetActive(true);
+        }
+
+        public void HideSkillTutorial()
+        {
+            if (skillTutorialPanel != null) skillTutorialPanel.SetActive(false);
+        }
+
+        private void BuildSkillTutorialPanel(RectTransform root)
+        {
+            skillTutorialPanel = CreatePanel("SkillTutorialPanel", root,
+                new Vector2(0.5f, 0.24f), new Vector2(720f, 230f),
+                waveGlassPanel != null ? waveGlassPanel : DreamlandUiSkin.SciFiWindow,
+                Color.white, true);
+            RectTransform rect = skillTutorialPanel.GetComponent<RectTransform>();
+            skillTutorialTitle = CreateTmpText("SkillName", rect,
+                new Vector2(0.5f, 0.78f), new Vector2(660f, 44f), 30,
+                TextAlignmentOptions.Center, FontStyles.Bold, waveDisplayFont);
+            skillTutorialDescription = CreateTmpText("SkillDescription", rect,
+                new Vector2(0.5f, 0.49f), new Vector2(660f, 76f), 24,
+                TextAlignmentOptions.Center, FontStyles.Normal, waveBodyFont);
+            skillTutorialInput = CreateTmpText("SkillInput", rect,
+                new Vector2(0.5f, 0.18f), new Vector2(660f, 42f), 24,
+                TextAlignmentOptions.Center, FontStyles.Bold, waveBodyFont);
+            skillTutorialPanel.SetActive(false);
+        }
+
         private GameObject synergyPanel;
         private TextMeshProUGUI synergyTitle;
         private TextMeshProUGUI synergyMessage;
@@ -137,6 +196,7 @@ namespace DreamGuardians
 
         private void OnDisable()
         {
+            HideSkillTutorial();
             DreamGameEvents.SynergyTriggered -= HandleSynergy;
 
             if (legacyRoleCleanupRoutine != null)
@@ -835,6 +895,7 @@ namespace DreamGuardians
             BuildBossPanel(root);
             BuildGuidePanel(root);
             BuildSynergyPanel(root);
+            BuildSkillTutorialPanel(root);
 
             if (rolePanel != null)
             {

@@ -85,6 +85,178 @@ namespace DreamGuardians
                 new Dictionary<string, int>();
 
 
+        private bool skillTutorialStarted;
+        private bool skillTutorialFinished;
+        private PlayerJobController localSkillPlayer;
+        private PlayerJobSkillController localTutorialSkill;
+        private bool localTutorialSkillUsed;
+        private readonly Dictionary<Fusion.PlayerRef, PlayerJobController> skillTutorialParticipants =
+            new Dictionary<Fusion.PlayerRef, PlayerJobController>();
+
+        private IEnumerator PlaySkillTutorial()
+        {
+            if (skillTutorialStarted) yield break;
+            skillTutorialStarted = true;
+            State = TutorialStage1State.SkillPractice;
+            bool missingPlayerLogged = false;
+            while (localSkillPlayer == null)
+            {
+                skillTutorialParticipants.Clear();
+                foreach (PlayerJobController player in UnityEngine.Object.FindObjectsByType<PlayerJobController>(FindObjectsInactive.Exclude))
+                {
+                    if (player.Object == null || !player.Object.IsValid) continue;
+                    skillTutorialParticipants[player.Object.InputAuthority] = player;
+                    if (player.Object.HasInputAuthority) localSkillPlayer = player;
+                }
+                if (localSkillPlayer != null) break;
+                if (!missingPlayerLogged)
+                {
+                    Debug.LogError("[SkillTutorial] Waiting for the spawned input-authority player.", this);
+                    missingPlayerLogged = true;
+                }
+                yield return new WaitForSeconds(0.5f);
+            }
+            localTutorialSkill = localSkillPlayer.GetComponent<PlayerJobSkillController>();
+            if (localTutorialSkill == null || !localTutorialSkill.HasTutorialOrigin || spawner == null || missionUI == null)
+            {
+                Debug.LogError("[SkillTutorial] Missing skill controller/origin, spawner or MissionBannerUI. Tutorial cannot start.", this);
+                // Keep the existing skip path available; never report a failed skill as success.
+                while (isActiveAndEnabled) yield return new WaitForSeconds(0.5f);
+                yield break;
+            }
+
+            localSkillPlayer.RequestTutorialSkillTarget(localTutorialSkill.GetTutorialTargetPosition());
+            yield return PlayToyFriendOnlyLine(null, "좋았어!", 1.4f, true);
+            yield return PlayToyFriendOnlyLine(null, "그런데 꿈빛 무기에는 특별한 힘도 있어.", 3f, false);
+            yield return PlayToyFriendOnlyLine(null, "직업마다 사용할 수 있는 특별한 스킬이 하나씩 있지!", 3.5f, false);
+
+            bool missingTargetLogged = false;
+            float nextTargetRetry = Time.time + 1f;
+            while (IsSkillTutorialSessionValid() && !spawner.HasSkillTutorialTarget(localSkillPlayer.Object.InputAuthority))
+            {
+                if (Time.time >= nextTargetRetry)
+                {
+                    localSkillPlayer.RequestTutorialSkillTarget(localTutorialSkill.GetTutorialTargetPosition());
+                    nextTargetRetry = Time.time + 1f;
+                }
+                if (!missingTargetLogged)
+                {
+                    Debug.LogError("[SkillTutorial] Waiting for the network tutorial target; check master spawn errors.", this);
+                    missingTargetLogged = true;
+                }
+                yield return new WaitForSeconds(0.25f);
+            }
+            if (!IsSkillTutorialSessionValid()) yield break;
+            localTutorialSkill.OnSkillActivated -= HandleTutorialSkillActivated;
+            localTutorialSkill.OnSkillActivated += HandleTutorialSkillActivated;
+            missionUI.ShowSkillTutorial(localSkillPlayer, false);
+            localTutorialSkill.BeginTutorialPractice();
+            yield return PlayToyFriendOnlyLine(null, "왼손 X 버튼을 눌러 스킬을 사용해 봐!", 3f, false);
+            if (toyFriend != null) yield return toyFriend.HideForCombat();
+
+            if (!IsSkillTutorialSessionValid()) yield break;
+            PlayerJob displayedJob = localSkillPlayer.CurrentJob;
+            while (!localTutorialSkillUsed)
+            {
+                if (!IsSkillTutorialSessionValid()) yield break;
+                PruneDisconnectedSkillPlayers();
+                if (!spawner.HasSkillTutorialTarget(localSkillPlayer.Object.InputAuthority) && Time.time >= nextTargetRetry)
+                {
+                    localSkillPlayer.RequestTutorialSkillTarget(localTutorialSkill.GetTutorialTargetPosition());
+                    nextTargetRetry = Time.time + 1f;
+                }
+                if (localSkillPlayer.CurrentJob != displayedJob)
+                {
+                    displayedJob = localSkillPlayer.CurrentJob;
+                    missionUI.ShowSkillTutorial(localSkillPlayer, false);
+                }
+                yield return new WaitForSeconds(0.25f);
+            }
+
+            // Allow the real effect (including the falling menu) to play against its target.
+            if (toyFriend != null) yield return toyFriend.ShowForStory();
+            yield return PlayToyFriendOnlyLine(null, "좋아! 바로 그거야!", 2f, true);
+            yield return PlayToyFriendOnlyLine(null, "스킬은 강력하지만, 한 번 사용하면 잠시 다시 사용할 수 없어.", 4f, false);
+            yield return PlayToyFriendOnlyLine(null, "적이 많이 몰리거나 위험할 때 사용해!", 3f, false);
+
+            while (!AllSkillTutorialPlayersCompleted())
+            {
+                if (!IsSkillTutorialSessionValid()) yield break;
+                yield return new WaitForSeconds(0.25f);
+            }
+            if (!IsSkillTutorialSessionValid()) yield break;
+
+            missionUI.HideSkillTutorial();
+            spawner.DespawnSkillTutorialTargets();
+            while (spawner.HasSkillTutorialTargets)
+            {
+                if (!IsSkillTutorialSessionValid()) yield break;
+                // Also handles a Shared Mode master change while waiting for cleanup.
+                spawner.DespawnSkillTutorialTargets();
+                yield return new WaitForSeconds(0.25f);
+            }
+            CleanupSkillTutorial();
+            skillTutorialFinished = true;
+            State = TutorialStage1State.TutorialClear;
+        }
+
+        private bool IsSkillTutorialSessionValid()
+        {
+            return isActiveAndEnabled && spawner != null && spawner.IsTutorialSessionReady &&
+                   localSkillPlayer != null && localSkillPlayer.Object != null &&
+                   localSkillPlayer.Object.IsValid && localTutorialSkill != null;
+        }
+
+        private void HandleTutorialSkillActivated(PlayerJob job)
+        {
+            if (State != TutorialStage1State.SkillPractice || localTutorialSkillUsed ||
+                localSkillPlayer == null || localSkillPlayer.Object == null ||
+                !localSkillPlayer.Object.HasInputAuthority) return;
+            localTutorialSkillUsed = true;
+            missionUI?.ShowSkillTutorial(localSkillPlayer, true);
+        }
+
+        private void PruneDisconnectedSkillPlayers()
+        {
+            foreach (Fusion.PlayerRef playerRef in new List<Fusion.PlayerRef>(skillTutorialParticipants.Keys))
+            {
+                PlayerJobController player = skillTutorialParticipants[playerRef];
+                bool connected = false;
+                if (player != null && player.Object != null && player.Object.IsValid)
+                {
+                    foreach (Fusion.PlayerRef active in player.Runner.ActivePlayers)
+                        if (active == player.Object.InputAuthority) connected = true;
+                }
+                if (!connected)
+                {
+                    spawner?.DespawnSkillTutorialTarget(playerRef);
+                    skillTutorialParticipants.Remove(playerRef);
+                }
+            }
+        }
+
+        private bool AllSkillTutorialPlayersCompleted()
+        {
+            PruneDisconnectedSkillPlayers();
+            foreach (PlayerJobController player in skillTutorialParticipants.Values)
+                if (!player.SkillTutorialCompleted) return false;
+            return true;
+        }
+
+        private void CleanupSkillTutorial()
+        {
+            missionUI?.HideSkillTutorial();
+            if (localTutorialSkill != null)
+            {
+                localTutorialSkill.OnSkillActivated -= HandleTutorialSkillActivated;
+                localTutorialSkill.EndTutorialPractice();
+            }
+            spawner?.DespawnSkillTutorialTargets();
+            localTutorialSkill = null;
+            localSkillPlayer = null;
+            skillTutorialParticipants.Clear();
+        }
+
         private EnemyHealth tutorialEnemy;
         private CoreHealthHUD coreHealthHud;
 
@@ -126,6 +298,11 @@ namespace DreamGuardians
 
         private void OnEnable()
         {
+            if (spawner != null)
+            {
+                spawner.SkillTutorialRequested += HandleSkillTutorialRequested;
+                spawner.SkillTutorialSkipped += HandleSkillTutorialSkipped;
+            }
             DreamGameEvents.EnemyHit +=
                 HandleEnemyHit;
 
@@ -159,6 +336,12 @@ namespace DreamGuardians
 
         private void OnDisable()
         {
+            StopDirectorCoroutines();
+            if (spawner != null)
+            {
+                spawner.SkillTutorialRequested -= HandleSkillTutorialRequested;
+                spawner.SkillTutorialSkipped -= HandleSkillTutorialSkipped;
+            }
             DreamGameEvents.EnemyHit -=
                 HandleEnemyHit;
 
@@ -1160,11 +1343,30 @@ namespace DreamGuardians
             }
 
 
-            State =
-                TutorialStage1State
-                    .TutorialClear;
+            if (spawner != null && spawner.IsTutorialSessionReady)
+                spawner.BeginSkillTutorialAfterPurification();
+            else
+                HandleSkillTutorialRequested();
+        }
 
+        private void HandleSkillTutorialSkipped(bool startStage1)
+        {
+            if (!isActiveAndEnabled) return;
+            if (startStage1) SkipTutorialAndStartStage1();
+            else StopForStage2Test();
+        }
 
+        private void HandleSkillTutorialRequested()
+        {
+            if (!isActiveAndEnabled || skillTutorialStarted ||
+                State == TutorialStage1State.Wave1 || State == TutorialStage1State.Complete) return;
+            // The original purification event is emitted by the spawning authority.
+            // Broadcast that transition, without duplicating purification or Core rewards remotely.
+            if (postShootingStoryRoutine != null) StopCoroutine(postShootingStoryRoutine);
+            if (flowRoutine != null) StopCoroutine(flowRoutine);
+            postShootingStoryRoutine = null;
+            flowRoutine = null;
+            State = TutorialStage1State.TutorialClear;
             if (transitionToWaveRoutine == null)
             {
                 transitionToWaveRoutine =
@@ -1206,6 +1408,14 @@ namespace DreamGuardians
             if (toyFriend != null)
             {
                 yield return toyFriend.ShowForStory();
+            }
+
+            yield return PlaySkillTutorial();
+            if (!skillTutorialFinished)
+            {
+                CleanupSkillTutorial();
+                transitionToWaveRoutine = null;
+                yield break;
             }
 
             TutorialDialogueLine clearLine =
@@ -1411,6 +1621,7 @@ namespace DreamGuardians
         /// </summary>
         public void SkipTutorialAndStartStage1()
         {
+            if (spawner != null && spawner.TryRequestSkillTutorialSkip(true)) return;
             if (stage1 == null)
             {
                 Debug.LogError(
@@ -1475,6 +1686,7 @@ namespace DreamGuardians
         /// </summary>
         public void StopForStage2Test()
         {
+            if (spawner != null && spawner.TryRequestSkillTutorialSkip(false)) return;
             StopDirectorCoroutines();
             RemoveTutorialEnemy();
 
@@ -1509,7 +1721,11 @@ namespace DreamGuardians
 
         private void StopDirectorCoroutines()
         {
-            StopAllCoroutines();
+            if (flowRoutine != null) StopCoroutine(flowRoutine);
+            if (transitionToWaveRoutine != null) StopCoroutine(transitionToWaveRoutine);
+            if (stage1CompletionRoutine != null) StopCoroutine(stage1CompletionRoutine);
+            if (postShootingStoryRoutine != null) StopCoroutine(postShootingStoryRoutine);
+            CleanupSkillTutorial();
 
             roleSelection?.Hide();
             toyFriend?.StopSpeaking();

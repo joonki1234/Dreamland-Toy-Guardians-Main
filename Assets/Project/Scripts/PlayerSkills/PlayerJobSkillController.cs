@@ -44,6 +44,61 @@ public sealed class PlayerJobSkillController : MonoBehaviour
     [SerializeField] private ChefSkill chefSkill = new ChefSkill();
     [SerializeField] private BuilderSkill builderSkill = new BuilderSkill();
 
+    public event System.Action<PlayerJob> OnSkillActivated;
+    private bool tutorialPracticeActive;
+    private bool tutorialCooldownReset;
+    private PlayerJob tutorialUsedJob;
+    private bool tutorialSkillUsed;
+
+    public void BeginTutorialPractice()
+    {
+        if (!CanUseLocalInput() || tutorialSkillUsed) return;
+        tutorialPracticeActive = true;
+    }
+
+    public void EndTutorialPractice()
+    {
+        tutorialPracticeActive = false;
+        if (CanUseLocalInput() && tutorialSkillUsed && !tutorialCooldownReset)
+        {
+            SetReadyTime(tutorialUsedJob, Time.time);
+            tutorialCooldownReset = true;
+        }
+    }
+
+    public Vector3 GetTutorialTargetPosition()
+    {
+        JobSkillContext context = new JobSkillContext(skillOrigin, skillDirection);
+        if (jobController.CurrentJob == PlayerJob.Chef)
+            return chefSkill.FindTargetGroundPoint(context);
+
+        Vector3 forward = Vector3.ProjectOnPlane(context.Forward, Vector3.up);
+        if (forward.sqrMagnitude < 0.0001f) forward = context.Origin.root.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
+        Quaternion frame = Quaternion.LookRotation(forward.normalized, Vector3.up);
+        Vector3 offset;
+        switch (jobController.CurrentJob)
+        {
+            case PlayerJob.Firefighter:
+                offset = Vector3.forward * firefighterSkill.TutorialTargetDistance;
+                break;
+            case PlayerJob.Builder:
+                offset = builderSkill.TutorialTargetOffset;
+                break;
+            default:
+                offset = Vector3.forward * policeSkill.TutorialTargetDistance;
+                break;
+        }
+        Vector3 position = context.Origin.root.position + frame * offset;
+        if (Physics.Raycast(position + Vector3.up * 4f, Vector3.down,
+                out RaycastHit hit, 12f, 1 << 8, QueryTriggerInteraction.Ignore))
+            position = hit.point;
+        return position;
+    }
+
+    public bool HasTutorialOrigin => skillOrigin != null && skillDirection != null;
+
     private float policeReadyTime;
     private float firefighterReadyTime;
     private float chefReadyTime;
@@ -143,7 +198,17 @@ public sealed class PlayerJobSkillController : MonoBehaviour
         }
 
         JobSkillContext context = new JobSkillContext(skillOrigin, skillDirection);
-        GetSkill(job).Execute(context, dealsDamage);
+        if (!GetSkill(job).Execute(context, dealsDamage)) return;
+        // Only the input owner can confirm a real activation. Remote effects are presentation.
+        if (!dealsDamage || !CanUseLocalInput()) return;
+        if (tutorialPracticeActive && !tutorialSkillUsed)
+        {
+            tutorialSkillUsed = true;
+            tutorialUsedJob = job;
+            tutorialPracticeActive = false;
+            jobController.ReportTutorialSkillUsed();
+        }
+        OnSkillActivated?.Invoke(job);
     }
 
     /// <summary>XR 입력과 분리된 건축가 긴급 철거 전용 진입점입니다.</summary>
@@ -165,6 +230,7 @@ public sealed class PlayerJobSkillController : MonoBehaviour
 
     private void OnDisable()
     {
+        EndTutorialPractice();
         leftPrimaryAction?.Disable();
         CancelBuilderSkill();
     }

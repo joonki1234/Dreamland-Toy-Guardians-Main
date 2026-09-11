@@ -27998,7 +27998,7 @@ MonoBehaviour:
   bossSpinChargeEffectPrefab: {fileID: 2715471840370901047, guid: df9374346b76e444dbbb2b019de4da25, type: 3}
   bossSpinWindEffectPrefab: {fileID: 1645123201969997353, guid: 292bfa542cd61114883916af45c0c4f3, type: 3}
   bossSpinWhooshSfx: {fileID: 8300000, guid: 64bd1ca4e852e4b5cbdf4fbb5b06085b, type: 3}
-  bossMaxHealth: 7600
+  bossMaxHealth: 4000
   bossCoreDamage: 21
   bossAttackInterval: 2.5
   firstAttackDelay: 4
