@@ -74,6 +74,7 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
     private bool isRunning;
 
     private bool stage1CompletionHandled;
+    private bool stage1FailureHandled;
     private bool stage2CompletionHandled;
     private bool stage2FailureHandled;
     private bool absorptionCompletionHandled;
@@ -127,74 +128,91 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
 
     private void ResolveFlowComponents()
     {
+        // 기본 FindAnyObjectByType<T>()는 비활성 오브젝트를 못 찾는다. 이 프로젝트
+        // 곳곳(TutorialStage1Director, AllyPortalCoreRevealController,
+        // EnemyPortalStageController 등)에서 이미 같은 문제로 발목을 잡혔던
+        // 것과 동일한 함정이라, 게임 전체 흐름을 관장하는 이 컨트롤러도
+        // FindObjectsInactive.Include로 통일한다. 여기서 못 찾으면
+        // SubscribeEvents()가 아무것도 구독하지 못해 Stage 완료/실패
+        // 이벤트가 전부 무시된다.
         if (stage1Director == null)
         {
             stage1Director =
                 UnityEngine.Object
-                    .FindAnyObjectByType<TutorialStage1Director>();
+                    .FindAnyObjectByType<TutorialStage1Director>(
+                        FindObjectsInactive.Include);
         }
 
         if (stage1WaveController == null)
         {
             stage1WaveController =
                 UnityEngine.Object
-                    .FindAnyObjectByType<Stage1WaveController>();
+                    .FindAnyObjectByType<Stage1WaveController>(
+                        FindObjectsInactive.Include);
         }
 
         if (stage2Director == null)
         {
             stage2Director =
                 UnityEngine.Object
-                    .FindAnyObjectByType<Stage2Director>();
+                    .FindAnyObjectByType<Stage2Director>(
+                        FindObjectsInactive.Include);
         }
 
         if (stage2WaveController == null)
         {
             stage2WaveController =
                 UnityEngine.Object
-                    .FindAnyObjectByType<Stage2WaveController>();
+                    .FindAnyObjectByType<Stage2WaveController>(
+                        FindObjectsInactive.Include);
         }
 
         if (transitionController == null)
         {
             transitionController =
                 UnityEngine.Object
-                    .FindAnyObjectByType<DreamlandTransitionController>();
+                    .FindAnyObjectByType<DreamlandTransitionController>(
+                        FindObjectsInactive.Include);
         }
 
         if (enemyPortalStageController == null)
         {
             enemyPortalStageController =
                 UnityEngine.Object
-                    .FindAnyObjectByType<EnemyPortalStageController>();
+                    .FindAnyObjectByType<EnemyPortalStageController>(
+                        FindObjectsInactive.Include);
         }
 
         if (finalBossDirector == null)
         {
             finalBossDirector =
                 UnityEngine.Object
-                    .FindAnyObjectByType<FinalBossDirector>();
+                    .FindAnyObjectByType<FinalBossDirector>(
+                        FindObjectsInactive.Include);
         }
 
         if (endingDirector == null)
         {
             endingDirector =
                 UnityEngine.Object
-                    .FindAnyObjectByType<EndingDirector>();
+                    .FindAnyObjectByType<EndingDirector>(
+                        FindObjectsInactive.Include);
         }
 
         if (enemySpawner == null)
         {
             enemySpawner =
                 UnityEngine.Object
-                    .FindAnyObjectByType<DreamEnemySpawner>();
+                    .FindAnyObjectByType<DreamEnemySpawner>(
+                        FindObjectsInactive.Include);
         }
 
         if (core == null)
         {
             core =
                 UnityEngine.Object
-                    .FindAnyObjectByType<CoreState>();
+                    .FindAnyObjectByType<CoreState>(
+                        FindObjectsInactive.Include);
         }
 
         if (core == null && enemySpawner != null)
@@ -212,6 +230,19 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
 
             stage1Director.Stage1Completed +=
                 HandleStage1Completed;
+        }
+
+        if (stage1WaveController != null)
+        {
+            // 코어가 파괴돼 Stage 1이 실패하면(HandleCoreDestroyed) Failed
+            // 이벤트가 발생하는데, 예전에는 이걸 구독하는 곳이 아무데도
+            // 없어서 "MISSION FAILED" 배너만 뜨고 GameOver 상태로 넘어가지
+            // 않았다 - 그래서 게임오버 화면(RETRY 버튼 등)이 영영 안 떴다.
+            stage1WaveController.Failed -=
+                HandleStage1Failed;
+
+            stage1WaveController.Failed +=
+                HandleStage1Failed;
         }
 
         if (stage2Director != null)
@@ -277,6 +308,12 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
                 HandleStage1Completed;
         }
 
+        if (stage1WaveController != null)
+        {
+            stage1WaveController.Failed -=
+                HandleStage1Failed;
+        }
+
         if (stage2Director != null)
         {
             stage2Director.Stage2Completed -=
@@ -336,6 +373,20 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
             this);
 
         StartStage2();
+    }
+
+    private void HandleStage1Failed()
+    {
+        if (stage1FailureHandled ||
+            stage1CompletionHandled)
+        {
+            return;
+        }
+
+        stage1FailureHandled = true;
+
+        EnterGameOver(
+            "Stage 1 실패 (코어 파괴)");
     }
 
     private void HandleStage2Completed()
