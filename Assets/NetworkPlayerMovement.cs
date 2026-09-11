@@ -1,3 +1,4 @@
+using System;
 using DreamGuardians;
 using Fusion;
 using UnityEngine;
@@ -123,6 +124,27 @@ public class NetworkPlayerMovement : NetworkBehaviour
     {
         _cc = GetComponent<CharacterController>();
 
+        // 입력 권한을 가진(=내가 조종하는) 캐릭터만 카메라/오디오리스너를 켠다.
+        // 다른 클라이언트 화면에는 남의 카메라가 보이거나 소리가 겹치면 안 되기 때문.
+        //
+        // 이 값을 이 메서드의 맨 앞에서, 다른 어떤 초기화(발소리 클립 로드,
+        // PlayerBoundaryShield 탐색, AudioListener 정리 등)보다도 먼저 확정하고
+        // LocalPlayerCamera까지 곧바로 세팅한다 - 예전에는 이 대입이 메서드
+        // 맨 끝부분에 있어서, 그 앞의 어떤 단계에서든(예: 씬에 아직 없는
+        // 오브젝트를 찾다 null 참조 등) 예외가 나면 LocalPlayerCamera가
+        // 영원히 비워진 채로 남았다. 이 static 프로퍼티를 폴링하는
+        // MissionBannerUI/CoreHealthHUD/ToyFriendController 같은 카메라 의존
+        // UI가 전부 "그 클라이언트만" 화면에 아무것도 못 그리는 사태로
+        // 이어졌던 것으로 보인다(같은 방의 다른 플레이어는 자기 캐릭터
+        // Spawned()가 문제없이 끝나 정상 진행됐을 것이다).
+        bool isMine = Object.HasInputAuthority;
+
+        if (isMine)
+        {
+            LocalPlayerCamera = playerCamera;
+            Cursor.lockState = CursorLockMode.Locked;
+        }
+
         // Assets/Audio/Resources/SFX/Footsteps/ 안의 발소리 클립들을 전부 불러온다.
         _footstepClips = Resources.LoadAll<AudioClip>("SFX/Footsteps");
 
@@ -160,52 +182,65 @@ public class NetworkPlayerMovement : NetworkBehaviour
         // 오브젝트"를 가리키는 Inspector 참조는 프리팹을 독립적으로 열어서
         // 저장하기만 해도 쉽게 끊어진다(실제로 한 번 끊어졌었다). 참조가
         // 비어있으면 이름으로 다시 찾아서 자동 복구한다.
-        if (playerBoundaryShield == null)
+        //
+        // 이 구간 전체를 try/catch로 감싼다 - 예전에는 여기서 뭔가(씬 탐색,
+        // 콜라이더 계산 등) 예외가 나면 Spawned()가 그대로 멈춰서, 위에서
+        // 이미 세팅한 LocalPlayerCamera는 살아있어도 이 아래(오디오 리스너
+        // 정리, HUD 카메라 연결 등)가 전혀 실행되지 않는 채로 조용히
+        // 끝나버렸다.
+        try
         {
-            GameObject shieldObject =
-                FindObjectByNameIncludingInactive("PlayerBoundaryShield");
-
-            if (shieldObject != null)
+            if (playerBoundaryShield == null)
             {
-                playerBoundaryShield = shieldObject.transform;
+                GameObject shieldObject =
+                    FindObjectByNameIncludingInactive("PlayerBoundaryShield");
+
+                if (shieldObject != null)
+                {
+                    playerBoundaryShield = shieldObject.transform;
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        "[NetworkPlayerMovement] PlayerBoundaryShield를 " +
+                        "씬에서 찾지 못했습니다. 이동 범위 제한이 적용되지 않습니다.");
+                }
+            }
+
+            if (playerBoundaryShield != null)
+            {
+                _boundarySphereCollider =
+                    playerBoundaryShield.GetComponent<SphereCollider>();
+
+                // "범위를 그냥 뚫고 나간다"는 증상이 재발할 경우, 참조가
+                // 실제로 붙었는지와 반지름이 얼마로 계산됐는지 바로 확인할 수
+                // 있도록 남겨둔다.
+                _cachedBoundaryCenter = playerBoundaryShield.position;
+                _cachedBoundaryRadius = GetBoundaryWorldRadius();
+                _hasCachedBoundary = true;
+
+                Debug.Log(
+                    "[NetworkPlayerMovement] Player Boundary Shield 연결됨: " +
+                    playerBoundaryShield.name +
+                    " / 콜라이더 존재: " + (_boundarySphereCollider != null) +
+                    " / 계산된 월드 반지름(고정값으로 캐싱됨): " + _cachedBoundaryRadius);
             }
             else
             {
                 Debug.LogWarning(
-                    "[NetworkPlayerMovement] PlayerBoundaryShield를 " +
-                    "씬에서 찾지 못했습니다. 이동 범위 제한이 적용되지 않습니다.");
+                    "[NetworkPlayerMovement] Player Boundary Shield가 연결되지 않았습니다.");
             }
-        }
 
-        if (playerBoundaryShield != null)
+            ComputeStartStageBounds();
+        }
+        catch (Exception exception)
         {
-            _boundarySphereCollider =
-                playerBoundaryShield.GetComponent<SphereCollider>();
-
-            // "범위를 그냥 뚫고 나간다"는 증상이 재발할 경우, 참조가
-            // 실제로 붙었는지와 반지름이 얼마로 계산됐는지 바로 확인할 수
-            // 있도록 남겨둔다.
-            _cachedBoundaryCenter = playerBoundaryShield.position;
-            _cachedBoundaryRadius = GetBoundaryWorldRadius();
-            _hasCachedBoundary = true;
-
-            Debug.Log(
-                "[NetworkPlayerMovement] Player Boundary Shield 연결됨: " +
-                playerBoundaryShield.name +
-                " / 콜라이더 존재: " + (_boundarySphereCollider != null) +
-                " / 계산된 월드 반지름(고정값으로 캐싱됨): " + _cachedBoundaryRadius);
+            Debug.LogError(
+                "[NetworkPlayerMovement] Spawned() 중 이동 경계 설정 단계에서 " +
+                "예외가 발생했습니다(이동 범위 제한만 비활성화되고 아래 " +
+                "카메라/HUD 연결은 계속 진행합니다): " + exception,
+                this);
         }
-        else
-        {
-            Debug.LogWarning(
-                "[NetworkPlayerMovement] Player Boundary Shield가 연결되지 않았습니다.");
-        }
-
-        ComputeStartStageBounds();
-
-        // 입력 권한을 가진(=내가 조종하는) 캐릭터만 카메라/오디오리스너를 켠다.
-        // 다른 클라이언트 화면에는 남의 카메라가 보이거나 소리가 겹치면 안 되기 때문.
-        bool isMine = Object.HasInputAuthority;
 
         if (playerCamera != null)
         {
@@ -291,16 +326,22 @@ public class NetworkPlayerMovement : NetworkBehaviour
             $"HasStateAuthority={Object.HasStateAuthority}, " +
             $"초기 rotation.y={transform.eulerAngles.y:F1}");
 
-        if (isMine)
+        if (isMine && playerCamera != null)
         {
-            LocalPlayerCamera = playerCamera;
-
-            Cursor.lockState = CursorLockMode.Locked;
-
             // 화면 고정 HUD(ToyFriendMapHud 등)가 Camera.main에 의존하면
             // 멀티플레이에서 남의 카메라를 잘못 따라갈 수 있으므로,
             // "내" 카메라가 확정된 지금 명시적으로 넘겨준다.
-            if (playerCamera != null)
+            //
+            // 아래 4개는 각각 독립적으로 FindAnyObjectByType을 호출한다 -
+            // 하나를 못 찾거나(아직 씬에 없음) 그 안에서 예외가 나더라도
+            // 나머지 HUD 연결까지 전부 멈추지 않도록 각자 try/catch로
+            // 감싼다. 예전에는 이 전체가 하나의 블록이라, 예를 들어
+            // hudFollowers 처리나 MissionBannerUI.Configure() 안에서 뭔가
+            // 실패하면 그 뒤의 CoreHealthHUD/ToyFriendController/
+            // FinalBossAttackController 연결까지 전부 조용히 건너뛰어져서,
+            // "이 클라이언트만 UI/체력바/로봇 시선이 전부 안 됨" 증상으로
+            // 이어질 수 있었다.
+            try
             {
                 ViewLockedHudFollower[] hudFollowers =
                     FindObjectsByType<ViewLockedHudFollower>(
@@ -311,34 +352,83 @@ public class NetworkPlayerMovement : NetworkBehaviour
                 {
                     hudFollowers[i].SetCamera(playerCamera);
                 }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[NetworkPlayerMovement] ViewLockedHudFollower 카메라 연결 중 예외: " +
+                    exception,
+                    this);
+            }
 
-                // MissionBannerUI(스테이지 배너/남은 적 수)와 CoreHealthHUD(코어 체력)도
-                // 같은 이유로 카메라가 확정되지 않으면 화면에 아무것도 안 그려진다.
-                // 이 프로젝트의 플레이어 카메라는 MainCamera 태그를 쓰지 않으므로
-                // Camera.main에 의존하는 두 HUD 모두 여기서 명시적으로 카메라를 넘겨준다.
+            // MissionBannerUI(스테이지 배너/남은 적 수)와 CoreHealthHUD(코어 체력)도
+            // 같은 이유로 카메라가 확정되지 않으면 화면에 아무것도 안 그려진다.
+            // 이 프로젝트의 플레이어 카메라는 MainCamera 태그를 쓰지 않으므로
+            // Camera.main에 의존하는 두 HUD 모두 여기서 명시적으로 카메라를 넘겨준다.
+            try
+            {
                 MissionBannerUI missionBannerUI =
                     FindAnyObjectByType<MissionBannerUI>(
                         FindObjectsInactive.Include);
                 missionBannerUI?.Configure(playerCamera);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[NetworkPlayerMovement] MissionBannerUI 카메라 연결 중 예외 " +
+                    "(이 클라이언트의 미션 배너/남은 적 수 UI가 안 보일 수 있습니다): " +
+                    exception,
+                    this);
+            }
 
+            try
+            {
                 CoreHealthHUD coreHealthHud =
                     FindAnyObjectByType<CoreHealthHUD>(
                         FindObjectsInactive.Include);
                 coreHealthHud?.SetCamera(playerCamera);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[NetworkPlayerMovement] CoreHealthHUD 카메라 연결 중 예외 " +
+                    "(이 클라이언트의 코어 체력 UI가 안 보일 수 있습니다): " +
+                    exception,
+                    this);
+            }
 
-                // ToyFriendController도 playerLookTarget이 비어 있으면 Camera.main에
-                // 의존하는데(항상 null), 그러면 장난감 친구가 말할 때/평상시에
-                // 플레이어를 전혀 바라보지 못한다. 여기서 명시적으로 넘겨준다.
+            // ToyFriendController도 playerLookTarget이 비어 있으면 Camera.main에
+            // 의존하는데(항상 null), 그러면 장난감 친구가 말할 때/평상시에
+            // 플레이어를 전혀 바라보지 못한다. 여기서 명시적으로 넘겨준다.
+            try
+            {
                 ToyFriendController toyFriend =
                     FindAnyObjectByType<ToyFriendController>(
                         FindObjectsInactive.Include);
                 toyFriend?.SetPlayerLookTarget(playerCamera.transform);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[NetworkPlayerMovement] ToyFriendController 카메라 연결 중 예외: " +
+                    exception,
+                    this);
+            }
 
-                // FinalBossAttackController의 눈알도 같은 이유로 Camera.main에
-                // 의존하면 항상 fallback(코어 방향)만 보게 되어 부자연스럽게
-                // 배치된다. 보스가 아직 스폰되지 않았을 수도 있으므로
-                // 정적 필드로 넘겨 나중에 보스가 참조하게 한다.
+            // FinalBossAttackController의 눈알도 같은 이유로 Camera.main에
+            // 의존하면 항상 fallback(코어 방향)만 보게 되어 부자연스럽게
+            // 배치된다. 보스가 아직 스폰되지 않았을 수도 있으므로
+            // 정적 필드로 넘겨 나중에 보스가 참조하게 한다.
+            try
+            {
                 FinalBossAttackController.SetLocalViewerCamera(playerCamera);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "[NetworkPlayerMovement] FinalBossAttackController 카메라 연결 중 예외: " +
+                    exception,
+                    this);
             }
         }
     }
