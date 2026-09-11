@@ -373,7 +373,12 @@ public class LobbySelectionController : MonoBehaviour
         GameDifficultyState difficultyState =
             roomManager.GetOrFindDifficultyState();
 
-        if (difficultyState == null)
+        // difficultyState는 FindAnyObjectByType으로 "찾아지긴" 했지만 Fusion이
+        // 아직 [Networked] 값을 읽을 수 있는 상태로 완전히 붙여놓기 전인 짧은
+        // 순간이 있다(참가자 접속 직후 실제로 재현된 InvalidOperationException:
+        // "Error when accessing GameDifficultyState.CurrentDifficulty..."). 그
+        // 틈에 읽으면 예외가 나서 난이도 조작이 그 프레임에서 통째로 끊긴다.
+        if (difficultyState == null || !difficultyState.IsReady)
         {
             return;
         }
@@ -401,20 +406,27 @@ public class LobbySelectionController : MonoBehaviour
                 ? roomManager.GetOrFindDifficultyState()
                 : null;
 
+        // FindAnyObjectByType으로는 찾아졌지만 Fusion이 아직 [Networked] 값을
+        // 읽을 준비가 안 된 상태일 수 있다(실제로 재현된
+        // InvalidOperationException 참고 - GameDifficultyState.IsReady 참조).
+        // 이 프레임에는 "연결 중" 텍스트를 보여주고 다음 프레임에 다시 시도한다.
+        bool difficultyReady =
+            difficultyState != null && difficultyState.IsReady;
+
         GameDifficulty difficulty =
-            difficultyState != null
+            difficultyReady
                 ? difficultyState.CurrentDifficulty
                 : GameDifficulty.Medium;
 
         if (difficultyText != null)
         {
             difficultyText.text =
-                difficultyState != null
+                difficultyReady
                     ? $"난이도: {GetDifficultyName(difficulty)}"
                     : "난이도: 중 (연결 중...)";
         }
 
-        bool locked = isCountdownActive || difficultyState == null;
+        bool locked = isCountdownActive || !difficultyReady;
 
         if (difficultyLeftArrowButton != null)
         {

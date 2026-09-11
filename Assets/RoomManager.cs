@@ -327,31 +327,68 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     /// <summary>
     /// 씬 로드가 막 끝난 시점에는 DreamlandProgressSync의 네트워크 복제가
     /// 아직 이 클라이언트에 도착 안 했을 수 있다(특히 나중에 합류한
-    /// 플레이어이거나 네트워크 지연이 있는 경우). 못 찾으면 몇 프레임
-    /// 재시도해서, 있는데 잠깐 못 찾은 경우까지 최대한 커버한다.
+    /// 플레이어이거나 네트워크 지연이 있는 경우). 못 찾으면 재시도해서,
+    /// 있는데 잠깐 못 찾은 경우까지 최대한 커버한다.
+    ///
+    /// 예전에는 30프레임(약 0.5초)만 재시도하고 포기했는데, 실제 2인
+    /// 테스트 로그에서 정확히 이 경로("DreamlandProgressSync를 찾지
+    /// 못해...")가 찍히는 게 확인됐다 - 0.5초 안에 복제가 안 끝나면
+    /// 이 클라이언트는 그 뒤로 영영 코어 체력/게임 진행 단계가
+    /// 로컬 전용(State Authority가 아니면 아무것도 안 바뀌는) 모드로
+    /// 고정돼 버렸고, 이게 "나중에 들어온 사람만 계속 진행이 멈춘 것처럼
+    /// 보이는" 증상의 실제 원인이었다. 실시간 기준 15초까지, 그리고 3초마다
+    /// 아직도 못 찾았다는 경고를 남기며 재시도하도록 넉넉하게 늘린다.
     /// </summary>
     private IEnumerator ConnectProgressSyncWhenReady()
     {
-        const int maxAttempts = 30; // 약 0.5초(고정 프레임 기준) 정도까지 재시도.
+        const float maxWaitSeconds = 15f;
+        const float warnIntervalSeconds = 3f;
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        float startTime = Time.unscaledTime;
+        float nextWarnTime = startTime + warnIntervalSeconds;
+
+        while (Time.unscaledTime - startTime < maxWaitSeconds)
         {
             DreamlandProgressSync sync =
                 FindAnyObjectByType<DreamlandProgressSync>(FindObjectsInactive.Include);
 
-            if (sync != null)
+            // sync가 "찾아졌다"는 것과 "Fusion이 [Networked] 값을 읽을 준비를
+            // 마쳤다"는 건 다르다 - GameDifficultyState에서 실제로 재현된
+            // InvalidOperationException과 동일한 함정이라, IsReady까지
+            // 확인한 뒤에만 진행한다. 아직 준비 안 됐으면 이번 프레임은
+            // 넘기고 계속 재시도한다(아래 while 루프가 계속 돈다).
+            if (sync != null && sync.IsReady)
             {
                 sync.OnEnteredGameplayScene();
+
+                Debug.Log(
+                    "[RoomManager] DreamlandProgressSync 연결 완료 " +
+                    $"({Time.unscaledTime - startTime:0.00}초 소요).",
+                    this);
+
                 yield break;
+            }
+
+            if (Time.unscaledTime >= nextWarnTime)
+            {
+                Debug.LogWarning(
+                    "[RoomManager] DreamlandProgressSync를 아직 찾지 못했습니다 " +
+                    $"({Time.unscaledTime - startTime:0.0}초 경과, 계속 재시도 중). " +
+                    "이 경고가 계속 반복되면 difficultyStatePrefab이 마스터 " +
+                    "클라이언트에서 스폰되지 않았거나 네트워크 복제가 비정상입니다.",
+                    this);
+
+                nextWarnTime = Time.unscaledTime + warnIntervalSeconds;
             }
 
             yield return null;
         }
 
-        Debug.LogWarning(
-            "[RoomManager] DreamlandProgressSync를 찾지 못해 게임 진행 상태 동기화를 " +
+        Debug.LogError(
+            "[RoomManager] DreamlandProgressSync를 " +
+            $"{maxWaitSeconds:0}초 동안 찾지 못해 게임 진행 상태 동기화를 " +
             "연결하지 못했습니다. 이 클라이언트는 코어 체력/게임 진행 단계가 " +
-            "다른 플레이어와 어긋날 수 있습니다.",
+            "다른 플레이어와 계속 어긋납니다.",
             this);
     }
 

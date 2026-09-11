@@ -60,6 +60,16 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
     [Networked]
     private NetworkBool Initialized { get; set; }
 
+    /// <summary>
+    /// GameDifficultyState에서 실제로 재현된 InvalidOperationException
+    /// ("Error when accessing ...CurrentDifficulty...")과 동일한 함정이
+    /// 이 클래스의 [Networked] 프로퍼티(Initialized/NetworkedCoreHealth/
+    /// NetworkedGameFlowState)에도 있다 - FindAnyObjectByType으로는
+    /// 찾아지지만 Fusion이 아직 값을 읽을 준비를 마치기 전인 짧은 순간이
+    /// 있다. 읽기 전에 항상 이 값으로 먼저 확인한다.
+    /// </summary>
+    public bool IsReady => Object != null && Object.IsValid;
+
     private CoreState _core;
     private DreamlandGameFlowController _flowController;
 
@@ -103,6 +113,16 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
     /// </summary>
     public void OnEnteredGameplayScene()
     {
+        if (!IsReady)
+        {
+            // 아직 Fusion이 [Networked] 값을 읽을 준비를 마치지 않았다.
+            // 여기서 강행하면 GameDifficultyState에서 실제로 재현된 것과
+            // 같은 InvalidOperationException이 나서 RoomManager의 재시도
+            // 코루틴이 죽어버린다 - 호출한 쪽(RoomManager)이 IsReady를
+            // 먼저 확인하고 준비될 때까지 다시 부르게 하는 게 안전하다.
+            return;
+        }
+
         _core = FindAnyObjectByType<CoreState>(FindObjectsInactive.Include);
         _flowController =
             FindAnyObjectByType<DreamlandGameFlowController>(

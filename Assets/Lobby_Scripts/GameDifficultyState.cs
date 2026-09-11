@@ -29,6 +29,19 @@ public class GameDifficultyState : NetworkBehaviour
     [Networked, OnChangedRender(nameof(HandleDifficultyChanged))]
     public GameDifficulty CurrentDifficulty { get; set; }
 
+    /// <summary>
+    /// 실제로 재현된 오류: 참가자가 접속한 직후(호스트 콘솔에
+    /// "InvalidOperationException: Error when accessing
+    /// GameDifficultyState.CurrentDifficulty..." 로 정확히 찍힘) 이
+    /// 오브젝트가 FindAnyObjectByType으로는 이미 "찾아지지만" Fusion이
+    /// 아직 [Networked] 값을 읽을 수 있는 상태로 완전히 붙여놓기 전인
+    /// 짧은 순간이 있다. 이 틈에 CurrentDifficulty를 읽으면 예외가 나고,
+    /// 그 예외가 호출한 쪽 메서드를 중간에서 끊어버려서 로비 흐름(난이도
+    /// UI 갱신 -> 게임 시작 진행)이 그 프레임에서 깨진다. 읽기 전에
+    /// 항상 이 값으로 먼저 확인해야 안전하다.
+    /// </summary>
+    public bool IsReady => Object != null && Object.IsValid;
+
     public event System.Action<GameDifficulty> DifficultyChanged;
 
     /// <summary>
