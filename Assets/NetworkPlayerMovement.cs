@@ -1,4 +1,3 @@
-using System;
 using DreamGuardians;
 using Fusion;
 using UnityEngine;
@@ -233,7 +232,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
 
             ComputeStartStageBounds();
         }
-        catch (Exception exception)
+        catch (System.Exception exception)
         {
             Debug.LogError(
                 "[NetworkPlayerMovement] Spawned() 중 이동 경계 설정 단계에서 " +
@@ -353,7 +352,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
                     hudFollowers[i].SetCamera(playerCamera);
                 }
             }
-            catch (Exception exception)
+            catch (System.Exception exception)
             {
                 Debug.LogError(
                     "[NetworkPlayerMovement] ViewLockedHudFollower 카메라 연결 중 예외: " +
@@ -372,7 +371,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
                         FindObjectsInactive.Include);
                 missionBannerUI?.Configure(playerCamera);
             }
-            catch (Exception exception)
+            catch (System.Exception exception)
             {
                 Debug.LogError(
                     "[NetworkPlayerMovement] MissionBannerUI 카메라 연결 중 예외 " +
@@ -388,7 +387,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
                         FindObjectsInactive.Include);
                 coreHealthHud?.SetCamera(playerCamera);
             }
-            catch (Exception exception)
+            catch (System.Exception exception)
             {
                 Debug.LogError(
                     "[NetworkPlayerMovement] CoreHealthHUD 카메라 연결 중 예외 " +
@@ -407,7 +406,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
                         FindObjectsInactive.Include);
                 toyFriend?.SetPlayerLookTarget(playerCamera.transform);
             }
-            catch (Exception exception)
+            catch (System.Exception exception)
             {
                 Debug.LogError(
                     "[NetworkPlayerMovement] ToyFriendController 카메라 연결 중 예외: " +
@@ -423,7 +422,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
             {
                 FinalBossAttackController.SetLocalViewerCamera(playerCamera);
             }
-            catch (Exception exception)
+            catch (System.Exception exception)
             {
                 Debug.LogError(
                     "[NetworkPlayerMovement] FinalBossAttackController 카메라 연결 중 예외: " +
