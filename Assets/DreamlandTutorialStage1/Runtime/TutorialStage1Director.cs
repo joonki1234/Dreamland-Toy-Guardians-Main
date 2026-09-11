@@ -535,32 +535,50 @@ namespace DreamGuardians
 
             // Only the Master creates the enemy. Every peer resolves the shared ID,
             // including peers whose scene or enemy replication arrives later.
-            float connectionStarted = Time.realtimeSinceStartup;
-            float nextDiagnostic = connectionStarted + 10f;
-            while (spawner != null && !spawner.TryFindTutorialEnemy(out tutorialEnemy))
+            //
+            // 60초 안에 못 찾으면 예전에는 State = Idle로 완전히 죽어버리고 다시는
+            // 재시도하지 않았다 - 네트워크 타이밍이 드물게 꼬이면(늦게 합류, 순간적인
+            // 지연 등) 이게 "미션 배너가 처음 상태 그대로 영원히 멈춤" 증상으로
+            // 이어질 수 있었다. spawner 자체가 없어져서 복구 불가능한 경우가
+            // 아니라면, 진단 로그만 남기고 대기를 계속 재시도한다.
+            while (spawner != null && tutorialEnemy == null)
             {
-                if (spawner.CanSpawnTutorialEnemy && !spawner.TutorialSpawnIssued)
+                float connectionStarted = Time.realtimeSinceStartup;
+                float nextDiagnostic = connectionStarted + 10f;
+
+                while (spawner != null && !spawner.TryFindTutorialEnemy(out tutorialEnemy))
                 {
-                    PlaceTutorialSpawnInFrontOfCamera();
-                    spawner.SpawnTutorialEnemy(tutorialSpawnPoint);
+                    if (spawner.CanSpawnTutorialEnemy && !spawner.TutorialSpawnIssued)
+                    {
+                        PlaceTutorialSpawnInFrontOfCamera();
+                        spawner.SpawnTutorialEnemy(tutorialSpawnPoint);
+                    }
+
+                    if (Time.realtimeSinceStartup >= nextDiagnostic)
+                    {
+                        string detail = spawner.IsTutorialSessionReady
+                            ? $"master={spawner.CanSpawnTutorialEnemy}, issued={spawner.TutorialSpawnIssued}, enemy={spawner.TutorialEnemyId}"
+                            : "RoomManager.Runner 연결 또는 Scene NetworkObject 등록 대기";
+                        Debug.LogWarning($"[TutorialNetwork] 복제 연결 대기: {detail}", this);
+                        nextDiagnostic += 10f;
+                    }
+                    if (Time.realtimeSinceStartup - connectionStarted >= 60f) break;
+                    yield return new WaitForSecondsRealtime(0.25f);
                 }
 
-                if (Time.realtimeSinceStartup >= nextDiagnostic)
+                if (tutorialEnemy == null && spawner != null)
                 {
-                    string detail = spawner.IsTutorialSessionReady
-                        ? $"master={spawner.CanSpawnTutorialEnemy}, issued={spawner.TutorialSpawnIssued}, enemy={spawner.TutorialEnemyId}"
-                        : "RoomManager.Runner 연결 또는 Scene NetworkObject 등록 대기";
-                    Debug.LogWarning($"[TutorialNetwork] 복제 연결 대기: {detail}", this);
-                    nextDiagnostic += 10f;
+                    Debug.LogError(
+                        "[TutorialNetwork] 60초 연결 대기 종료 - 포기하지 않고 다시 시도합니다. " +
+                        "세션/Scene 등록/Enemy 복제 상태를 확인하세요.",
+                        this);
                 }
-                if (Time.realtimeSinceStartup - connectionStarted >= 60f) break;
-                yield return new WaitForSecondsRealtime(0.25f);
             }
 
             if (tutorialEnemy == null)
             {
                 Debug.LogError(
-                    "[TutorialNetwork] 연결 대기 종료. 세션/Scene 등록/Enemy 복제 상태를 확인하세요.",
+                    "[TutorialNetwork] Spawner를 잃어버려 연결 대기를 더 이상 진행할 수 없습니다.",
                     this);
 
                 State = TutorialStage1State.Idle;

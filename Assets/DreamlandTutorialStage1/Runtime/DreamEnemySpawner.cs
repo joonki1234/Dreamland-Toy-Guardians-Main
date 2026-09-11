@@ -93,17 +93,42 @@ namespace DreamGuardians
         private readonly HashSet<EnemyPurification> activeEnemies =
             new HashSet<EnemyPurification>();
 
+        // activeEnemies 자체는 이 집합을 실제로 채우고 비우는 클라이언트(=상태 권한을
+        // 가진 마스터)에서만 정확하다. 다른 클라이언트는 적이 Runner.Spawn()의
+        // onBeforeSpawned 콜백(마스터에서만 호출됨)을 거치지 않아 이 집합에 아예 안
+        // 들어오므로, ActiveEnemyCount를 그대로 읽으면 항상 0에 가까웠다 - 그 값을
+        // 읽어서 "적이 0마리가 될 때까지 대기"하는 Stage1WaveController/
+        // Stage2WaveController의 웨이브 클리어 판정이 비-마스터 클라이언트에서
+        // 실제 전투와 무관하게 어긋나고, 그 결과 미션 배너 문구가 갱신되지 않는
+        // 것처럼 보였다. activeEnemies가 바뀔 때마다 이 값도 같이 갱신해서 모든
+        // 클라이언트에 복제되게 한다.
+        [Networked] private int NetworkedActiveEnemyCount { get; set; }
+
         private int nextSpawnPointIndex;
         private int spawnedCombatEnemyCount;
         private int spawnCancellationVersion;
 
-        public int ActiveEnemyCount => activeEnemies.Count;
+        public int ActiveEnemyCount => NetworkedActiveEnemyCount;
         public GameObject EnemyPrefab => enemyPrefab;
         public CoreState TargetCore => targetCore;
         public IReadOnlyList<Transform> SpawnPoints => spawnPoints;
 
         public event Action<EnemyHealth> EnemySpawned;
         public event Action AllEnemiesCleared;
+
+        // activeEnemies를 바꾼 직후 반드시 이 메서드를 호출해서
+        // NetworkedActiveEnemyCount를 같이 갱신한다. HasStateAuthority 가드는
+        // DespawnEnemyImmediately/DespawnAllEnemiesImmediately 같은 테스트 전용
+        // 헬퍼가 상태 권한 없는 클라이언트에서 호출될 때 Fusion이 [Networked]
+        // 값 쓰기를 거부/경고하지 않도록 막아준다 - 그 경우엔 로컬 activeEnemies
+        // 정리만 조용히 진행된다.
+        private void SyncActiveEnemyCount()
+        {
+            if (Object != null && Object.HasStateAuthority)
+            {
+                NetworkedActiveEnemyCount = activeEnemies.Count;
+            }
+        }
 
 
         private void Awake()
@@ -617,6 +642,7 @@ namespace DreamGuardians
 
                 activeEnemies.Remove(
                     purification);
+                SyncActiveEnemyCount();
             }
 
             Destroy(enemy.gameObject);
@@ -659,6 +685,7 @@ namespace DreamGuardians
 
                 purification.Completed -= HandlePurificationCompleted;
                 activeEnemies.Remove(purification);
+                SyncActiveEnemyCount();
                 Destroy(purification.gameObject);
             }
 
@@ -1019,6 +1046,7 @@ namespace DreamGuardians
 
             activeEnemies.Add(
                 purification);
+            SyncActiveEnemyCount();
 
             EnemySpawned?.Invoke(
                 health);
@@ -1252,6 +1280,7 @@ namespace DreamGuardians
 
             activeEnemies.Remove(
                 purification);
+            SyncActiveEnemyCount();
 
             if (activeEnemies.Count == 0)
             {
