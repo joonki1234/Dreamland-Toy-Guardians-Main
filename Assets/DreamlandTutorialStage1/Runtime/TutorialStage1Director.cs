@@ -342,7 +342,52 @@ namespace DreamGuardians
 
             flowRoutine =
                 StartCoroutine(
-                    BeginRoutine());
+                    SafeBeginRoutine());
+        }
+
+
+        /// <summary>
+        /// BeginRoutine() 안에서 예외(NullReferenceException 등)가 나면 코루틴이
+        /// 아무 로그도 없이 그냥 조용히 멈춰버린다 - 그러면 "이 사람 화면만
+        /// 로드/스토리/길이 처음 상태에서 멈춰 있다"는 증상만 보이고 정확히
+        /// 어디서 막혔는지 알 방법이 없다. yield return 문은 try/catch 블록
+        /// 안에 둘 수 없어서(C# 컴파일러 제약), IEnumerator를 직접
+        /// MoveNext()로 돌리면서 그 호출만 try/catch로 감싸는 표준적인
+        /// 방식으로 우회한다. 예외가 나면 어느 줄인지 스택 트레이스와 함께
+        /// 에러로 남기고 멈춘다(기존 동작과 동일하게 조용히 멈추긴 하지만,
+        /// 최소한 콘솔에서 원인을 바로 확인할 수 있다).
+        /// </summary>
+        private IEnumerator SafeBeginRoutine()
+        {
+            IEnumerator inner = BeginRoutine();
+
+            while (true)
+            {
+                object current;
+
+                try
+                {
+                    if (!inner.MoveNext())
+                    {
+                        yield break;
+                    }
+
+                    current = inner.Current;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        "[TutorialFlow] BeginRoutine() 도중 예외가 발생해 " +
+                        "튜토리얼 진행이 멈췄습니다(이 클라이언트 화면만 " +
+                        "이후 UI/길/대사가 갱신되지 않는 원인일 수 있습니다): " +
+                        exception,
+                        this);
+
+                    yield break;
+                }
+
+                yield return current;
+            }
         }
 
 

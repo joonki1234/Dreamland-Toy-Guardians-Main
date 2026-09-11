@@ -399,7 +399,47 @@ namespace DreamGuardians
 
             waveRoutine =
                 StartCoroutine(
-                    RunWaveRoutine());
+                    SafeRunWaveRoutine());
+        }
+
+        /// <summary>
+        /// RunWaveRoutine() 안에서 예외가 나면 코루틴이 아무 로그도 없이 조용히
+        /// 멈춘다 - 이 클라이언트만 Stage 1 진행(포탈/길 준비 요청, 웨이브
+        /// 스폰 등)이 처음 상태에서 멈춘 것처럼 보이는 원인이 될 수 있다.
+        /// TutorialStage1Director.SafeBeginRoutine()과 동일한 방식으로,
+        /// IEnumerator를 직접 MoveNext()로 돌리며 그 호출만 try/catch로
+        /// 감싸 예외 발생 지점을 콘솔에 남긴다.
+        /// </summary>
+        private IEnumerator SafeRunWaveRoutine()
+        {
+            IEnumerator inner = RunWaveRoutine();
+
+            while (true)
+            {
+                object current;
+
+                try
+                {
+                    if (!inner.MoveNext())
+                    {
+                        yield break;
+                    }
+
+                    current = inner.Current;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        "[Dreamland] RunWaveRoutine() 도중 예외가 발생해 " +
+                        "Stage 1 진행이 멈췄습니다: " +
+                        exception,
+                        this);
+
+                    yield break;
+                }
+
+                yield return current;
+            }
         }
 
 
