@@ -50,6 +50,15 @@ namespace DreamGuardians
         [Networked, OnChangedRender(nameof(HandleNetworkedDeathChanged))]
         private NetworkBool NetworkedIsDead { get; set; }
 
+        [Networked]
+        private NetworkBool NetworkedDamageEnabled { get; set; }
+
+        [Networked]
+        private NetworkBool NetworkedHasTutorialTargetOwner { get; set; }
+
+        [Networked]
+        private PlayerRef NetworkedTutorialTargetOwner { get; set; }
+
         // 튜토리얼 훈련용 몬스터(damageEnabled=false, 무적)는 실제 체력이
         // 줄지 않아 ApplyDamageAuthoritative가 아무 것도 하지 않는다. 그래서
         // "명중 횟수"만 따로 네트워크에 동기화해서, 방 안의 누가 맞혔든
@@ -76,6 +85,15 @@ namespace DreamGuardians
         {
             _spawnCompleted = true;
 
+            // EnemyWorldHealthBar is local presentation. ConfigureSpawnedEnemy's
+            // onBeforeSpawned callback runs only on the spawning authority, and a
+            // runtime-added MonoBehaviour is not replicated by Fusion. Ensure every
+            // peer builds its own World Space bar for this shared network enemy.
+            if (GetComponent<EnemyWorldHealthBar>() == null)
+            {
+                gameObject.AddComponent<EnemyWorldHealthBar>();
+            }
+
             // Configure() is called from Runner.Spawn's onBeforeSpawned callback.
             // At that point Networked properties are not available through this
             // component's IsNetworked guard, so maxHealth/local fallback hold the
@@ -85,6 +103,7 @@ namespace DreamGuardians
                 NetworkedMaxHealth = maxHealth;
                 NetworkedHealth = maxHealth;
                 NetworkedIsDead = false;
+                NetworkedDamageEnabled = damageEnabled;
                 NetworkedTutorialHitCount = 0;
             }
         }
@@ -98,7 +117,10 @@ namespace DreamGuardians
         public float CurrentHealth => IsNetworked ? NetworkedHealth : localHealthFallback;
         public float NormalizedHealth => MaxHealth <= 0f ? 0f : CurrentHealth / MaxHealth;
         public bool IsDead => IsNetworked ? NetworkedIsDead : localIsDeadFallback;
-        public bool DamageEnabled => damageEnabled;
+        public bool DamageEnabled => IsNetworked ? NetworkedDamageEnabled : damageEnabled;
+        public bool IsPlayerTutorialTarget =>
+            IsNetworked && NetworkedHasTutorialTargetOwner;
+        public PlayerRef TutorialTargetOwner => NetworkedTutorialTargetOwner;
 
         public event Action<EnemyHealth, float, float> HealthChanged;
         public event Action<EnemyHealth, DamageInfo> HitRegistered;
@@ -150,6 +172,7 @@ namespace DreamGuardians
                     NetworkedMaxHealth = maxHealth;
                     NetworkedHealth = maxHealth;
                     NetworkedIsDead = false;
+                    NetworkedDamageEnabled = damageEnabled;
                     NetworkedTutorialHitCount = 0;
                 }
             }
@@ -164,6 +187,25 @@ namespace DreamGuardians
 
         public void SetDamageEnabled(bool enabled)
         {
+            damageEnabled = enabled;
+            if (!IsNetworked) return;
+            if (Object.HasStateAuthority)
+                NetworkedDamageEnabled = enabled;
+            else
+                RPC_SetDamageEnabled(enabled);
+        }
+
+        public void SetTutorialTargetOwner(PlayerRef owner)
+        {
+            if (!IsNetworked || !Object.HasStateAuthority) return;
+            NetworkedTutorialTargetOwner = owner;
+            NetworkedHasTutorialTargetOwner = true;
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_SetDamageEnabled(NetworkBool enabled)
+        {
+            NetworkedDamageEnabled = enabled;
             damageEnabled = enabled;
         }
 
@@ -201,6 +243,10 @@ namespace DreamGuardians
         /// </summary>
         public bool TakeDamage(DamageInfo info)
         {
+            if (IsPlayerTutorialTarget &&
+                (Runner == null || Runner.LocalPlayer != NetworkedTutorialTargetOwner))
+                return false;
+
             if (IsDead || IsDuplicateShot(info))
             {
                 return false;
@@ -213,7 +259,7 @@ namespace DreamGuardians
             HitRegistered?.Invoke(this, info);
             DreamGameEvents.RaiseEnemyHit(this, info);
 
-            if (!damageEnabled)
+            if (!DamageEnabled)
             {
                 // 무적 상태(튜토리얼 훈련용)라 실제 데미지 계산 경로를
                 // 타지 않으므로, 명중 횟수만 별도로 동기화한다.
@@ -244,8 +290,12 @@ namespace DreamGuardians
             int role,
             int shotId,
             Vector3 hitPoint,
-            bool allowSynergy)
+            bool allowSynergy,
+            RpcInfo rpcInfo = default)
         {
+            if (IsPlayerTutorialTarget && rpcInfo.Source != NetworkedTutorialTargetOwner)
+                return;
+
             DamageInfo info = new DamageInfo(
                 amount,
                 playerId,
@@ -288,8 +338,10 @@ namespace DreamGuardians
         }
 
         [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-        private void RPC_RequestTutorialHit()
+        private void RPC_RequestTutorialHit(RpcInfo rpcInfo = default)
         {
+            if (IsPlayerTutorialTarget && rpcInfo.Source != NetworkedTutorialTargetOwner)
+                return;
             NetworkedTutorialHitCount++;
         }
 
@@ -314,7 +366,7 @@ namespace DreamGuardians
         /// </summary>
         private void ApplyDamageAuthoritative(DamageInfo info)
         {
-            bool wasDamageEnabled = damageEnabled;
+            bool wasDamageEnabled = DamageEnabled;
 
             SynergyResult synergyResult = SynergyResult.None;
             if (info.allowSynergy)

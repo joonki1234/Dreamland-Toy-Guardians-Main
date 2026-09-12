@@ -208,6 +208,15 @@ namespace DreamGuardians
         private void HandleHealthChanged(EnemyHealth _, float current, float maximum)
         {
             UpdateBar(maximum <= 0f ? 0f : current / maximum);
+
+            // Health is authoritative/networked, but visibility is local. A remote
+            // peer does not receive the shooter's local HitRegistered event, so use
+            // the replicated health change to reveal its own bar after damage.
+            if (barRoot != null && current > 0f && current < maximum)
+            {
+                UpdatePlacement();
+                barRoot.SetActive(true);
+            }
         }
 
         private void HandleHit(EnemyHealth _, DamageInfo __)

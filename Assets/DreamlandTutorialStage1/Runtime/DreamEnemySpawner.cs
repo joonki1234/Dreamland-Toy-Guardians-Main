@@ -28,6 +28,7 @@ namespace DreamGuardians
         // 인원수만큼 몬스터가 중복 생성되지 않는다.
         private RoomManager roomManager;
         public event Action TutorialPresentationRequested;
+        public event Action BasicTutorialCompletionChanged;
         public event Action SkillTutorialRequested;
         public event Action<bool> SkillTutorialSkipped;
         private bool skillTutorialTargetsClosed;
@@ -122,6 +123,101 @@ namespace DreamGuardians
 
         private readonly Dictionary<PlayerRef, NetworkId> skillTutorialTargets =
             new Dictionary<PlayerRef, NetworkId>();
+        private readonly Dictionary<PlayerRef, NetworkId> basicTutorialTargets =
+            new Dictionary<PlayerRef, NetworkId>();
+        private readonly HashSet<PlayerRef> completedBasicTutorialPlayers =
+            new HashSet<PlayerRef>();
+
+        public bool HasBasicTutorialTarget(PlayerRef player) =>
+            basicTutorialTargets.TryGetValue(player, out NetworkId id) &&
+            IsTutorialSessionReady && Runner.TryFindObject(id, out _);
+
+        public bool TryFindBasicTutorialTarget(PlayerRef player, out EnemyHealth enemy)
+        {
+            enemy = null;
+            if (!basicTutorialTargets.TryGetValue(player, out NetworkId id) ||
+                !IsTutorialSessionReady || !Runner.TryFindObject(id, out NetworkObject target))
+                return false;
+            enemy = target.GetComponent<EnemyHealth>();
+            return enemy != null;
+        }
+
+        public bool AreBasicTutorialHitsComplete(int requiredHits)
+        {
+            foreach (PlayerRef player in Runner.ActivePlayers)
+            {
+                if (!TryFindBasicTutorialTarget(player, out EnemyHealth target) ||
+                    target.NetworkedTutorialHitCount < requiredHits) return false;
+            }
+            return true;
+        }
+
+        public bool AreBasicTutorialPlayersComplete()
+        {
+            foreach (PlayerRef player in Runner.ActivePlayers)
+                if (!completedBasicTutorialPlayers.Contains(player)) return false;
+            return true;
+        }
+
+        public void SpawnBasicTutorialTarget(PlayerRef player, Vector3 groundPosition)
+        {
+            if (!CanSpawnTutorialEnemy || basicTutorialTargets.ContainsKey(player)) return;
+            EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
+                Quaternion.identity, true, 0.4f, null, null, true);
+            if (target == null) return;
+            target.SetTutorialTargetOwner(player);
+            RPC_RegisterBasicTutorialTarget(player, target.Object.Id);
+            EnemyPurification purification = target.GetComponent<EnemyPurification>();
+            if (purification != null)
+                purification.Completed += _ => RPC_CompleteBasicTutorialPlayer(player);
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_RegisterBasicTutorialTarget(PlayerRef player, NetworkId id)
+        {
+            basicTutorialTargets[player] = id;
+            StartCoroutine(BindTutorialTargetPresentation(player, id));
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_CompleteBasicTutorialPlayer(PlayerRef player)
+        {
+            completedBasicTutorialPlayers.Add(player);
+            BasicTutorialCompletionChanged?.Invoke();
+        }
+
+        private IEnumerator BindTutorialTargetPresentation(PlayerRef player, NetworkId id)
+        {
+            while (IsTutorialSessionReady)
+            {
+                if (Runner.TryFindObject(id, out NetworkObject target))
+                {
+                    TutorialTargetLocalPresentation presentation =
+                        target.GetComponent<TutorialTargetLocalPresentation>() ??
+                        target.gameObject.AddComponent<TutorialTargetLocalPresentation>();
+                    presentation.Initialize(player, Runner);
+                    yield break;
+                }
+                yield return null;
+            }
+        }
+
+        public void DespawnBasicTutorialTargets()
+        {
+            if (!CanSpawnTutorialEnemy) return;
+            foreach (NetworkId id in new List<NetworkId>(basicTutorialTargets.Values))
+                if (Runner.TryFindObject(id, out NetworkObject target) && target != null &&
+                    target.IsValid && target.HasStateAuthority)
+                    Runner.Despawn(target);
+            RPC_ClearBasicTutorialTargets();
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_ClearBasicTutorialTargets()
+        {
+            basicTutorialTargets.Clear();
+            completedBasicTutorialPlayers.Clear();
+        }
 
         public bool HasSkillTutorialTarget(PlayerRef player)
         {
@@ -157,6 +253,7 @@ namespace DreamGuardians
                 skillTutorialSpawnErrorLogged = true;
                 return;
             }
+            target.SetTutorialTargetOwner(player);
             RPC_RegisterSkillTutorialTarget(player, target.Object.Id);
         }
 
@@ -184,6 +281,10 @@ namespace DreamGuardians
                         mover.enabled = false;
                     }
                     if (!target.HasStateAuthority) MakeTutorialEnemyHighlyVisible(target.gameObject);
+                    TutorialTargetLocalPresentation presentation =
+                        target.GetComponent<TutorialTargetLocalPresentation>() ??
+                        target.gameObject.AddComponent<TutorialTargetLocalPresentation>();
+                    presentation.Initialize(player, Runner);
                     yield break;
                 }
                 yield return null;
@@ -258,11 +359,14 @@ namespace DreamGuardians
 
         private void OnDisable()
         {
+            DespawnBasicTutorialTargets();
             DespawnSkillTutorialTargets();
             foreach (Coroutine routine in skillTargetBindingRoutines.Values)
                 if (routine != null) StopCoroutine(routine);
             skillTargetBindingRoutines.Clear();
             skillTutorialTargets.Clear();
+            basicTutorialTargets.Clear();
+            completedBasicTutorialPlayers.Clear();
         }
 
         private NetworkRunner GetRunner()
@@ -1632,6 +1736,31 @@ namespace DreamGuardians
                 "[DreamEnemySpawner] 포탈 등장 완료 후 " +
                 "적 1마리 생성",
                 this);
+        }
+    }
+
+    [DisallowMultipleComponent]
+    public sealed class TutorialTargetLocalPresentation : MonoBehaviour
+    {
+        private PlayerRef owner;
+        private bool initialized;
+
+        public PlayerRef Owner => owner;
+
+        public void Initialize(PlayerRef targetOwner, NetworkRunner runner)
+        {
+            if (initialized && owner == targetOwner) return;
+            owner = targetOwner;
+            initialized = true;
+
+            bool showLocally = runner != null && runner.LocalPlayer == owner;
+            foreach (Renderer targetRenderer in GetComponentsInChildren<Renderer>(true))
+                if (targetRenderer != null) targetRenderer.enabled = showLocally;
+            foreach (Collider targetCollider in GetComponentsInChildren<Collider>(true))
+                if (targetCollider != null) targetCollider.enabled = showLocally;
+
+            EnemyWorldHealthBar healthBar = GetComponent<EnemyWorldHealthBar>();
+            if (!showLocally) healthBar?.Hide();
         }
     }
 }

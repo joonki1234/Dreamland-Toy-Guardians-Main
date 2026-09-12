@@ -289,6 +289,7 @@ namespace DreamGuardians
         private Coroutine stage1CompletionRoutine;
         private Coroutine postShootingStoryRoutine;
         private Coroutine tutorialPresentationStartRoutine;
+        private Coroutine basicTutorialCompletionRoutine;
 
         private bool emergencySuppressionCompleted;
         private bool chefBuilderSynergyCompleted;
@@ -326,6 +327,7 @@ namespace DreamGuardians
             if (spawner != null)
             {
                 spawner.TutorialPresentationRequested += HandleTutorialPresentationRequested;
+                spawner.BasicTutorialCompletionChanged += HandleBasicTutorialCompletionChanged;
                 spawner.SkillTutorialRequested += HandleSkillTutorialRequested;
                 spawner.SkillTutorialSkipped += HandleSkillTutorialSkipped;
             }
@@ -395,6 +397,7 @@ namespace DreamGuardians
             if (spawner != null)
             {
                 spawner.TutorialPresentationRequested -= HandleTutorialPresentationRequested;
+                spawner.BasicTutorialCompletionChanged -= HandleBasicTutorialCompletionChanged;
                 spawner.SkillTutorialRequested -= HandleSkillTutorialRequested;
                 spawner.SkillTutorialSkipped -= HandleSkillTutorialSkipped;
             }
@@ -849,46 +852,21 @@ namespace DreamGuardians
                 DreamEnemySpawner.TutorialPresentationPhase.BasicAttack);
 
 
-            // Only the Master creates the enemy. Every peer resolves the shared ID,
-            // including peers whose scene or enemy replication arrives later.
-            //
-            // 60초 안에 못 찾으면 예전에는 State = Idle로 완전히 죽어버리고 다시는
-            // 재시도하지 않았다 - 네트워크 타이밍이 드물게 꼬이면(늦게 합류, 순간적인
-            // 지연 등) 이게 "미션 배너가 처음 상태 그대로 영원히 멈춤" 증상으로
-            // 이어질 수 있었다. spawner 자체가 없어져서 복구 불가능한 경우가
-            // 아니라면, 진단 로그만 남기고 대기를 계속 재시도한다.
+            PlayerJobController localBasicPlayer = null;
             while (spawner != null && tutorialEnemy == null)
             {
-                float connectionStarted = Time.realtimeSinceStartup;
-                float nextDiagnostic = connectionStarted + 10f;
-
-                while (spawner != null && !spawner.TryFindTutorialEnemy(out tutorialEnemy))
+                foreach (PlayerJobController player in UnityEngine.Object.FindObjectsByType<PlayerJobController>(FindObjectsInactive.Exclude))
                 {
-                    if (spawner.CanSpawnTutorialEnemy && !spawner.TutorialSpawnIssued)
-                    {
-                        PlaceTutorialSpawnInFrontOfCamera();
-                        spawner.SpawnTutorialEnemy(tutorialSpawnPoint);
-                    }
-
-                    if (Time.realtimeSinceStartup >= nextDiagnostic)
-                    {
-                        string detail = spawner.IsTutorialSessionReady
-                            ? $"master={spawner.CanSpawnTutorialEnemy}, issued={spawner.TutorialSpawnIssued}, enemy={spawner.TutorialEnemyId}"
-                            : "RoomManager.Runner 연결 또는 Scene NetworkObject 등록 대기";
-                        Debug.LogWarning($"[TutorialNetwork] 복제 연결 대기: {detail}", this);
-                        nextDiagnostic += 10f;
-                    }
-                    if (Time.realtimeSinceStartup - connectionStarted >= 60f) break;
-                    yield return new WaitForSecondsRealtime(0.25f);
+                    if (player.Object != null && player.Object.IsValid && player.Object.HasInputAuthority)
+                        localBasicPlayer = player;
                 }
-
-                if (tutorialEnemy == null && spawner != null)
+                if (localBasicPlayer != null)
                 {
-                    Debug.LogError(
-                        "[TutorialNetwork] 60초 연결 대기 종료 - 포기하지 않고 다시 시도합니다. " +
-                        "세션/Scene 등록/Enemy 복제 상태를 확인하세요.",
-                        this);
+                    PlaceTutorialSpawnInFrontOfCamera();
+                    localBasicPlayer.RequestBasicTutorialTarget(tutorialSpawnPoint.position);
+                    spawner.TryFindBasicTutorialTarget(localBasicPlayer.Object.InputAuthority, out tutorialEnemy);
                 }
+                if (tutorialEnemy == null) yield return new WaitForSecondsRealtime(0.25f);
             }
 
             if (tutorialEnemy == null)
@@ -902,7 +880,7 @@ namespace DreamGuardians
                 yield break;
             }
 
-            Debug.Log($"[TutorialNetwork] Bound player={tutorialEnemy.Runner.LocalPlayer}, enemy={tutorialEnemy.Object.Id}", this);
+            Debug.Log($"[TutorialNetwork] Bound local basic target player={tutorialEnemy.Runner.LocalPlayer}, enemy={tutorialEnemy.Object.Id}", this);
 
             tutorialEnemy.SetDamageEnabled(false);
 
@@ -1287,6 +1265,10 @@ namespace DreamGuardians
 
         private IEnumerator PlayPostShootingStoryRoutine()
         {
+            while (spawner != null &&
+                   !spawner.AreBasicTutorialHitsComplete(requiredHitsPerPlayer))
+                yield return new WaitForSeconds(0.1f);
+
             missionUI?.SetObjective(string.Empty);
             missionUI?.SetProgress(string.Empty);
             missionUI?.HideTransientMessages();
@@ -1416,25 +1398,28 @@ namespace DreamGuardians
             EnemyPurification purification,
             float _)
         {
-            if (purification == null ||
-                purification.Health != tutorialEnemy)
-            {
-                return;
-            }
+            // Per-player basic targets report completion through the spawner after
+            // their full purification sequence finishes.
+        }
 
+        private void HandleBasicTutorialCompletionChanged()
+        {
+            if (!isActiveAndEnabled || State != TutorialStage1State.PurifyTutorialEnemy ||
+                spawner == null || !spawner.AreBasicTutorialPlayersComplete() ||
+                basicTutorialCompletionRoutine != null) return;
 
-            if (State !=
-                TutorialStage1State
-                    .PurifyTutorialEnemy)
-            {
-                return;
-            }
+            if (spawner.CanSpawnTutorialEnemy)
+                basicTutorialCompletionRoutine = StartCoroutine(CompleteBasicTutorialRoutine());
+        }
 
-
-            if (spawner != null && spawner.IsTutorialSessionReady)
-                spawner.BeginSkillTutorialAfterPurification();
-            else
-                HandleSkillTutorialRequested();
+        private IEnumerator CompleteBasicTutorialRoutine()
+        {
+            // Completed is raised immediately before EnemyPurification destroys its object.
+            // Let that frame finish before removing any disconnected-player target left over.
+            yield return null;
+            spawner.DespawnBasicTutorialTargets();
+            spawner.BeginSkillTutorialAfterPurification();
+            basicTutorialCompletionRoutine = null;
         }
 
         private void HandleSkillTutorialSkipped(bool startStage1)
@@ -1815,6 +1800,8 @@ namespace DreamGuardians
             if (postShootingStoryRoutine != null) StopCoroutine(postShootingStoryRoutine);
             if (tutorialPresentationStartRoutine != null)
                 StopCoroutine(tutorialPresentationStartRoutine);
+            if (basicTutorialCompletionRoutine != null)
+                StopCoroutine(basicTutorialCompletionRoutine);
             CleanupSkillTutorial();
 
             roleSelection?.Hide();
@@ -1825,11 +1812,19 @@ namespace DreamGuardians
             stage1CompletionRoutine = null;
             postShootingStoryRoutine = null;
             tutorialPresentationStartRoutine = null;
+            basicTutorialCompletionRoutine = null;
         }
 
 
         private void RemoveTutorialEnemy()
         {
+            if (spawner != null && spawner.CanSpawnTutorialEnemy)
+            {
+                spawner.DespawnBasicTutorialTargets();
+                tutorialEnemy = null;
+                return;
+            }
+
             if (tutorialEnemy == null)
             {
                 return;
@@ -1853,9 +1848,8 @@ namespace DreamGuardians
 
 
         /// <summary>
-        /// 명중 횟수는 이제 EnemyHealth.NetworkedTutorialHitCount(모든
-        /// 클라이언트에 동기화됨)를 그대로 표시한다 - 방 안의 누가
-        /// 맞혔든 모두가 같은 숫자를 본다.
+        /// 각 클라이언트는 자기 PlayerRef에 할당된 target의 복제된
+        /// NetworkedTutorialHitCount만 로컬 UI에 표시한다.
         /// </summary>
         private void RefreshShootingProgress()
         {

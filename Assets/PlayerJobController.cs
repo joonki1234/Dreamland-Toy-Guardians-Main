@@ -395,6 +395,20 @@ public class PlayerJobController : NetworkBehaviour
     public bool SkillTutorialCompleted { get; private set; }
     private DreamGuardians.DreamEnemySpawner skillTutorialSpawner;
 
+    public void RequestBasicTutorialTarget(Vector3 groundPosition)
+    {
+        if (Object != null && Object.IsValid && Object.HasInputAuthority)
+            RPC_RequestBasicTutorialTarget(groundPosition);
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
+    private void RPC_RequestBasicTutorialTarget(Vector3 groundPosition)
+    {
+        if (!Runner.IsSharedModeMasterClient) return;
+        skillTutorialSpawner ??= FindAnyObjectByType<DreamGuardians.DreamEnemySpawner>();
+        skillTutorialSpawner?.SpawnBasicTutorialTarget(Object.InputAuthority, groundPosition);
+    }
+
     public void RequestTutorialSkillTarget(Vector3 groundPosition)
     {
         if (Object != null && Object.IsValid && Object.HasInputAuthority)
