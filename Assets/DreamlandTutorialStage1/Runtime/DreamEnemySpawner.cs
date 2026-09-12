@@ -10,6 +10,16 @@ namespace DreamGuardians
     [RequireComponent(typeof(NetworkObject))]
     public sealed partial class DreamEnemySpawner : NetworkBehaviour
     {
+        public enum TutorialPresentationPhase
+        {
+            None,
+            PortalAndCore,
+            ToyFriendEntrance,
+            StoryDialogue,
+            MissionIntro,
+            BasicAttack
+        }
+
         // 협동 플레이 동기화: 몬스터는 이제 Runner.Spawn()으로 생성되는
         // 진짜 네트워크 오브젝트다(전에는 Instantiate로 각 클라이언트가
         // 따로 만들어서 서로에게 보이지 않았다). Shared Mode에서는
@@ -17,10 +27,52 @@ namespace DreamGuardians
         // 클라이언트는 그 결과를 그대로 받아서 보게 된다 - 그래야
         // 인원수만큼 몬스터가 중복 생성되지 않는다.
         private RoomManager roomManager;
+        public event Action TutorialPresentationRequested;
         public event Action SkillTutorialRequested;
         public event Action<bool> SkillTutorialSkipped;
         private bool skillTutorialTargetsClosed;
         private bool skillTutorialSpawnErrorLogged;
+
+        [Networked, OnChangedRender(nameof(HandleTutorialPresentationStarted))]
+        public TutorialPresentationPhase NetworkedTutorialPresentationPhase { get; private set; }
+
+        public bool TutorialPresentationStarted =>
+            NetworkedTutorialPresentationPhase > TutorialPresentationPhase.None;
+
+        public void RequestTutorialPresentationStart()
+        {
+            if (!IsTutorialSessionReady || TutorialPresentationStarted) return;
+
+            if (Object.HasStateAuthority)
+                StartTutorialPresentation();
+            else
+                RPC_RequestTutorialPresentationStart();
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_RequestTutorialPresentationStart()
+        {
+            StartTutorialPresentation();
+        }
+
+        private void StartTutorialPresentation()
+        {
+            if (TutorialPresentationStarted) return;
+            NetworkedTutorialPresentationPhase = TutorialPresentationPhase.PortalAndCore;
+            TutorialPresentationRequested?.Invoke();
+        }
+
+        public void AdvanceTutorialPresentation(TutorialPresentationPhase phase)
+        {
+            if (!CanSpawnTutorialEnemy || phase <= NetworkedTutorialPresentationPhase) return;
+            NetworkedTutorialPresentationPhase = phase;
+        }
+
+        private void HandleTutorialPresentationStarted()
+        {
+            if (TutorialPresentationStarted)
+                TutorialPresentationRequested?.Invoke();
+        }
 
         public bool TryRequestSkillTutorialSkip(bool startStage1)
         {

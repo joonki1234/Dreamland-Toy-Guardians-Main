@@ -288,6 +288,7 @@ namespace DreamGuardians
         private Coroutine transitionToWaveRoutine;
         private Coroutine stage1CompletionRoutine;
         private Coroutine postShootingStoryRoutine;
+        private Coroutine tutorialPresentationStartRoutine;
 
         private bool emergencySuppressionCompleted;
         private bool chefBuilderSynergyCompleted;
@@ -324,6 +325,7 @@ namespace DreamGuardians
         {
             if (spawner != null)
             {
+                spawner.TutorialPresentationRequested += HandleTutorialPresentationRequested;
                 spawner.SkillTutorialRequested += HandleSkillTutorialRequested;
                 spawner.SkillTutorialSkipped += HandleSkillTutorialSkipped;
             }
@@ -353,8 +355,37 @@ namespace DreamGuardians
 
             if (autoStart)
             {
-                Begin();
+                tutorialPresentationStartRoutine =
+                    StartCoroutine(RequestTutorialPresentationStart());
             }
+        }
+
+        private IEnumerator RequestTutorialPresentationStart()
+        {
+            while (isActiveAndEnabled &&
+                   (spawner == null || !spawner.IsTutorialSessionReady))
+            {
+                ResolveReferences();
+                yield return null;
+            }
+
+            if (!isActiveAndEnabled || spawner == null) yield break;
+
+            spawner.RequestTutorialPresentationStart();
+
+            // The replicated flag also covers a client whose local event subscription
+            // happened after the authority had already started the presentation.
+            if (spawner.TutorialPresentationStarted)
+                HandleTutorialPresentationRequested();
+
+            tutorialPresentationStartRoutine = null;
+        }
+
+        private void HandleTutorialPresentationRequested()
+        {
+            if (!isActiveAndEnabled || !autoStart || flowRoutine != null ||
+                State != TutorialStage1State.Idle) return;
+            Begin();
         }
 
 
@@ -363,6 +394,7 @@ namespace DreamGuardians
             StopDirectorCoroutines();
             if (spawner != null)
             {
+                spawner.TutorialPresentationRequested -= HandleTutorialPresentationRequested;
                 spawner.SkillTutorialRequested -= HandleSkillTutorialRequested;
                 spawner.SkillTutorialSkipped -= HandleSkillTutorialSkipped;
             }
@@ -617,6 +649,11 @@ namespace DreamGuardians
             State =
                 TutorialStage1State.Intro;
 
+            DreamEnemySpawner.TutorialPresentationPhase entryPhase =
+                spawner != null
+                    ? spawner.NetworkedTutorialPresentationPhase
+                    : DreamEnemySpawner.TutorialPresentationPhase.PortalAndCore;
+
             // 튜토리얼 안내(등장 연출~대사) 중에는 코어 체력이 아직 의미가 없으니
             // 실제 사격 연습이 시작되기 전까지 숨겨둡니다.
             GetCoreHealthHud()?.SetVisible(false);
@@ -626,7 +663,8 @@ namespace DreamGuardians
              * 1단계:
              * 아군 포탈 → 코어 → Road_0 등장
              */
-            if (allyPortalCoreRevealController != null)
+            if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.PortalAndCore &&
+                allyPortalCoreRevealController != null)
             {
                 Debug.Log(
                     $"[TutorialFlow] 포탈/코어/Road_0 등장 연출 호출 직전. " +
@@ -662,6 +700,10 @@ namespace DreamGuardians
                         this);
                 }
             }
+            else if (allyPortalCoreRevealController != null)
+            {
+                allyPortalCoreRevealController.ShowImmediately();
+            }
             else
             {
                 Debug.LogWarning(
@@ -677,7 +719,11 @@ namespace DreamGuardians
              * 코어에서 나온 빛이 장난감 친구로 변하고,
              * 대화 위치까지 걸어온 뒤 플레이어를 바라봅니다.
              */
-            if (toyFriendEntranceSequence != null)
+            spawner?.AdvanceTutorialPresentation(
+                DreamEnemySpawner.TutorialPresentationPhase.ToyFriendEntrance);
+
+            if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.ToyFriendEntrance &&
+                toyFriendEntranceSequence != null)
             {
                 toyFriendEntranceSequence.PlaySequence();
 
@@ -694,6 +740,10 @@ namespace DreamGuardians
                         this);
                 }
             }
+            else if (toyFriend != null)
+            {
+                yield return toyFriend.ShowForStory(0f);
+            }
             else
             {
                 Debug.LogWarning(
@@ -706,7 +756,11 @@ namespace DreamGuardians
             /*
              * 3단계: 3D 장난감 친구의 스토리 설명
              */
-            if (dialogueData != null &&
+            spawner?.AdvanceTutorialPresentation(
+                DreamEnemySpawner.TutorialPresentationPhase.StoryDialogue);
+
+            if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.StoryDialogue &&
+                dialogueData != null &&
                 dialogueData.IntroLines != null)
             {
                 foreach (
@@ -718,7 +772,7 @@ namespace DreamGuardians
                 }
 
             }
-            else
+            else if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.StoryDialogue)
             {
                 yield return PlayDialogueLine(
                     new TutorialDialogueLine(
@@ -736,7 +790,8 @@ namespace DreamGuardians
             State = TutorialStage1State.RoleSelection;
             roleSelection?.Hide();
 
-            if (dialogueData != null)
+            if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.StoryDialogue &&
+                dialogueData != null)
             {
                 yield return PlayDialogueLine(
                     dialogueData.EnemyAppearsLine);
@@ -744,11 +799,15 @@ namespace DreamGuardians
 
             State = TutorialStage1State.Intro;
 
+            spawner?.AdvanceTutorialPresentation(
+                DreamEnemySpawner.TutorialPresentationPhase.MissionIntro);
+
 
             /*
              * 5단계: 설명과 직업 선택이 끝난 뒤 튜토리얼 시작 배너
              */
-            missionUI?.ShowBanner(
+            if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.MissionIntro)
+                missionUI?.ShowBanner(
                 dialogueData != null
                     ? dialogueData.MissionStartTitle
                     : "TUTORIAL START",
@@ -767,7 +826,8 @@ namespace DreamGuardians
                     ? dialogueData.MissionStartDuration
                     : 2f;
 
-            if (missionStartDuration > 0f)
+            if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.MissionIntro &&
+                missionStartDuration > 0f)
             {
                 yield return new WaitForSeconds(
                     missionStartDuration);
@@ -777,12 +837,16 @@ namespace DreamGuardians
             /*
              * 5단계: 튜토리얼 적 등장 전 대기
              */
-            if (firstSpawnDelay > 0f)
+            if (entryPhase <= DreamEnemySpawner.TutorialPresentationPhase.MissionIntro &&
+                firstSpawnDelay > 0f)
             {
                 yield return
                     new WaitForSeconds(
                         firstSpawnDelay);
             }
+
+            spawner?.AdvanceTutorialPresentation(
+                DreamEnemySpawner.TutorialPresentationPhase.BasicAttack);
 
 
             // Only the Master creates the enemy. Every peer resolves the shared ID,
@@ -1749,6 +1813,8 @@ namespace DreamGuardians
             if (transitionToWaveRoutine != null) StopCoroutine(transitionToWaveRoutine);
             if (stage1CompletionRoutine != null) StopCoroutine(stage1CompletionRoutine);
             if (postShootingStoryRoutine != null) StopCoroutine(postShootingStoryRoutine);
+            if (tutorialPresentationStartRoutine != null)
+                StopCoroutine(tutorialPresentationStartRoutine);
             CleanupSkillTutorial();
 
             roleSelection?.Hide();
@@ -1758,6 +1824,7 @@ namespace DreamGuardians
             transitionToWaveRoutine = null;
             stage1CompletionRoutine = null;
             postShootingStoryRoutine = null;
+            tutorialPresentationStartRoutine = null;
         }
 
 
