@@ -405,7 +405,8 @@ public class PlayerJobController : NetworkBehaviour
     private void RPC_RequestTutorialSkillTarget(Vector3 groundPosition)
     {
         if (!Runner.IsSharedModeMasterClient) return;
-        skillTutorialSpawner ??= FindAnyObjectByType<DreamGuardians.DreamEnemySpawner>();
+        if (skillTutorialSpawner == null)
+            skillTutorialSpawner = FindAnyObjectByType<DreamGuardians.DreamEnemySpawner>();
         if (skillTutorialSpawner == null)
         {
             Debug.LogError("[SkillTutorial] DreamEnemySpawner reference is missing.", this);

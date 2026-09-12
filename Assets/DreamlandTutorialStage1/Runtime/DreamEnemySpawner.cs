@@ -121,7 +121,7 @@ namespace DreamGuardians
             // RPC and object replication can arrive in either order. Configure only this instance.
             while (skillTutorialTargets.ContainsKey(player) && IsTutorialSessionReady)
             {
-                if (Runner.TryFindObject(id, out NetworkObject target))
+                if (Runner.TryFindObject(id, out NetworkObject target) && target != null && target.IsValid)
                 {
                     EnemyHealth health = target.GetComponent<EnemyHealth>();
                     if (health != null) health.Configure(baseEnemyHealth * 0.4f, false);
@@ -141,7 +141,7 @@ namespace DreamGuardians
         public void DespawnSkillTutorialTarget(PlayerRef player)
         {
             if (!CanSpawnTutorialEnemy || !skillTutorialTargets.TryGetValue(player, out NetworkId id)) return;
-            if (Runner.TryFindObject(id, out NetworkObject target))
+            if (Runner.TryFindObject(id, out NetworkObject target) && target != null && target.IsValid)
             {
                 if (!target.HasStateAuthority) return;
                 EnemyPurification purification = target.GetComponent<EnemyPurification>();
@@ -933,7 +933,7 @@ namespace DreamGuardians
                     fallbackObject,
                     tutorialEnemy,
                     healthMultiplier,
-                    spawnPoint);
+                    spawnPoint, registerTutorialEnemy);
             }
 
             NetworkRunner runner = GetRunner();
@@ -964,7 +964,7 @@ namespace DreamGuardians
                         networkObject.gameObject,
                         tutorialEnemy,
                         healthMultiplier,
-                        spawnPoint);
+                        spawnPoint, registerTutorialEnemy);
                 });
 
             if (tutorialEnemy && registerTutorialEnemy && spawnedObject != null)
@@ -988,7 +988,8 @@ namespace DreamGuardians
             GameObject enemyObject,
             bool tutorialEnemy,
             float healthMultiplier,
-            Transform spawnPoint)
+            Transform spawnPoint,
+            bool registerTutorialEnemy)
         {
             Vector3 position = enemyObject.transform.position;
 
@@ -1034,17 +1035,20 @@ namespace DreamGuardians
                 return null;
             }
 
-            RoleSynergyTracker synergyTracker =
-                GetOrAdd<RoleSynergyTracker>(
-                    enemyObject);
+            if (!tutorialEnemy || registerTutorialEnemy)
+            {
+                RoleSynergyTracker synergyTracker =
+                    GetOrAdd<RoleSynergyTracker>(
+                        enemyObject);
 
-            synergyTracker.ConfigureAudio(
-                emergencySuppressionSfx,
-                emergencySuppressionSfxVolume,
-                synergyAudioMinDistance,
-                synergyAudioMaxDistance,
-                synergyAudioDopplerLevel
-            );
+                synergyTracker.ConfigureAudio(
+                    emergencySuppressionSfx,
+                    emergencySuppressionSfxVolume,
+                    synergyAudioMinDistance,
+                    synergyAudioMaxDistance,
+                    synergyAudioDopplerLevel
+                );
+            }
 
             GetOrAdd<EnemyWorldHealthBar>(
                 enemyObject);
@@ -1192,16 +1196,20 @@ namespace DreamGuardians
             }
 
 
-            EnemyPurification purification =
-                GetOrAdd<EnemyPurification>(
-                    enemyObject);
+            EnemyPurification purification = null;
+            if (!tutorialEnemy || registerTutorialEnemy)
+            {
+                purification =
+                    GetOrAdd<EnemyPurification>(
+                        enemyObject);
 
-            purification.Configure(
-                targetCore,
-                energyRewardPerEnemy);
+                purification.Configure(
+                    targetCore,
+                    energyRewardPerEnemy);
 
-            purification.Completed +=
-                HandlePurificationCompleted;
+                purification.Completed +=
+                    HandlePurificationCompleted;
+            }
 
             float configuredHealth =
                 baseEnemyHealth *
@@ -1215,12 +1223,15 @@ namespace DreamGuardians
                 configuredHealth,
                 !tutorialEnemy);
 
-            activeEnemies.Add(
-                purification);
-            SyncActiveEnemyCount();
+            if (purification != null)
+            {
+                activeEnemies.Add(
+                    purification);
+                SyncActiveEnemyCount();
 
-            EnemySpawned?.Invoke(
-                health);
+                EnemySpawned?.Invoke(
+                    health);
+            }
 
             return health;
         }

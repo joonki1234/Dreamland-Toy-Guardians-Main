@@ -99,16 +99,25 @@ namespace DreamGuardians
             skillTutorialStarted = true;
             State = TutorialStage1State.SkillPractice;
             bool missingPlayerLogged = false;
-            while (localSkillPlayer == null)
+            if (spawner == null || !spawner.IsTutorialSessionReady) yield break;
+            skillTutorialParticipants.Clear();
+            foreach (Fusion.PlayerRef playerRef in spawner.Runner.ActivePlayers)
+                skillTutorialParticipants[playerRef] = null;
+            while (true)
             {
-                skillTutorialParticipants.Clear();
+                if (spawner == null || !spawner.IsTutorialSessionReady) yield break;
+                PruneDisconnectedSkillPlayers();
                 foreach (PlayerJobController player in UnityEngine.Object.FindObjectsByType<PlayerJobController>(FindObjectsInactive.Exclude))
                 {
                     if (player.Object == null || !player.Object.IsValid) continue;
+                    if (!skillTutorialParticipants.ContainsKey(player.Object.InputAuthority)) continue;
                     skillTutorialParticipants[player.Object.InputAuthority] = player;
                     if (player.Object.HasInputAuthority) localSkillPlayer = player;
                 }
-                if (localSkillPlayer != null) break;
+                bool allSpawned = localSkillPlayer != null;
+                foreach (PlayerJobController player in skillTutorialParticipants.Values)
+                    if (player == null || player.Object == null || !player.Object.IsValid) allSpawned = false;
+                if (allSpawned) break;
                 if (!missingPlayerLogged)
                 {
                     Debug.LogError("[SkillTutorial] Waiting for the spawned input-authority player.", this);
@@ -152,7 +161,7 @@ namespace DreamGuardians
             missionUI.ShowSkillTutorial(localSkillPlayer, false);
             localTutorialSkill.BeginTutorialPractice();
             yield return PlayToyFriendOnlyLine(null, "왼손 X 버튼을 눌러 스킬을 사용해 봐!", 3f, false);
-            if (toyFriend != null) yield return toyFriend.HideForCombat();
+            if (toyFriend != null) yield return PlaySkillTutorialFriendTransition(toyFriend, toyFriend.HideForCombat());
 
             if (!IsSkillTutorialSessionValid()) yield break;
             PlayerJob displayedJob = localSkillPlayer.CurrentJob;
@@ -174,7 +183,7 @@ namespace DreamGuardians
             }
 
             // Allow the real effect (including the falling menu) to play against its target.
-            if (toyFriend != null) yield return toyFriend.ShowForStory();
+            if (toyFriend != null) yield return PlaySkillTutorialFriendTransition(toyFriend, toyFriend.ShowForStory());
             yield return PlayToyFriendOnlyLine(null, "좋아! 바로 그거야!", 2f, true);
             yield return PlayToyFriendOnlyLine(null, "스킬은 강력하지만, 한 번 사용하면 잠시 다시 사용할 수 없어.", 4f, false);
             yield return PlayToyFriendOnlyLine(null, "적이 많이 몰리거나 위험할 때 사용해!", 3f, false);
@@ -188,7 +197,7 @@ namespace DreamGuardians
 
             missionUI.HideSkillTutorial();
             spawner.DespawnSkillTutorialTargets();
-            while (spawner.HasSkillTutorialTargets)
+            while (spawner != null && spawner.HasSkillTutorialTargets)
             {
                 if (!IsSkillTutorialSessionValid()) yield break;
                 // Also handles a Shared Mode master change while waiting for cleanup.
@@ -200,11 +209,19 @@ namespace DreamGuardians
             State = TutorialStage1State.TutorialClear;
         }
 
+        private IEnumerator PlaySkillTutorialFriendTransition(ToyFriendController friend, IEnumerator transition)
+        {
+            // This coroutine runs on the director, so destroying the friend does not stop it automatically.
+            while (friend != null && IsSkillTutorialSessionValid() && transition.MoveNext())
+                yield return transition.Current;
+        }
+
         private bool IsSkillTutorialSessionValid()
         {
             return isActiveAndEnabled && spawner != null && spawner.IsTutorialSessionReady &&
                    localSkillPlayer != null && localSkillPlayer.Object != null &&
-                   localSkillPlayer.Object.IsValid && localTutorialSkill != null;
+                   localSkillPlayer.Object.IsValid && localTutorialSkill != null &&
+                   localTutorialSkill.HasTutorialOrigin && missionUI != null;
         }
 
         private void HandleTutorialSkillActivated(PlayerJob job)
@@ -213,23 +230,20 @@ namespace DreamGuardians
                 localSkillPlayer == null || localSkillPlayer.Object == null ||
                 !localSkillPlayer.Object.HasInputAuthority) return;
             localTutorialSkillUsed = true;
-            missionUI?.ShowSkillTutorial(localSkillPlayer, true);
+            if (missionUI != null) missionUI.ShowSkillTutorial(localSkillPlayer, true);
         }
 
         private void PruneDisconnectedSkillPlayers()
         {
+            if (spawner == null || !spawner.IsTutorialSessionReady) return;
             foreach (Fusion.PlayerRef playerRef in new List<Fusion.PlayerRef>(skillTutorialParticipants.Keys))
             {
-                PlayerJobController player = skillTutorialParticipants[playerRef];
                 bool connected = false;
-                if (player != null && player.Object != null && player.Object.IsValid)
-                {
-                    foreach (Fusion.PlayerRef active in player.Runner.ActivePlayers)
-                        if (active == player.Object.InputAuthority) connected = true;
-                }
+                foreach (Fusion.PlayerRef active in spawner.Runner.ActivePlayers)
+                    if (active == playerRef) connected = true;
                 if (!connected)
                 {
-                    spawner?.DespawnSkillTutorialTarget(playerRef);
+                    spawner.DespawnSkillTutorialTarget(playerRef);
                     skillTutorialParticipants.Remove(playerRef);
                 }
             }
@@ -239,19 +253,20 @@ namespace DreamGuardians
         {
             PruneDisconnectedSkillPlayers();
             foreach (PlayerJobController player in skillTutorialParticipants.Values)
-                if (!player.SkillTutorialCompleted) return false;
+                if (player == null || player.Object == null || !player.Object.IsValid ||
+                    !player.SkillTutorialCompleted) return false;
             return true;
         }
 
         private void CleanupSkillTutorial()
         {
-            missionUI?.HideSkillTutorial();
+            if (missionUI != null) missionUI.HideSkillTutorial();
             if (localTutorialSkill != null)
             {
                 localTutorialSkill.OnSkillActivated -= HandleTutorialSkillActivated;
                 localTutorialSkill.EndTutorialPractice();
             }
-            spawner?.DespawnSkillTutorialTargets();
+            if (spawner != null) spawner.DespawnSkillTutorialTargets();
             localTutorialSkill = null;
             localSkillPlayer = null;
             skillTutorialParticipants.Clear();
@@ -1487,7 +1502,7 @@ namespace DreamGuardians
                             : line.Duration)
                     : Mathf.Max(0.2f, fallbackDuration);
 
-            missionUI?.HideTransientMessages();
+            if (missionUI != null) missionUI.HideTransientMessages();
 
             if (toyFriend != null)
             {
@@ -1500,7 +1515,7 @@ namespace DreamGuardians
             else
             {
                 // 3D 친구가 씬에서 누락된 경우에만 2D 대화창으로 폴백합니다.
-                missionUI?.ShowDialogue(
+                if (missionUI != null) missionUI.ShowDialogue(
                     speaker,
                     message,
                     duration);
