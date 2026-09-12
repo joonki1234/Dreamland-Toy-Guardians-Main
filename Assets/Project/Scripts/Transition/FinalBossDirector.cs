@@ -2279,7 +2279,15 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private void StopMinionRoutine()
     {
-        bossObject?.GetComponent<FinalBossFaceController>()?.CancelSummon();
+        // bossObject는 런타임에 생성된 인스턴스라 Boss Spawn 전에는 null이고,
+        // Play 종료/Script Reload 중에는 managed 참조가 남은 채 Unity의 native
+        // 오브젝트가 먼저 파괴될 수 있다. null 조건 연산자(?.)는 UnityEngine.Object의
+        // 파괴된 오브젝트 판정을 사용하지 않으므로 명시적인 Unity null 검사를 한다.
+        if (bossObject != null)
+        {
+            bossObject.GetComponent<FinalBossFaceController>()?.CancelSummon();
+        }
+
         if (minionRoutine == null)
         {
             return;
