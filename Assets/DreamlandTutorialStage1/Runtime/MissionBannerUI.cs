@@ -183,6 +183,15 @@ namespace DreamGuardians
 
         private void OnEnable()
         {
+            NetworkPlayerMovement.LocalPlayerCameraReady -= HandleLocalPlayerCameraReady;
+            NetworkPlayerMovement.LocalPlayerCameraReady += HandleLocalPlayerCameraReady;
+
+            if (NetworkPlayerMovement.LocalPlayerCamera != null)
+            {
+                HandleLocalPlayerCameraReady(
+                    NetworkPlayerMovement.LocalPlayerCamera);
+            }
+
             DreamGameEvents.SynergyTriggered -= HandleSynergy;
             DreamGameEvents.SynergyTriggered += HandleSynergy;
 
@@ -196,6 +205,7 @@ namespace DreamGuardians
 
         private void OnDisable()
         {
+            NetworkPlayerMovement.LocalPlayerCameraReady -= HandleLocalPlayerCameraReady;
             HideSkillTutorial();
             DreamGameEvents.SynergyTriggered -= HandleSynergy;
 
@@ -217,6 +227,14 @@ namespace DreamGuardians
             uiCamera = targetCamera;
             EnsureUI();
             ApplyCamera();
+        }
+
+        private void HandleLocalPlayerCameraReady(Camera targetCamera)
+        {
+            if (targetCamera != null)
+            {
+                Configure(targetCamera);
+            }
         }
 
         public void ShowBanner(

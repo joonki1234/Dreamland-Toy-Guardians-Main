@@ -93,7 +93,7 @@ public sealed class DreamRoadRevealController : MonoBehaviour
     private Coroutine road3Routine;
     private Coroutine road4Routine;
 
-    private void Start()
+    private void Awake()
     {
         if (hideAllRoadsOnStart)
         {
@@ -423,6 +423,38 @@ public sealed class DreamRoadRevealController : MonoBehaviour
         }
 
         roadRoot.gameObject.SetActive(active);
+    }
+
+    public void RevealRoad(int roadIndex)
+    {
+        switch (roadIndex)
+        {
+            case 0: RevealRoad0(); break;
+            case 1: RevealRoad1(); break;
+            case 2: RevealRoad2(); break;
+            case 3: RevealRoad3(); break;
+            case 4: RevealRoad4(); break;
+        }
+    }
+
+    public void ShowRoadImmediately(int roadIndex)
+    {
+        Transform road = GetRoad(roadIndex);
+        ShowRoadImmediately(road);
+        SetExtraRoadObjectsActive(GetExtraRoadObjects(road), true);
+    }
+
+    private Transform GetRoad(int roadIndex)
+    {
+        switch (roadIndex)
+        {
+            case 0: return road0;
+            case 1: return road1;
+            case 2: return road2;
+            case 3: return road3;
+            case 4: return road4;
+            default: return null;
+        }
     }
 
     private Transform[] GetExtraRoadObjects(Transform roadRoot)

@@ -43,6 +43,21 @@ using DreamGuardians;
 /// </summary>
 public sealed class DreamlandProgressSync : NetworkBehaviour
 {
+    public enum MapRevealStage
+    {
+        None,
+        Road0,
+        Road1,
+        Road2,
+        Road3,
+        Road4,
+        Part1,
+        Part2,
+        Part3,
+        Part4,
+        Fence
+    }
+
     /// <summary>
     /// 같은 클라이언트 안에서 CoreState.TakeDamage() /
     /// DreamlandGameFlowController.ChangeState()가 바로 참조할 수 있도록
@@ -56,6 +71,9 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
 
     [Networked, OnChangedRender(nameof(HandleGameFlowStateChanged))]
     private DreamlandGameFlowController.GameFlowState NetworkedGameFlowState { get; set; }
+
+    [Networked, OnChangedRender(nameof(HandleMapRevealStageChanged))]
+    private MapRevealStage NetworkedMapRevealStage { get; set; }
 
     [Networked]
     private NetworkBool Initialized { get; set; }
@@ -72,6 +90,9 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
 
     private CoreState _core;
     private DreamlandGameFlowController _flowController;
+    private DreamRoadRevealController _roadRevealController;
+    private DreamWorldRevealController _worldRevealController;
+    private MapRevealStage _locallyAppliedRevealStage;
 
     public override void Spawned()
     {
@@ -97,6 +118,7 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
         _flowController =
             FindAnyObjectByType<DreamlandGameFlowController>(
                 FindObjectsInactive.Include);
+        ResolveRevealControllers();
     }
 
     private void OnDestroy()
@@ -147,6 +169,8 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
                     : DreamlandGameFlowController.GameFlowState
                         .WaitingForStage1Complete;
 
+            NetworkedMapRevealStage = MapRevealStage.None;
+
             Initialized = true;
         }
 
@@ -156,6 +180,7 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
         // 값을 직접 한 번 반영해 준다.
         HandleCoreHealthChanged();
         HandleGameFlowStateChanged();
+        ApplyMapRevealState(animateLatestStage: false);
     }
 
     /// <summary>
@@ -201,6 +226,23 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
         }
     }
 
+    public void RequestMapRevealStage(MapRevealStage stage)
+    {
+        if (Object == null || stage <= MapRevealStage.None)
+        {
+            return;
+        }
+
+        if (Object.HasStateAuthority)
+        {
+            AdvanceMapRevealStage(stage);
+        }
+        else
+        {
+            RPC_RequestMapRevealStage(stage);
+        }
+    }
+
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     private void RPC_RequestCoreDamage(float amount)
     {
@@ -212,6 +254,20 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
         DreamlandGameFlowController.GameFlowState state)
     {
         NetworkedGameFlowState = state;
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    private void RPC_RequestMapRevealStage(MapRevealStage stage)
+    {
+        AdvanceMapRevealStage(stage);
+    }
+
+    private void AdvanceMapRevealStage(MapRevealStage stage)
+    {
+        if (stage > NetworkedMapRevealStage)
+        {
+            NetworkedMapRevealStage = stage;
+        }
     }
 
     private void ApplyCoreDamage(float amount)
@@ -240,5 +296,78 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
                 FindObjectsInactive.Include);
 
         _flowController?.ApplyNetworkedState(NetworkedGameFlowState);
+    }
+
+    private void HandleMapRevealStageChanged()
+    {
+        ApplyMapRevealState(animateLatestStage: true);
+    }
+
+    private void ApplyMapRevealState(bool animateLatestStage)
+    {
+        ResolveRevealControllers();
+
+        if (_roadRevealController == null || _worldRevealController == null)
+        {
+            return;
+        }
+
+        MapRevealStage target = NetworkedMapRevealStage;
+        if (target <= _locallyAppliedRevealStage)
+        {
+            return;
+        }
+
+        for (int value = (int)_locallyAppliedRevealStage + 1;
+             value <= (int)target;
+             value++)
+        {
+            MapRevealStage stage = (MapRevealStage)value;
+            bool animate = animateLatestStage && stage == target;
+            ApplySingleMapRevealStage(stage, animate);
+        }
+
+        _locallyAppliedRevealStage = target;
+    }
+
+    private void ApplySingleMapRevealStage(MapRevealStage stage, bool animate)
+    {
+        int roadIndex = (int)stage - (int)MapRevealStage.Road0;
+        if (roadIndex >= 0 && roadIndex <= 4)
+        {
+            if (animate)
+            {
+                _roadRevealController.RevealRoad(roadIndex);
+            }
+            else
+            {
+                _roadRevealController.ShowRoadImmediately(roadIndex);
+            }
+
+            return;
+        }
+
+        int worldStep = (int)stage - (int)MapRevealStage.Part1;
+        if (worldStep >= 0 && worldStep <= 4)
+        {
+            if (animate)
+            {
+                _worldRevealController.RevealStep(worldStep);
+            }
+            else
+            {
+                _worldRevealController.ShowStepImmediately(worldStep);
+            }
+        }
+    }
+
+    private void ResolveRevealControllers()
+    {
+        _roadRevealController ??=
+            FindAnyObjectByType<DreamRoadRevealController>(
+                FindObjectsInactive.Include);
+        _worldRevealController ??=
+            FindAnyObjectByType<DreamWorldRevealController>(
+                FindObjectsInactive.Include);
     }
 }

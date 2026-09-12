@@ -50,6 +50,9 @@ namespace DreamGuardians
 
         private void OnEnable()
         {
+            NetworkPlayerMovement.LocalPlayerCameraReady -= HandleLocalPlayerCameraReady;
+            NetworkPlayerMovement.LocalPlayerCameraReady += HandleLocalPlayerCameraReady;
+
             core ??= GetComponent<CoreState>();
 
             if (core != null)
@@ -59,6 +62,11 @@ namespace DreamGuardians
             }
 
             EnsureUI();
+            if (NetworkPlayerMovement.LocalPlayerCamera != null)
+            {
+                HandleLocalPlayerCameraReady(
+                    NetworkPlayerMovement.LocalPlayerCamera);
+            }
             if (canvasObject != null)
             {
                 canvasObject.SetActive(requestedVisible);
@@ -68,6 +76,7 @@ namespace DreamGuardians
 
         private void OnDisable()
         {
+            NetworkPlayerMovement.LocalPlayerCameraReady -= HandleLocalPlayerCameraReady;
             if (core != null)
             {
                 core.HealthChanged -= HandleHealthChanged;
@@ -77,11 +86,6 @@ namespace DreamGuardians
             {
                 canvasObject.SetActive(false);
             }
-        }
-
-        private void LateUpdate()
-        {
-            ApplyCamera();
         }
 
         private void OnDestroy()
@@ -103,6 +107,14 @@ namespace DreamGuardians
             explicitCamera = camera;
             cameraExplicitlySet = camera != null;
             ApplyCamera();
+        }
+
+        private void HandleLocalPlayerCameraReady(Camera camera)
+        {
+            if (camera != null)
+            {
+                SetCamera(camera);
+            }
         }
 
         /// <summary>

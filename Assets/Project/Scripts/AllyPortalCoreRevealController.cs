@@ -399,7 +399,16 @@ public sealed class AllyPortalCoreRevealController : MonoBehaviour
          */
         if (roadRevealController != null)
         {
-            roadRevealController.RevealRoad0();
+            DreamlandProgressSync sync = DreamlandProgressSync.Instance;
+            if (sync != null && sync.IsReady)
+            {
+                sync.RequestMapRevealStage(
+                    DreamlandProgressSync.MapRevealStage.Road0);
+            }
+            else
+            {
+                roadRevealController.RevealRoad0();
+            }
         }
         else
         {

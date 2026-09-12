@@ -85,6 +85,7 @@ public class NetworkPlayerMovement : NetworkBehaviour
     /// 폴링해서 스폰된 뒤에 가져다 쓴다.
     /// </summary>
     public static Camera LocalPlayerCamera { get; private set; }
+    public static event System.Action<Camera> LocalPlayerCameraReady;
 
     private CharacterController _cc;
     private SphereCollider _boundarySphereCollider;
@@ -251,6 +252,11 @@ public class NetworkPlayerMovement : NetworkBehaviour
             // "렌더링(Camera 컴포넌트)"뿐이므로, 컴포넌트만 비활성화해
             // 오브젝트(와 그 자식 무기)는 계속 활성 상태로 둔다.
             playerCamera.enabled = isMine;
+
+            if (isMine)
+            {
+                LocalPlayerCameraReady?.Invoke(playerCamera);
+            }
         }
         else
         {

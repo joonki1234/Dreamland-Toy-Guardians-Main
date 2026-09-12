@@ -166,15 +166,17 @@ public sealed class DreamWorldRevealController : MonoBehaviour
     {
         ResolveReferences();
         CaptureAllOriginalStates();
+
+        if (hideAllGroupsOnStart)
+        {
+            HideAllGroupsImmediately();
+        }
     }
 
 
     private void Start()
     {
-        if (hideAllGroupsOnStart)
-        {
-            HideAllGroupsImmediately();
-        }
+        // 초기 Hide는 네트워크 상태 적용보다 반드시 먼저 끝나도록 Awake에서 한다.
     }
 
 
@@ -1176,6 +1178,44 @@ public sealed class DreamWorldRevealController : MonoBehaviour
         sequenceRoutine = null;
         groupRevealRoutines.Clear();
         revealingGroups.Clear();
+    }
+
+    public void RevealStep(int step)
+    {
+        switch (step)
+        {
+            case 0: RevealPart1(); break;
+            case 1: RevealPart2(); break;
+            case 2: RevealPart3(); break;
+            case 3: RevealPart4(); break;
+            case 4: RevealFence(); break;
+        }
+    }
+
+    public void ShowStepImmediately(int step)
+    {
+        Transform group = GetStepGroup(step);
+        if (group == null)
+        {
+            return;
+        }
+
+        EnsureFinalDreamlandRootActive();
+        ShowGroupImmediately(group);
+        revealedGroups.Add(group);
+    }
+
+    private Transform GetStepGroup(int step)
+    {
+        switch (step)
+        {
+            case 0: return part1;
+            case 1: return part2;
+            case 2: return part3;
+            case 3: return part4;
+            case 4: return fence;
+            default: return null;
+        }
     }
 
 

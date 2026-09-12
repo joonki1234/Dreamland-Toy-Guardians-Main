@@ -664,7 +664,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         road1Revealed = true;
 
-        roadRevealController?.RevealRoad1();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Road1,
+            () => roadRevealController?.RevealRoad1());
 
         Debug.Log(
             "[PortalStage] Portal A에서 Road_1 생성",
@@ -681,7 +683,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         road2Revealed = true;
 
-        roadRevealController?.RevealRoad2();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Road2,
+            () => roadRevealController?.RevealRoad2());
 
         Debug.Log(
             "[PortalStage] Portal B에서 Road_2 생성",
@@ -698,7 +702,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         road3Revealed = true;
 
-        roadRevealController?.RevealRoad3();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Road3,
+            () => roadRevealController?.RevealRoad3());
 
         Debug.Log(
             "[PortalStage] Portal C에서 Road_3 생성",
@@ -715,7 +721,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         road4Revealed = true;
 
-        roadRevealController?.RevealRoad4();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Road4,
+            () => roadRevealController?.RevealRoad4());
 
         Debug.Log(
             "[PortalStage] Portal D에서 Road_4 생성",
@@ -736,7 +744,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         part1Revealed = true;
 
-        worldRevealController?.RevealPart1();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Part1,
+            () => worldRevealController?.RevealPart1());
 
         Debug.Log(
             "[PortalStage] Stage 2 첫 침식: Part_1",
@@ -753,7 +763,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         part2Revealed = true;
 
-        worldRevealController?.RevealPart2();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Part2,
+            () => worldRevealController?.RevealPart2());
 
         Debug.Log(
             "[PortalStage] Stage 2 두 번째 침식: Part_2",
@@ -770,7 +782,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         part3Revealed = true;
 
-        worldRevealController?.RevealPart3();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Part3,
+            () => worldRevealController?.RevealPart3());
 
         Debug.Log(
             "[PortalStage] Stage 2 세 번째 침식: Part_3",
@@ -787,7 +801,9 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         part4Revealed = true;
 
-        worldRevealController?.RevealPart4();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Part4,
+            () => worldRevealController?.RevealPart4());
 
         Debug.Log(
             "[PortalStage] Stage 2 네 번째 침식: Part_4",
@@ -804,11 +820,27 @@ public sealed class EnemyPortalStageController : MonoBehaviour
 
         fenceRevealed = true;
 
-        worldRevealController?.RevealFence();
+        RequestMapReveal(
+            DreamlandProgressSync.MapRevealStage.Fence,
+            () => worldRevealController?.RevealFence());
 
         Debug.Log(
             "[PortalStage] Stage 2 최종 침식: fence",
             this);
+    }
+
+    private static void RequestMapReveal(
+        DreamlandProgressSync.MapRevealStage stage,
+        System.Action localFallback)
+    {
+        DreamlandProgressSync sync = DreamlandProgressSync.Instance;
+        if (sync != null && sync.IsReady)
+        {
+            sync.RequestMapRevealStage(stage);
+            return;
+        }
+
+        localFallback?.Invoke();
     }
 
 
