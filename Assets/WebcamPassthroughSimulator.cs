@@ -49,6 +49,11 @@ public class WebcamPassthroughSimulator : MonoBehaviour
 
     [Header("웹캠 설정")]
     [Tooltip(
+        "Unity Editor에서 Webcam MR 배경 시뮬레이션을 사용할 때만 켭니다. " +
+        "물리 웹캠이 없는 개발 환경에서는 끈 상태로 둡니다.")]
+    [SerializeField] private bool enableWebcamSimulation = false;
+
+    [Tooltip(
         "비워두면 시스템 기본 웹캠을 사용한다. 특정 웹캠을 쓰고 싶으면 " +
         "WebCamTexture.devices에서 확인한 이름을 넣는다.")]
     [SerializeField] private string preferredDeviceName = "";
@@ -64,14 +69,17 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     private CameraClearFlags originalGameCameraClearFlags;
     private bool originalFlagsCached;
     private bool isRunning;
+    private bool isStarting;
 
 
     private void Start()
     {
+#if UNITY_EDITOR
         if (startEnabledOnAwake)
         {
             EnableMrBackground();
         }
+#endif
     }
 
 
@@ -81,8 +89,18 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     /// </summary>
     public void EnableMrBackground()
     {
-        if (isRunning)
+#if !UNITY_EDITOR
+        return;
+#else
+        if (isRunning || isStarting)
         {
+            return;
+        }
+
+        if (!enableWebcamSimulation)
+        {
+            isRunning = false;
+            isStarting = false;
             return;
         }
 
@@ -98,34 +116,78 @@ public class WebcamPassthroughSimulator : MonoBehaviour
 
         if (devices.Length == 0)
         {
+            ClearFailedWebcamState();
             Debug.LogWarning(
                 "[WebcamPassthroughSimulator] 이 PC에서 웹캠을 찾지 못했습니다. " +
                 "웹캠 배경 없이 기존 화면 그대로 진행합니다.");
             return;
         }
 
-        string deviceName = devices[0].name;
+        string deviceName = null;
+        foreach (WebCamDevice device in devices)
+        {
+            if (!string.IsNullOrWhiteSpace(device.name))
+            {
+                deviceName = device.name;
+                break;
+            }
+        }
 
-        if (!string.IsNullOrEmpty(preferredDeviceName))
+        if (string.IsNullOrWhiteSpace(deviceName))
+        {
+            ClearFailedWebcamState();
+            Debug.LogWarning(
+                "[WebcamPassthroughSimulator] 웹캠 목록은 존재하지만 유효한 장치 이름이 " +
+                "없습니다. Webcam MR 배경 없이 게임을 계속 진행합니다.");
+            return;
+        }
+
+        bool preferredDeviceFound = string.IsNullOrWhiteSpace(preferredDeviceName);
+
+        if (!preferredDeviceFound)
         {
             foreach (WebCamDevice device in devices)
             {
                 if (device.name == preferredDeviceName)
                 {
                     deviceName = device.name;
+                    preferredDeviceFound = true;
                     break;
                 }
             }
         }
 
-        webCamTexture = new WebCamTexture(deviceName, requestedWidth, requestedHeight);
+        if (!preferredDeviceFound)
+        {
+            Debug.LogWarning(
+                "[WebcamPassthroughSimulator] preferredDeviceName과 일치하는 웹캠을 " +
+                $"찾지 못해 첫 번째 사용 가능 장치 '{deviceName}'를 사용합니다.");
+        }
+
+        /*
+         * 1280x720을 강제로 요청하면 일부 Windows 웹캠/가상 카메라 드라이버가
+         * 해당 Media Foundation 프로필을 열지 못해 "Couldn't config the stream!"
+         * 을 발생시킨다. 이 기능은 Editor MR 배경 시뮬레이터이므로 선택한 장치의
+         * 기본(드라이버가 보장하는) 스트림 설정을 사용한다. requestedWidth/
+         * requestedHeight는 Inspector 호환성과 진단용으로 유지한다.
+         */
+        webCamTexture = new WebCamTexture(deviceName);
         backgroundImage.texture = webCamTexture;
-        webCamTexture.Play();
+        isStarting = true;
 
-        isRunning = true;
+        try
+        {
+            webCamTexture.Play();
+        }
+        catch (System.Exception exception)
+        {
+            FailWebcamStart(
+                $"장치 '{deviceName}'의 스트림을 시작하지 못했습니다: {exception.Message}");
+            return;
+        }
 
-        StartCoroutine(FitBackgroundAspectWhenReady());
-        StartCoroutine(ResolveGameCameraAndSetUpUrpStack());
+        StartCoroutine(FitBackgroundAspectWhenReady(deviceName));
+#endif
     }
 
 
@@ -224,22 +286,36 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     /// 실제 해상도가 나온 뒤에 화면 비율을 맞춰준다(웹캠 영상이
     /// 찌그러져 보이지 않도록).
     /// </summary>
-    private System.Collections.IEnumerator FitBackgroundAspectWhenReady()
+    private System.Collections.IEnumerator FitBackgroundAspectWhenReady(string deviceName)
     {
         // webCamTexture.width가 웹캠 초기화 전엔 임시값(예: 16)으로 나올 수 있다.
         float timeout = 3f;
         float elapsed = 0f;
 
-        while (webCamTexture != null && webCamTexture.width <= 16 && elapsed < timeout)
+        while (webCamTexture != null &&
+               elapsed < timeout &&
+               (!webCamTexture.isPlaying ||
+                !webCamTexture.didUpdateThisFrame ||
+                webCamTexture.width <= 16 ||
+                webCamTexture.height <= 16))
         {
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        if (webCamTexture == null || webCamTexture.width <= 16)
+        if (webCamTexture == null ||
+            !webCamTexture.isPlaying ||
+            webCamTexture.width <= 16 ||
+            webCamTexture.height <= 16)
         {
+            FailWebcamStart(
+                $"장치 '{deviceName}'에서 {timeout:0.#}초 안에 유효한 프레임을 받지 못했습니다. " +
+                $"요청값은 {requestedWidth}x{requestedHeight}였으며 장치 기본 설정으로도 시작하지 못했습니다.");
             yield break;
         }
+
+        isStarting = false;
+        isRunning = true;
 
         RectTransform rectTransform = backgroundImage.rectTransform;
         float webcamAspect = (float)webCamTexture.width / webCamTexture.height;
@@ -253,6 +329,8 @@ public class WebcamPassthroughSimulator : MonoBehaviour
 
         fitter.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
         fitter.aspectRatio = webcamAspect;
+
+        StartCoroutine(ResolveGameCameraAndSetUpUrpStack());
     }
 
 
@@ -263,10 +341,7 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     /// </summary>
     public void EndMrAndSwitchToFullVr()
     {
-        if (!isRunning)
-        {
-            return;
-        }
+        StopAllCoroutines();
 
         if (webCamTexture != null)
         {
@@ -309,14 +384,50 @@ public class WebcamPassthroughSimulator : MonoBehaviour
         }
 
         isRunning = false;
+        isStarting = false;
+    }
+
+
+    private void FailWebcamStart(string reason)
+    {
+        ClearFailedWebcamState();
+        Debug.LogWarning(
+            "[WebcamPassthroughSimulator] " + reason +
+            " Webcam MR 배경만 비활성화하고 게임은 계속 진행합니다.",
+            this);
+    }
+
+
+    private void ClearFailedWebcamState()
+    {
+        if (webCamTexture != null)
+        {
+            if (webCamTexture.isPlaying)
+            {
+                webCamTexture.Stop();
+            }
+
+            webCamTexture = null;
+        }
+
+        if (backgroundImage != null)
+        {
+            backgroundImage.texture = null;
+        }
+
+        isRunning = false;
+        isStarting = false;
+    }
+
+
+    private void OnDisable()
+    {
+        EndMrAndSwitchToFullVr();
     }
 
 
     private void OnDestroy()
     {
-        if (webCamTexture != null)
-        {
-            webCamTexture.Stop();
-        }
+        EndMrAndSwitchToFullVr();
     }
 }

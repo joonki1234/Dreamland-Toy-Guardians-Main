@@ -139,6 +139,15 @@ namespace DreamGuardians
             yield return PlayToyFriendOnlyLine(null, "그런데 꿈빛 무기에는 특별한 힘도 있어.", 3f, false);
             yield return PlayToyFriendOnlyLine(null, "직업마다 사용할 수 있는 특별한 스킬이 하나씩 있지!", 3.5f, false);
 
+            // The dialogue HUD is driven by ToyFriendController's own coroutine.
+            // Wait for its final frame to hide the HUD before showing the skill panel.
+            while (toyFriend != null && toyFriend.IsSpeaking)
+                yield return null;
+            if (missionUI != null) missionUI.HideTransientMessages();
+            if (toyFriend != null)
+                yield return PlaySkillTutorialFriendTransition(toyFriend, toyFriend.HideForCombat());
+            yield return new WaitForSeconds(0.2f);
+
             bool missingTargetLogged = false;
             float nextTargetRetry = Time.time + 1f;
             while (IsSkillTutorialSessionValid() && !spawner.HasSkillTutorialTarget(localSkillPlayer.Object.InputAuthority))
@@ -160,8 +169,6 @@ namespace DreamGuardians
             localTutorialSkill.OnSkillActivated += HandleTutorialSkillActivated;
             missionUI.ShowSkillTutorial(localSkillPlayer, false);
             localTutorialSkill.BeginTutorialPractice();
-            yield return PlayToyFriendOnlyLine(null, "왼손 X 버튼을 눌러 스킬을 사용해 봐!", 3f, false);
-            if (toyFriend != null) yield return PlaySkillTutorialFriendTransition(toyFriend, toyFriend.HideForCombat());
 
             if (!IsSkillTutorialSessionValid()) yield break;
             PlayerJob displayedJob = localSkillPlayer.CurrentJob;
@@ -183,6 +190,8 @@ namespace DreamGuardians
             }
 
             // Allow the real effect (including the falling menu) to play against its target.
+            missionUI.HideSkillTutorial();
+            yield return new WaitForSeconds(0.2f);
             if (toyFriend != null) yield return PlaySkillTutorialFriendTransition(toyFriend, toyFriend.ShowForStory());
             yield return PlayToyFriendOnlyLine(null, "좋아! 바로 그거야!", 2f, true);
             yield return PlayToyFriendOnlyLine(null, "스킬은 강력하지만, 한 번 사용하면 잠시 다시 사용할 수 없어.", 4f, false);
@@ -230,7 +239,7 @@ namespace DreamGuardians
                 localSkillPlayer == null || localSkillPlayer.Object == null ||
                 !localSkillPlayer.Object.HasInputAuthority) return;
             localTutorialSkillUsed = true;
-            if (missionUI != null) missionUI.ShowSkillTutorial(localSkillPlayer, true);
+            if (missionUI != null) missionUI.HideSkillTutorial();
         }
 
         private void PruneDisconnectedSkillPlayers()
