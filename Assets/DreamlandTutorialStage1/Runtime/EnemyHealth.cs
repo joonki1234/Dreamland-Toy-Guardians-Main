@@ -44,6 +44,9 @@ namespace DreamGuardians
         [Networked, OnChangedRender(nameof(HandleNetworkedHealthChanged))]
         private float NetworkedHealth { get; set; }
 
+        [Networked]
+        private float NetworkedMaxHealth { get; set; }
+
         [Networked, OnChangedRender(nameof(HandleNetworkedDeathChanged))]
         private NetworkBool NetworkedIsDead { get; set; }
 
@@ -72,6 +75,18 @@ namespace DreamGuardians
         public override void Spawned()
         {
             _spawnCompleted = true;
+
+            // Configure() is called from Runner.Spawn's onBeforeSpawned callback.
+            // At that point Networked properties are not available through this
+            // component's IsNetworked guard, so maxHealth/local fallback hold the
+            // requested initial value until Spawned commits it authoritatively.
+            if (Object.HasStateAuthority)
+            {
+                NetworkedMaxHealth = maxHealth;
+                NetworkedHealth = maxHealth;
+                NetworkedIsDead = false;
+                NetworkedTutorialHitCount = 0;
+            }
         }
 
 #if UNITY_EDITOR
@@ -79,9 +94,9 @@ namespace DreamGuardians
         private static float editorTestDamageMultiplier = 1f;
 #endif
 
-        public float MaxHealth => maxHealth;
+        public float MaxHealth => IsNetworked ? NetworkedMaxHealth : maxHealth;
         public float CurrentHealth => IsNetworked ? NetworkedHealth : localHealthFallback;
-        public float NormalizedHealth => maxHealth <= 0f ? 0f : CurrentHealth / maxHealth;
+        public float NormalizedHealth => MaxHealth <= 0f ? 0f : CurrentHealth / MaxHealth;
         public bool IsDead => IsNetworked ? NetworkedIsDead : localIsDeadFallback;
         public bool DamageEnabled => damageEnabled;
 
@@ -132,6 +147,7 @@ namespace DreamGuardians
             {
                 if (Object.HasStateAuthority)
                 {
+                    NetworkedMaxHealth = maxHealth;
                     NetworkedHealth = maxHealth;
                     NetworkedIsDead = false;
                     NetworkedTutorialHitCount = 0;
@@ -143,7 +159,7 @@ namespace DreamGuardians
                 localIsDeadFallback = false;
             }
 
-            HealthChanged?.Invoke(this, CurrentHealth, maxHealth);
+            HealthChanged?.Invoke(this, CurrentHealth, MaxHealth);
         }
 
         public void SetDamageEnabled(bool enabled)
@@ -171,7 +187,7 @@ namespace DreamGuardians
             // NetworkedHealth가 이미 maxHealth였다면(예: 튜토리얼 무적 상태) Fusion의
             // OnChangedRender는 값이 변하지 않아 발동하지 않으므로, 여기서 직접
             // 호출하지 않으면 체력바 UI가 갱신되지 않는다.
-            HealthChanged?.Invoke(this, maxHealth, maxHealth);
+            HealthChanged?.Invoke(this, MaxHealth, MaxHealth);
         }
 
         /// <summary>
@@ -320,7 +336,8 @@ namespace DreamGuardians
 
 #if UNITY_EDITOR
             if (editorTestDamageBoostEnabled &&
-                info.role != PlayerRole.None)
+                info.role != PlayerRole.None &&
+                GetComponent<FinalBossAttackController>() != null)
             {
                 totalDamage *= editorTestDamageMultiplier;
             }
@@ -346,7 +363,7 @@ namespace DreamGuardians
             else
             {
                 localHealthFallback = newHealth;
-                HealthChanged?.Invoke(this, localHealthFallback, maxHealth);
+                HealthChanged?.Invoke(this, localHealthFallback, MaxHealth);
 
                 if (willDie)
                 {
@@ -365,7 +382,7 @@ namespace DreamGuardians
         /// </summary>
         private void HandleNetworkedHealthChanged()
         {
-            HealthChanged?.Invoke(this, NetworkedHealth, maxHealth);
+            HealthChanged?.Invoke(this, NetworkedHealth, MaxHealth);
         }
 
         /// <summary>
