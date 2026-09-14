@@ -38,6 +38,34 @@ public sealed class GameOverUI : MonoBehaviour
     private GameObject rootPanel;
     private bool retryRequested;
 
+    /// <summary>
+    /// 씬에 이 컴포넌트를 수동으로 배치하지 않아도 항상 존재하도록 자동 생성한다.
+    /// 예전에는 "빈 오브젝트 만들고 이 스크립트를 붙여달라"고 에디터 작업을
+    /// 안내했는데, 실제로 씬에 추가되지 않은 채로 남아있어서 코어가 0이
+    /// 돼도(DreamlandGameFlowController.OnStateChanged가 GameOver로 바뀌어도)
+    /// 그걸 들을 컴포넌트 자체가 존재하지 않아 게임오버 화면이 계속 안 떴다.
+    ///
+    /// [RuntimeInitializeOnLoadMethod]는 앱이 켜질 때(=Lobby/StartScene)
+    /// 딱 한 번만 실행되고, 이후 SceneManager.LoadScene()으로 실제 게임플레이
+    /// 맵(Dreamland_map_3)으로 넘어갈 때는 다시 실행되지 않는다 - 그래서
+    /// 그 방식 대신, 게임플레이 맵에만 있는 DreamlandGameFlowController.Awake()
+    /// 에서 이 메서드를 직접 호출한다(그 컴포넌트는 씬이 로드될 때마다
+    /// 항상 Awake()가 실행된다).
+    /// </summary>
+    public static void EnsureInstanceExists()
+    {
+        if (FindAnyObjectByType<GameOverUI>(FindObjectsInactive.Include) != null)
+        {
+            return;
+        }
+
+        GameObject autoObject = new GameObject("GameOverUI (Auto)");
+        autoObject.AddComponent<GameOverUI>();
+
+        Debug.Log(
+            "[GameOverUI] 씬에 배치되어 있지 않아 자동으로 생성했습니다.");
+    }
+
     private void Awake()
     {
         if (gameFlowController == null)
