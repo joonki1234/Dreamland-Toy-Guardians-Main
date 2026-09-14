@@ -387,7 +387,7 @@ public class LobbySelectionController : MonoBehaviour
             Mathf.Clamp(
                 (int)difficultyState.CurrentDifficulty + direction,
                 0,
-                2
+                3
             );
 
         difficultyState.RequestSetDifficulty((GameDifficulty)nextValue);
@@ -437,7 +437,7 @@ public class LobbySelectionController : MonoBehaviour
         if (difficultyRightArrowButton != null)
         {
             difficultyRightArrowButton.interactable =
-                !locked && difficulty != GameDifficulty.Hard;
+                !locked && difficulty != GameDifficulty.Highest;
         }
     }
 
@@ -453,6 +453,9 @@ public class LobbySelectionController : MonoBehaviour
 
             case GameDifficulty.Hard:
                 return "상";
+
+            case GameDifficulty.Highest:
+                return "최상";
 
             default:
                 return "중";

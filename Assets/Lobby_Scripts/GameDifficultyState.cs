@@ -4,7 +4,42 @@ public enum GameDifficulty
 {
     Easy,
     Medium,
-    Hard
+    Hard,
+    Highest
+}
+
+/// <summary>
+/// 난이도별 실제 밸런스 배율. 현재 게임에 들어있는 기본값(적/보스 HP,
+/// 드론 속도)은 "상"(Hard) 기준으로 잡혀 있으므로 Hard = 1배(기준값)로 두고,
+/// 하/중은 그보다 살짝 약하게, 최상은 그보다 살짝 강하게 잡았다.
+/// DreamEnemySpawner(일반 적 HP), FinalBossDirector(보스 HP),
+/// DroneEnemyWaspy(드론 속도)에서 사용한다.
+/// </summary>
+public static class DifficultyBalance
+{
+    public static float GetEnemyHealthMultiplier(GameDifficulty difficulty)
+    {
+        switch (difficulty)
+        {
+            case GameDifficulty.Easy: return 0.7f;
+            case GameDifficulty.Medium: return 0.85f;
+            case GameDifficulty.Hard: return 1f;
+            case GameDifficulty.Highest: return 1.2f;
+            default: return 1f;
+        }
+    }
+
+    public static float GetDroneSpeedMultiplier(GameDifficulty difficulty)
+    {
+        switch (difficulty)
+        {
+            case GameDifficulty.Easy: return 0.85f;
+            case GameDifficulty.Medium: return 0.92f;
+            case GameDifficulty.Hard: return 1f;
+            case GameDifficulty.Highest: return 1.1f;
+            default: return 1f;
+        }
+    }
 }
 
 /// <summary>

@@ -50,6 +50,16 @@ public sealed class FinalBossDirector : MonoBehaviour
     [SerializeField]
     private EnemyPortalStageController enemyPortalStageController;
 
+    // 난이도(하/중/상/최상) 시스템: 로비에서 고른 값을 읽어 보스 Max HP에도
+    // 배율로 반영한다. 못 찾으면 항상 "상"과 동일한 1배로 취급해 인스펙터에
+    // 세팅된 bossMaxHealth(맵 씬 기준 7600) 값을 그대로 유지한다.
+    private GameDifficultyState difficultyState;
+
+    // ConfigureBossComponents()에서 계산된, 난이도 배율이 실제로 반영된
+    // 보스 Max HP. 인스펙터 값(bossMaxHealth)은 항상 "상" 기준 원본값으로
+    // 남겨두고, 실제로 적용된 값만 별도로 들고 있는다(로그 등에서 사용).
+    private float effectiveBossMaxHealth;
+
     [Header("Boss Spawn / Castle")]
     [SerializeField]
     private GameObject bossPrefab;
@@ -439,6 +449,12 @@ public sealed class FinalBossDirector : MonoBehaviour
                 UnityEngine.Object.FindAnyObjectByType<EnemyPortalStageController>();
         }
 
+        if (difficultyState == null)
+        {
+            difficultyState =
+                UnityEngine.Object.FindAnyObjectByType<GameDifficultyState>();
+        }
+
         if (castleAnchor == null)
         {
             GameObject castle = GameObject.Find("Castle");
@@ -456,6 +472,16 @@ public sealed class FinalBossDirector : MonoBehaviour
                 treeBorder = treeRoot.transform;
             }
         }
+    }
+
+    private float ResolveBossHealthDifficultyMultiplier()
+    {
+        if (difficultyState == null || !difficultyState.IsReady)
+        {
+            return 1f;
+        }
+
+        return DifficultyBalance.GetEnemyHealthMultiplier(difficultyState.CurrentDifficulty);
     }
 
     private void SubscribeEvents()
@@ -632,7 +658,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         Debug.Log(
             "[FinalBoss] 오염된 선물상자 보스전 시작. 보스 HP: " +
-            bossMaxHealth.ToString("0") +
+            effectiveBossMaxHealth.ToString("0") +
             " / 근접·원거리·비행 적 순환 소환 활성화",
             this);
 
@@ -797,8 +823,14 @@ public sealed class FinalBossDirector : MonoBehaviour
         // BossCombat 경로를 탄다).
         enemySpawner?.BindBossCombat(bossHealth, bossAttack);
 
+        // 난이도(하/중/상/최상) 배율 적용: 인스펙터의 bossMaxHealth(맵 씬
+        // 기준 7600)는 "상" 기준 원본값이고, 여기서 난이도에 맞는 배율을
+        // 곱한 값을 실제 전투 HP로 사용한다. GameDifficultyState를 못 찾으면
+        // (싱글 테스트 등) 배율 1배 = 기존과 동일한 7600 그대로 적용된다.
+        effectiveBossMaxHealth = bossMaxHealth * ResolveBossHealthDifficultyMultiplier();
+
         // 등장/스토리 연출 중에는 피격되지 않도록 막습니다.
-        bossHealth.Configure(bossMaxHealth, false);
+        bossHealth.Configure(effectiveBossMaxHealth, false);
         enemySpawner?.BindBossFace(bossObject.GetComponent<FinalBossFaceController>());
         EnsureBossHitbox();
         IgnorePlayerCollisionsWithBoss();
