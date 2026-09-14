@@ -80,6 +80,67 @@ namespace DreamGuardians
         // 추적한다(PlayerJobController/NetworkPlayerMovement와 동일한 패턴).
         private bool _spawnCompleted;
         private bool IsNetworked => _spawnCompleted && Object != null;
+        private DreamEnemySpawner bossCombatSource;
+        private int bossCombatRound;
+        private bool boundToBossCombat;
+        public bool IsBossCombatProxy => boundToBossCombat;
+        internal bool CanEvaluateSynergy => IsBossCombatProxy
+            ? bossCombatSource != null && bossCombatSource.IsBossCombatAuthority && bossCombatSource.BossCombat.Round == bossCombatRound
+            : !IsNetworked || Object.HasStateAuthority;
+        internal float SynergyTime => IsBossCombatProxy ? (float)bossCombatSource.BossNetworkTime
+            : IsNetworked ? (float)Runner.SimulationTime : Time.time;
+
+        internal void BindBossCombat(DreamEnemySpawner source, int round)
+        {
+            bossCombatSource = source;
+            boundToBossCombat = true;
+            bossCombatRound = round;
+            processedShotKeys.Clear();
+            processedShotOrder.Clear();
+            synergyTracker ??= GetComponent<RoleSynergyTracker>();
+            synergyTracker?.ResetHitHistory();
+        }
+
+        // Keep the proxy marker: losing transport must never enable local HP writes.
+        internal void UnbindBossCombat() { bossCombatSource = null; }
+
+        internal bool IsConfirmedBossDuplicate(DamageInfo info) => IsDuplicateShot(info);
+
+        internal void ApplyBossDamageAuthoritative(DamageInfo info)
+        {
+            if (!IsBossCombatProxy || !CanEvaluateSynergy || IsDuplicateShot(info)) return;
+            RememberShot(info);
+            ApplyDamageAuthoritative(info);
+        }
+
+        internal bool ApplyBossSynergyStun(float duration)
+        {
+            if (!IsBossCombatProxy) return false;
+            if (CanEvaluateSynergy) bossCombatSource.StunBoss(duration);
+            return true;
+        }
+
+        internal void PresentConfirmedBossSynergy(SynergyResult result) => PresentSynergy(result);
+
+        internal void ApplyConfirmedBossState(BossCombatSnapshot state)
+        {
+            if (!IsBossCombatProxy || state.Round != bossCombatRound) return;
+            float previous = localHealthFallback;
+            bool died = !localIsDeadFallback && state.Dead;
+            bool changed = previous != state.HP || maxHealth != state.MaxHP;
+            maxHealth = state.MaxHP;
+            localHealthFallback = state.HP;
+            localIsDeadFallback = state.Dead;
+            damageEnabled = state.Active && state.DamageEnabled && !state.Dead;
+            if (changed) HealthChanged?.Invoke(this, state.HP, state.MaxHP);
+            if (died)
+            {
+                var info = new DamageInfo(0, "BOSS_CONFIRMED", PlayerRole.None, -1, transform.position, false);
+                PlayDeathSfx();
+                Died?.Invoke(this, info);
+                DreamGameEvents.RaiseEnemyDied(this, info);
+            }
+        }
 
         public override void Spawned()
         {
@@ -187,6 +248,11 @@ namespace DreamGuardians
 
         public void SetDamageEnabled(bool enabled)
         {
+            if (IsBossCombatProxy)
+            {
+                if (enabled && bossCombatSource != null) bossCombatSource.EnableBossCombatDamage(bossCombatRound);
+                return;
+            }
             damageEnabled = enabled;
             if (!IsNetworked) return;
             if (Object.HasStateAuthority)
@@ -241,8 +307,25 @@ namespace DreamGuardians
         ///   하고, 실제 결과는 NetworkedHealth 동기화를 통해 곧 이
         ///   클라이언트에도 반영된다.
         /// </summary>
-        public bool TakeDamage(DamageInfo info)
+        public bool TakeDamage(DamageInfo info) => TakeDamage(info, BossAttackStamp.Capture());
+
+        public bool TakeDamage(DamageInfo info, BossAttackStamp bossStamp)
         {
+            if (IsBossCombatProxy)
+            {
+                if (bossCombatSource == null || bossStamp.Round != bossCombatRound || IsDead) return false;
+                bool accepted = bossCombatSource.RequestBossDamage(info, bossStamp);
+                if (accepted)
+                {
+                    HitRegistered?.Invoke(this, info);
+                    DreamGameEvents.RaiseEnemyHit(this, info);
+                }
+                return accepted;
+            }
+            string attackType = info.playerId;
+            if (IsNetworked)
+                info.playerId = Runner.LocalPlayer + "/" + attackType;
+
             if (IsPlayerTutorialTarget &&
                 (Runner == null || Runner.LocalPlayer != NetworkedTutorialTargetOwner))
                 return false;
@@ -270,7 +353,7 @@ namespace DreamGuardians
             {
                 RPC_RequestDamage(
                     info.amount,
-                    info.playerId,
+                    attackType,
                     (int)info.role,
                     info.shotId,
                     info.hitPoint,
@@ -298,7 +381,7 @@ namespace DreamGuardians
 
             DamageInfo info = new DamageInfo(
                 amount,
-                playerId,
+                rpcInfo.Source + "/" + playerId,
                 (PlayerRole)role,
                 shotId,
                 hitPoint,
@@ -366,6 +449,7 @@ namespace DreamGuardians
         /// </summary>
         private void ApplyDamageAuthoritative(DamageInfo info)
         {
+            if (!CanEvaluateSynergy) return;
             bool wasDamageEnabled = DamageEnabled;
 
             SynergyResult synergyResult = SynergyResult.None;
@@ -403,7 +487,11 @@ namespace DreamGuardians
             float newHealth = Mathf.Max(0f, CurrentHealth - totalDamage);
             bool willDie = newHealth <= 0f;
 
-            if (IsNetworked)
+            if (IsBossCombatProxy)
+            {
+                bossCombatSource.CommitBossHP(newHealth);
+            }
+            else if (IsNetworked)
             {
                 NetworkedHealth = newHealth;
 
@@ -426,6 +514,69 @@ namespace DreamGuardians
                     DreamGameEvents.RaiseEnemyDied(this, info);
                 }
             }
+        }
+
+        internal void PublishSynergy(SynergyResult result)
+        {
+            if (!CanEvaluateSynergy) return;
+            if (IsBossCombatProxy) bossCombatSource.PublishBossSynergy(result);
+            else if (IsNetworked)
+                RPC_SynergyTriggered((int)result.Kind, result.BonusDamage,
+                    (int)result.FirstRole, (int)result.SecondRole);
+            else
+                PresentSynergy(result);
+        }
+
+        public void ApplySynergyLure(Vector3 position, float duration)
+        {
+            if (IsNetworked && !Object.HasStateAuthority) RPC_SynergyLure(position, duration);
+            else if (!IsDead) GetComponent<EnemyCoreMover>()?.ApplyLure(position, duration);
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_SynergyLure(Vector3 position, float duration)
+        {
+            if (!IsDead) GetComponent<EnemyCoreMover>()?.ApplyLure(position, duration);
+        }
+
+        public void ApplySynergyImpact(Vector3 direction, float distance, float duration, float stun)
+        {
+            if (IsNetworked && !Object.HasStateAuthority)
+                RPC_SynergyImpact(direction, distance, duration, stun);
+            else
+                ApplySynergyImpactAuthoritative(direction, distance, duration, stun);
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_SynergyImpact(Vector3 direction, float distance, float duration, float stun)
+        {
+            ApplySynergyImpactAuthoritative(direction, distance, duration, stun);
+        }
+
+        private void ApplySynergyImpactAuthoritative(Vector3 direction, float distance, float duration, float stun)
+        {
+            if (IsDead) return;
+            var mover = GetComponent<EnemyCoreMover>();
+            mover?.ApplyStun(stun);
+            mover?.ApplyKnockback(direction, distance, duration);
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_SynergyTriggered(int kind, float bonusDamage, int firstRole, int secondRole)
+        {
+            PresentSynergy(new SynergyResult((SynergyKind)kind, bonusDamage,
+                (PlayerRole)firstRole, (PlayerRole)secondRole));
+        }
+
+        private void PresentSynergy(SynergyResult result)
+        {
+            synergyTracker ??= GetComponent<RoleSynergyTracker>();
+            if (synergyTracker == null)
+            {
+                synergyTracker = gameObject.AddComponent<RoleSynergyTracker>();
+                FindAnyObjectByType<DreamEnemySpawner>()?.ConfigureSynergyAudio(synergyTracker);
+            }
+            synergyTracker.PresentResult(result);
         }
 
         /// <summary>

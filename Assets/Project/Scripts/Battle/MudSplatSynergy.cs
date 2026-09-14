@@ -101,11 +101,47 @@ public class MudSplatSynergy : MonoBehaviour
     private bool synergyActivated;
 
     private static int nextShotId = 100000;
+    private PlayerJobController networkOwner;
+    private int networkMudId;
+    private BossAttackStamp bossAttackStamp;
+    private void Awake() => bossAttackStamp = BossAttackStamp.Capture();
+    private int presentedPhase;
+    public float LureStartDelay => lureStartDelay;
+    public float LureDuration => lureDuration;
+
+    public void BindNetworkMud(PlayerJobController owner, int id, BossAttackStamp stamp)
+    {
+        bossAttackStamp = stamp;
+        networkOwner = owner;
+        networkMudId = id;
+    }
+
+    public void ApplyNetworkLure() => LureNearbyEnemies();
+    public void ApplyNetworkExplosion() => Explode();
+
+    public void PresentNetworkPhase(int phase)
+    {
+        if (phase >= 1 && presentedPhase < 1)
+        {
+            synergyActivated = true;
+            SpatialAudioOneShot.Play(activationSound, transform.position, activationSoundVolume,
+                audioMinDistance, audioMaxDistance, audioDopplerLevel, "ChefBuilderSynergy_ActivationAudio");
+        }
+        if (phase >= 3 && presentedPhase < 3)
+        {
+            CreateExplosionEffect();
+            SpatialAudioOneShot.Play(explosionSound, transform.position, explosionSoundVolume,
+                audioMinDistance, audioMaxDistance, audioDopplerLevel, "ChefBuilderSynergy_ExplosionAudio");
+            foreach (var renderer in GetComponentsInChildren<Renderer>()) renderer.enabled = false;
+            foreach (var collider in GetComponentsInChildren<Collider>()) collider.enabled = false;
+        }
+        presentedPhase = phase;
+    }
 
 
     private void OnTriggerEnter(Collider other)
     {
-        if (synergyActivated ||
+        if (!isActiveAndEnabled || synergyActivated ||
             !RoleSynergyProgression.IsUnlocked)
         {
             return;
@@ -114,8 +150,15 @@ public class MudSplatSynergy : MonoBehaviour
         ChefFoodProjectile food =
             other.GetComponentInParent<ChefFoodProjectile>();
 
-        if (food == null)
+        if (food == null || !food.CanActivateSynergy)
         {
+            return;
+        }
+
+        if (!food.TryConsumeForSynergy()) return;
+        if (networkOwner != null)
+        {
+            networkOwner.RequestMudActivation(networkMudId);
             return;
         }
 
@@ -244,7 +287,7 @@ public class MudSplatSynergy : MonoBehaviour
                 continue;
             }
 
-            mover.ApplyLure(
+            enemy.ApplySynergyLure(
                 transform.position,
                 lureDuration
             );
@@ -335,7 +378,7 @@ public class MudSplatSynergy : MonoBehaviour
                 );
 
             bool damageApplied =
-                enemy.TakeDamage(damageInfo);
+                enemy.TakeDamage(damageInfo, bossAttackStamp);
 
             if (!damageApplied)
             {
@@ -354,14 +397,11 @@ public class MudSplatSynergy : MonoBehaviour
 
                 knockbackDirection.y = 0f;
 
-                mover.ApplyStun(
-                    stunDuration
-                );
-
-                mover.ApplyKnockback(
+                enemy.ApplySynergyImpact(
                     knockbackDirection,
                     knockbackDistance,
-                    knockbackDuration
+                    knockbackDuration,
+                    stunDuration
                 );
             }
 

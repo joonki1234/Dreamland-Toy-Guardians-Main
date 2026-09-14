@@ -5,6 +5,8 @@ using UnityEngine;
 
 public sealed class ChefSpecialMenuProjectile : MonoBehaviour
 {
+    private BossAttackStamp bossAttackStamp;
+    private void Awake() => bossAttackStamp = BossAttackStamp.Capture();
     private enum State
     {
         Falling,
@@ -394,7 +396,7 @@ public sealed class ChefSpecialMenuProjectile : MonoBehaviour
                 true
             );
 
-            enemy.TakeDamage(damageInfo);
+            enemy.TakeDamage(damageInfo, bossAttackStamp);
         }
     }
 }

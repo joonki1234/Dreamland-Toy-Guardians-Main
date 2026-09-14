@@ -21,12 +21,15 @@ public sealed class DirtShotContext
     private readonly float maximumDamagePerEnemy;
 
     private bool mudSplatCreated;
+    public PlayerJobController NetworkOwner { get; }
 
     public DirtShotContext(
         float firstShardDamage,
         float additionalShardDamage,
-        float maximumDamagePerEnemy)
+        float maximumDamagePerEnemy,
+        PlayerJobController networkOwner = null)
     {
+        NetworkOwner = networkOwner;
         this.firstShardDamage =
             Mathf.Max(0f, firstShardDamage);
 

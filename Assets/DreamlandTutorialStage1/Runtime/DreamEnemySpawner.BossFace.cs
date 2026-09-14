@@ -15,6 +15,9 @@ namespace DreamGuardians
     public sealed partial class DreamEnemySpawner
     {
         [Networked] public BossFaceSnapshot BossFaceState { get; private set; }
+        [Networked] private NetworkBool NetworkedSynergyUnlocked { get; set; }
+        public bool SharedSynergyUnlocked => Object.HasStateAuthority
+            ? RoleSynergyProgression.LocalIsUnlocked : NetworkedSynergyUnlocked;
         private bool bossFaceNetworkSpawned;
         private FinalBossFaceController localBossFace;
         private int lastBossFaceEvent = -1;
@@ -25,10 +28,17 @@ namespace DreamGuardians
         public bool IsBossFaceAuthority => IsBossFaceNetworkReady &&
             Object.HasStateAuthority && Runner.IsSharedModeMasterClient;
 
-        public override void Spawned() { bossFaceNetworkSpawned = true; }
+        public override void Spawned()
+        {
+            bossFaceNetworkSpawned = true;
+            RoleSynergyProgression.NetworkSource = this;
+            if (Object.HasStateAuthority) NetworkedSynergyUnlocked = RoleSynergyProgression.LocalIsUnlocked;
+        }
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
+            if (combatBoss != null) UnbindBossCombat(combatBoss);
             bossFaceNetworkSpawned = false;
+            if (RoleSynergyProgression.NetworkSource == this) RoleSynergyProgression.NetworkSource = null;
             wasBossFaceAuthority = false;
         }
 
@@ -59,6 +69,8 @@ namespace DreamGuardians
 
         public override void FixedUpdateNetwork()
         {
+            TickBossCombat();
+            if (Object.HasStateAuthority) NetworkedSynergyUnlocked = RoleSynergyProgression.LocalIsUnlocked;
             if (!IsBossFaceAuthority) { wasBossFaceAuthority = false; return; }
             // On master migration, publish the new authority's live presentation rather
             // than accepting writes from the old master. Combat migration is out of scope.

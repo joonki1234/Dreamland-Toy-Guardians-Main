@@ -356,6 +356,9 @@ public sealed class FinalBossDirector : MonoBehaviour
     private bool firstPhaseAdvanceTriggered;
     private bool secondPhaseAdvanceTriggered;
     private int minionSpawnIndex;
+    private int bossCombatRound;
+    private bool UsesBossNetwork => enemySpawner != null && enemySpawner.IsBossCombatReady;
+    private bool CanRunBossGameplay => !UsesBossNetwork || enemySpawner.IsBossCombatAuthority;
     private bool hasCachedCastleSpawnPose;
     private Vector3 cachedCastleSpawnPosition;
     private Quaternion cachedCastleSpawnRotation;
@@ -548,6 +551,7 @@ public sealed class FinalBossDirector : MonoBehaviour
             return;
         }
 
+        if (UsesBossNetwork && CanRunBossGameplay) enemySpawner.BeginBossCombat(bossMaxHealth);
         bossRoutine = StartCoroutine(BossIntroRoutine());
     }
 
@@ -575,6 +579,9 @@ public sealed class FinalBossDirector : MonoBehaviour
             yield break;
         }
 
+        // A remote scene may reach the intro before the new round snapshot arrives.
+        while (UsesBossNetwork && (!enemySpawner.BossCombat.Active || enemySpawner.BossCombat.Round <= bossCombatRound))
+            yield return null;
         ConfigureBossComponents();
         StartBossSpawnCameraShake();
         yield return BossRevealRoutine();
@@ -603,6 +610,13 @@ public sealed class FinalBossDirector : MonoBehaviour
         {
             yield return toyFriend.HideForCombat(
                 toyFriendStoryTransitionDuration);
+        }
+
+        if (UsesBossNetwork && bossHealth != null && bossHealth.IsDead)
+        {
+            currentState = FinalBossState.Fighting;
+            HandleBossDied(bossHealth, default);
+            yield break;
         }
 
         if (currentState != FinalBossState.Intro ||
@@ -797,6 +811,12 @@ public sealed class FinalBossDirector : MonoBehaviour
         IgnorePlayerCollisionsWithBoss();
         bossAttack.PrepareCorruptedVisuals(core);
         SubscribeBossHealth();
+        if (UsesBossNetwork)
+        {
+            bossCombatRound = enemySpawner.BossCombat.Round;
+            enemySpawner.ConfigureSynergyAudio(bossObject.GetComponent<RoleSynergyTracker>());
+            enemySpawner.BindBossCombat(bossHealth, bossAttack, this);
+        }
     }
 
     /// <summary>
@@ -929,15 +949,16 @@ public sealed class FinalBossDirector : MonoBehaviour
             return;
         }
 
+        if (!CanRunBossGameplay) return;
         float normalized = Mathf.Clamp01(current / maximum);
 
-        if (!firstPhaseAdvanceTriggered && normalized <= (2f / 3f))
+        if (!firstPhaseAdvanceTriggered && (UsesBossNetwork ? enemySpawner.BossCombat.Phase >= 1 : normalized <= (2f / 3f)))
         {
             firstPhaseAdvanceTriggered = true;
             StartCoroutine(RequestPhaseAdvanceWhenReady(1));
         }
 
-        if (!secondPhaseAdvanceTriggered && normalized <= (1f / 3f))
+        if (!secondPhaseAdvanceTriggered && (UsesBossNetwork ? enemySpawner.BossCombat.Phase >= 2 : normalized <= (1f / 3f)))
         {
             secondPhaseAdvanceTriggered = true;
             StartCoroutine(RequestPhaseAdvanceWhenReady(2));
@@ -948,7 +969,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     {
         while (currentState == FinalBossState.Fighting &&
                bossAttack != null &&
-               bossAttack.IsPhaseMoving)
+               (bossAttack.IsPhaseMoving || (UsesBossNetwork && enemySpawner.IsBossStunned)))
         {
             yield return null;
         }
@@ -973,6 +994,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     private void StartMinionRoutine()
     {
         StopMinionRoutine();
+        if (!CanRunBossGameplay) return;
 
         if (enemySpawner == null)
         {
@@ -1053,6 +1075,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private void SpawnNextBossMinion()
     {
+        if (!CanRunBossGameplay) return;
         if (enemySpawner == null ||
             bossObject == null ||
             droneEnemyPrefab == null)
@@ -1104,8 +1127,8 @@ public sealed class FinalBossDirector : MonoBehaviour
         }
         else face?.CancelSummon();
 
-        bossAttack?.PlaySummonPulse();
-        CreateSummonBurst(spawnPosition);
+        if (UsesBossNetwork) enemySpawner.PublishBossSummon(spawnPosition);
+        else PresentBossSummon(spawnPosition);
 
         minionSpawnIndex++;
 
@@ -1119,6 +1142,12 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private static readonly RaycastHit[] GroundProjectionHitsBuffer =
         new RaycastHit[16];
+
+    public void PresentBossSummon(Vector3 position)
+    {
+        bossAttack?.PlaySummonPulse();
+        CreateSummonBurst(position);
+    }
 
     private bool TryProjectToGround(
         Vector3 sourcePosition,
@@ -1278,7 +1307,8 @@ public sealed class FinalBossDirector : MonoBehaviour
             "BossDefeated 이벤트를 발생시킵니다.",
             this);
 
-        BossDefeated?.Invoke();
+        if (!UsesBossNetwork || enemySpawner.TryClaimBossEnding(bossCombatRound))
+            BossDefeated?.Invoke();
     }
 
     private void HandleCoreDestroyed()
@@ -1303,6 +1333,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         StopBossRoutine();
         StopMinionRoutine();
         currentState = FinalBossState.Failed;
+        if (UsesBossNetwork && CanRunBossGameplay) enemySpawner.StopBossCombat();
 
         if (bossAttack != null)
         {
@@ -1323,7 +1354,7 @@ public sealed class FinalBossDirector : MonoBehaviour
             "[FinalBoss] 코어가 파괴되어 BossFailed 이벤트를 발생시킵니다.",
             this);
 
-        BossFailed?.Invoke();
+        if (CanRunBossGameplay) BossFailed?.Invoke();
     }
 
     private void RefreshBossProgress()
@@ -1602,6 +1633,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     public void AbortAndResetForTest()
     {
+        if (UsesBossNetwork && CanRunBossGameplay) enemySpawner.StopBossCombat();
         StopBossRoutine();
         StopMinionRoutine();
         StopCameraShake();
@@ -2226,6 +2258,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
     private void CleanupBossSpawnedEnemies()
     {
+        if (!CanRunBossGameplay) return;
         if (bossSpawnedEnemies.Count == 0)
         {
             return;
@@ -2300,6 +2333,7 @@ public sealed class FinalBossDirector : MonoBehaviour
     private void CleanupBossObject()
     {
         UnsubscribeBossHealth();
+        if (enemySpawner != null && bossHealth != null) enemySpawner.UnbindBossCombat(bossHealth);
 
         if (bossObject != null)
             enemySpawner?.UnbindBossFace(bossObject.GetComponent<FinalBossFaceController>());

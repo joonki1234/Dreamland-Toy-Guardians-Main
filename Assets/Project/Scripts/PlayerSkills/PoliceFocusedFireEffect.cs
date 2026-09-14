@@ -13,6 +13,8 @@ public sealed class PoliceFocusedFireEffect : MonoBehaviour
     }
 
     private static int nextFocusedFireShotId = 800000;
+    private BossAttackStamp bossAttackStamp;
+    private void Awake() => bossAttackStamp = BossAttackStamp.Capture();
 
     private readonly List<Transform> muzzlePoints = new List<Transform>();
     private readonly List<LightningBeam> lightningBeams = new List<LightningBeam>();
@@ -542,7 +544,7 @@ public sealed class PoliceFocusedFireEffect : MonoBehaviour
                 true
             );
 
-            enemy.TakeDamage(damageInfo);
+            enemy.TakeDamage(damageInfo, bossAttackStamp);
         }
     }
 

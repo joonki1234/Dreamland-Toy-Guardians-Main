@@ -7,6 +7,8 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
     private float damage = 10f;
     private int shotId;
     private bool hasHit;
+    private BossAttackStamp bossAttackStamp;
+    private void Awake() => bossAttackStamp = BossAttackStamp.Capture();
 
     public void Initialize(float bulletDamage, int uniqueShotId)
     {
@@ -16,7 +18,7 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (hasHit || collision == null) return;
+        if (!isActiveAndEnabled || hasHit || collision == null) return;
 
         Vector3 hitPoint = transform.position;
         if (collision.contactCount > 0) hitPoint = collision.GetContact(0).point;
@@ -34,7 +36,7 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (hasHit || other == null) return;
+        if (!isActiveAndEnabled || hasHit || other == null) return;
 
         EnemyHealth enemy = other.GetComponentInParent<EnemyHealth>();
         if (enemy == null) return;
@@ -58,7 +60,7 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
             true
         );
 
-        bool damageApplied = enemy.TakeDamage(damageInfo);
+        bool damageApplied = enemy.TakeDamage(damageInfo, bossAttackStamp);
 
         if (damageApplied)
         {

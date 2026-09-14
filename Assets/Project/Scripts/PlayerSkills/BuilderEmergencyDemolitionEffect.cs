@@ -8,6 +8,8 @@ using UnityEngine.Rendering;
 /// <summary>긴급 철거의 FBX Hammer Animation, 충돌 연출 및 범위 공격을 관리합니다.</summary>
 public sealed class BuilderEmergencyDemolitionEffect : MonoBehaviour
 {
+    private BossAttackStamp bossAttackStamp;
+    private void Awake() => bossAttackStamp = BossAttackStamp.Capture();
     private enum VfxRole { MainSwing, SecondarySwing, Debris, Dust, Spawn }
     private const int HitBufferSize = 128;
     private static int nextSkillShotId = 1200000;
@@ -511,7 +513,7 @@ public sealed class BuilderEmergencyDemolitionEffect : MonoBehaviour
             DamageInfo info = new DamageInfo(direct ? directDamage : shockwaveDamage,
                 "BUILDER_EMERGENCY_DEMOLITION", PlayerRole.Architect, shotId,
                 candidate.ClosestPoint(point), true);
-            enemy.TakeDamage(info);
+            enemy.TakeDamage(info, bossAttackStamp);
 
             EnemyCoreMover mover = enemy != null ? enemy.GetComponent<EnemyCoreMover>() : null;
             if (enemy != null && !enemy.IsDead && mover != null && mover.isActiveAndEnabled)

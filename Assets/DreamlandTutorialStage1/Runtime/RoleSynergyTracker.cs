@@ -43,6 +43,12 @@ namespace DreamGuardians
         /// </summary>
         public float CurrentDamageMultiplier => 1f;
 
+        internal void ResetHitHistory()
+        {
+            lastHitTimes.Clear();
+            lastTriggerTimes.Clear();
+        }
+
 
         private void Awake()
         {
@@ -75,13 +81,13 @@ namespace DreamGuardians
         /// </summary>
         public SynergyResult RegisterHit(PlayerRole role)
         {
-            if (role == PlayerRole.None ||
+            if ((owner != null && !owner.CanEvaluateSynergy) || role == PlayerRole.None ||
                 !RoleSynergyProgression.IsUnlocked)
             {
                 return SynergyResult.None;
             }
 
-            float now = Time.time;
+            float now = owner != null ? owner.SynergyTime : Time.time;
             lastHitTimes[role] = now;
 
             SynergyResult result = role switch
@@ -110,6 +116,15 @@ namespace DreamGuardians
 
             ApplyEffect(result.Kind);
 
+            if (owner != null) owner.PublishSynergy(result);
+            else PresentResult(result);
+            return result;
+        }
+
+        // Presentation only. Never register hits, add damage or stun from an RPC.
+        internal void PresentResult(SynergyResult result)
+        {
+
             if (result.Kind == SynergyKind.EmergencySuppression)
             {
                 SpatialAudioOneShot.Play(
@@ -127,7 +142,6 @@ namespace DreamGuardians
                 new SynergyEventData(owner, result)
             );
 
-            return result;
         }
 
 
@@ -177,10 +191,12 @@ namespace DreamGuardians
             switch (kind)
             {
                 case SynergyKind.EmergencySuppression:
+                    float duration = emergencyStunDuration * (IsBoss() ? 0.35f : 1f);
+                    if (owner != null && owner.ApplyBossSynergyStun(duration)) break;
                     mover ??= GetComponent<EnemyCoreMover>();
 
                     mover?.ApplyStun(
-                        emergencyStunDuration * (IsBoss() ? 0.35f : 1f)
+                        duration
                     );
                     break;
             }

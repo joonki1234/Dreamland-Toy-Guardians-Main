@@ -26,6 +26,9 @@ public class DirtProjectile : MonoBehaviour
     private DirtShotContext shotContext;
     private int projectileShotId = -1;
     private bool hasHit;
+    private BossAttackStamp bossAttackStamp;
+    private void Awake() => bossAttackStamp = BossAttackStamp.Capture();
+    public GameObject MudSplatPrefab => mudSplatPrefab;
 
     /// <summary>
     /// PlayerJobController가 파편을 생성한 직후 호출한다.
@@ -43,7 +46,7 @@ public class DirtProjectile : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (hasHit)
+        if (!isActiveAndEnabled || hasHit)
         {
             return;
         }
@@ -99,7 +102,7 @@ public class DirtProjectile : MonoBehaviour
             );
 
             bool damageApplied =
-                enemy.TakeDamage(damageInfo);
+                enemy.TakeDamage(damageInfo, bossAttackStamp);
 
             if (damageApplied)
             {
@@ -188,6 +191,13 @@ public class DirtProjectile : MonoBehaviour
                 Random.Range(0f, 360f),
                 contact.normal
             );
+
+        if (shotContext?.NetworkOwner != null && shotContext.NetworkOwner.Object != null)
+        {
+            shotContext.NetworkOwner.CreateNetworkMud(spawnPosition,
+                randomRotation * surfaceRotation, destroyDelay, bossAttackStamp);
+            return;
+        }
 
         GameObject splat = Instantiate(
             mudSplatPrefab,

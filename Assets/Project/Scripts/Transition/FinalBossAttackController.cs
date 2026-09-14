@@ -225,6 +225,76 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private bool phaseMoving;
     private bool isDead;
     private bool orientationApplied;
+    private DreamEnemySpawner bossCombat;
+    private int bossRound;
+    private int playedPatternRevision;
+    private double nextPatternSegment;
+    private bool UsesBossCombat => bossCombat != null && bossCombat.IsBossCombatReady;
+    private bool CanDecidePattern => !UsesBossCombat || bossCombat.IsBossCombatAuthority;
+
+    public void BindBossCombat(DreamEnemySpawner source, int round)
+    {
+        bossCombat = source;
+        bossRound = round;
+        playedPatternRevision = 0;
+    }
+
+    public void ApplyBossPattern(BossCombatSnapshot state)
+    {
+        if (!configured || isDead || state.Round != bossRound || state.Dead ||
+            state.PatternRevision <= playedPatternRevision || state.Pattern == BossPattern.None) return;
+        if (attackRoutine != null) StopCoroutine(attackRoutine);
+        if (phaseRoutine != null) StopCoroutine(phaseRoutine);
+        attackRoutine = null;
+        phaseRoutine = null;
+        DestroyActiveDarkBolt();
+        attacking = false;
+        phaseMoving = false;
+        playedPatternRevision = state.PatternRevision;
+        nextPatternSegment = state.PatternStartedAt;
+        transform.SetPositionAndRotation(state.PatternPosition, state.PatternRotation);
+        groundY = state.PatternPosition.y;
+        transform.localScale = baseScale;
+        if (state.Pattern == BossPattern.AdvanceOne || state.Pattern == BossPattern.AdvanceTwo)
+        {
+            StartPhaseAdvance(state.Pattern == BossPattern.AdvanceOne ? 1 : 2);
+            return;
+        }
+        currentPhaseIndex = state.Phase;
+        attacking = true;
+        attackRoutine = StartCoroutine(RunNetworkPattern(state.Pattern switch
+        {
+            BossPattern.Slam => SlamAttackRoutine(),
+            BossPattern.Spin => SpinAttackRoutine(),
+            BossPattern.DarkBolt => DarkEnergyBoltRoutine(),
+            _ => HeadbuttLungeRoutine()
+        }));
+    }
+
+    private IEnumerator RunNetworkPattern(IEnumerator routine)
+    {
+        // Always yield once so a fully elapsed late-join pattern cannot leave a
+        // completed Coroutine handle assigned after FinishAttack cleared it.
+        yield return null;
+        yield return routine;
+    }
+
+    private double BeginPatternSegment(float duration)
+    {
+        if (!UsesBossCombat) return Time.time;
+        double start = nextPatternSegment;
+        nextPatternSegment += duration;
+        return start;
+    }
+
+    private float PatternElapsed(double start) => Mathf.Max(0f,
+        (float)((UsesBossCombat ? bossCombat.BossNetworkTime : Time.time) - start));
+
+    private IEnumerator WaitPatternSeconds(float duration)
+    {
+        double start = BeginPatternSegment(duration);
+        while (PatternElapsed(start) < duration && CanContinueAttack()) yield return null;
+    }
 
     private Coroutine attackRoutine;
     private Coroutine phaseRoutine;
@@ -398,7 +468,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
             return;
         }
 
-        if (Time.time >= nextAttackTime)
+        if (CanDecidePattern && (!UsesBossCombat || !bossCombat.IsBossStunned) && Time.time >= nextAttackTime)
         {
             StartNextAttack(inMeleeRange);
         }
@@ -500,6 +570,17 @@ public sealed class FinalBossAttackController : MonoBehaviour
     /// </summary>
     public void AdvanceTowardCore(int phaseIndex)
     {
+        if (UsesBossCombat)
+        {
+            bossCombat.StartBossPattern(phaseIndex == 1 ? BossPattern.AdvanceOne : BossPattern.AdvanceTwo,
+                new Vector3(transform.position.x, groundY, transform.position.z), transform.rotation);
+            return;
+        }
+        StartPhaseAdvance(phaseIndex);
+    }
+
+    private void StartPhaseAdvance(int phaseIndex)
+    {
         // HP 임계값을 넘었다는 사실 자체는 이동 연출이 스킵되더라도(이미
         // 이동 중이었거나 등) 반영해둬야, 패턴 2(검은 에너지탄)가 그 뒤로
         // 계속 잠겨있지 않는다.
@@ -523,8 +604,8 @@ public sealed class FinalBossAttackController : MonoBehaviour
             DestroyActiveDarkBolt();
         }
 
-        phaseRoutine = StartCoroutine(
-            PhaseAdvanceRoutine(Mathf.Max(1, phaseIndex)));
+        var routine = PhaseAdvanceRoutine(Mathf.Max(1, phaseIndex));
+        phaseRoutine = StartCoroutine(UsesBossCombat ? RunNetworkPattern(routine) : routine);
     }
 
     /// <summary>
@@ -571,14 +652,15 @@ public sealed class FinalBossAttackController : MonoBehaviour
         targetPosition.y = groundY;
 
         Quaternion startRotation = transform.rotation;
-        float elapsed = 0f;
         float duration = Mathf.Max(0.1f, phaseAdvanceDuration);
+        double segmentStart = BeginPatternSegment(duration);
+        float elapsed = 0f;
 
         PlaySummonPulse();
 
         while (elapsed < duration && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / duration);
             float smoothT = t * t * (3f - 2f * t);
 
@@ -675,6 +757,18 @@ public sealed class FinalBossAttackController : MonoBehaviour
             return;
         }
 
+        if (UsesBossCombat)
+        {
+            int index = nextAttackIndex % (currentPhaseIndex == 1 ? 3 : 2);
+            BossPattern networkPattern = currentPhaseIndex >= 2 ? BossPattern.Headbutt
+                : !inMeleeRange || index == 2 ? BossPattern.DarkBolt
+                : index == 0 ? BossPattern.Slam : BossPattern.Spin;
+            bossCombat.StartBossPattern(networkPattern,
+                new Vector3(transform.position.x, groundY, transform.position.z), transform.rotation);
+            nextAttackIndex++;
+            return;
+        }
+
         attacking = true;
         transform.localScale = baseScale;
         SetPosition(new Vector3(
@@ -737,11 +831,12 @@ public sealed class FinalBossAttackController : MonoBehaviour
             squashedScale,
             slamWindupDuration);
 
+        double segmentStart = BeginPatternSegment(slamDuration);
         float elapsed = 0f;
 
         while (elapsed < slamDuration && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / slamDuration);
             float jumpOffset = Mathf.Sin(t * Mathf.PI) * slamJumpHeight;
 
@@ -869,11 +964,12 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         lungeDirection.Normalize();
 
+        double segmentStart = BeginPatternSegment(spinDuration);
         float elapsed = 0f;
 
         while (elapsed < spinDuration && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / spinDuration);
             float spinAngle = t * spinTurns * 360f;
 
@@ -923,7 +1019,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         }
 
         // 잠깐 소환 연출을 보여준 뒤 날아가기 시작한다.
-        yield return new WaitForSeconds(0.25f);
+        yield return WaitPatternSeconds(0.25f);
 
         Camera localViewer = NetworkPlayerMovement.LocalPlayerCamera;
         Vector3 targetPosition =
@@ -931,11 +1027,12 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 ? localViewer.transform.position
                 : spawnPosition + transform.forward * (auraRuntimeRadius * 6f);
 
+        double segmentStart = BeginPatternSegment(boltTravelDuration);
         float elapsed = 0f;
 
         while (elapsed < boltTravelDuration && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / boltTravelDuration);
             t = t * t * (3f - 2f * t);
 
@@ -1063,9 +1160,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         float elapsed = 0f;
         float windup = Mathf.Max(0.05f, headbuttWindupDuration);
+        double segmentStart = BeginPatternSegment(windup);
         while (elapsed < windup && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / windup);
             SetPosition(Vector3.Lerp(restPosition, windbackPosition, t * t));
             yield return null;
@@ -1073,9 +1171,10 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         elapsed = 0f;
         float lunge = Mathf.Max(0.05f, headbuttLungeDuration);
+        segmentStart = BeginPatternSegment(lunge);
         while (elapsed < lunge && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / lunge);
             float fastT = 1f - Mathf.Pow(1f - t, 3f);
             SetPosition(Vector3.Lerp(windbackPosition, impactPosition, fastT));
@@ -1091,10 +1190,11 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         elapsed = 0f;
         float recover = Mathf.Max(0.05f, headbuttRecoverDuration);
+        segmentStart = BeginPatternSegment(recover);
         Vector3 recoverStart = transform.position;
         while (elapsed < recover && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / recover);
             float smooth = t * t * (3f - 2f * t);
             SetPosition(Vector3.Lerp(recoverStart, restPosition, smooth));
@@ -1116,11 +1216,12 @@ public sealed class FinalBossAttackController : MonoBehaviour
             yield break;
         }
 
+        double segmentStart = BeginPatternSegment(duration);
         float elapsed = 0f;
 
         while (elapsed < duration && CanContinueAttack())
         {
-            elapsed += Time.deltaTime;
+            elapsed = PatternElapsed(segmentStart);
             float t = Mathf.Clamp01(elapsed / duration);
             t = t * t * (3f - 2f * t);
 
@@ -1148,7 +1249,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
         float appliedDamage =
             coreDamage * Mathf.Max(0f, damageMultiplier);
 
-        targetCore.TakeDamage(appliedDamage);
+        if (UsesBossCombat)
+            bossCombat.RequestBossCoreDamage(bossRound, playedPatternRevision, appliedDamage);
+        else targetCore.TakeDamage(appliedDamage);
 
         Debug.Log(
             "[FinalBoss] 선물상자 보스가 코어에 " +
@@ -1168,7 +1271,9 @@ public sealed class FinalBossAttackController : MonoBehaviour
 
         float appliedDamage = Mathf.Max(0f, amount);
 
-        targetCore.TakeDamage(appliedDamage);
+        if (UsesBossCombat)
+            bossCombat.RequestBossCoreDamage(bossRound, playedPatternRevision, appliedDamage);
+        else targetCore.TakeDamage(appliedDamage);
 
         Debug.Log(
             "[FinalBoss] 선물상자 보스가 에너지탄으로 코어에 " +

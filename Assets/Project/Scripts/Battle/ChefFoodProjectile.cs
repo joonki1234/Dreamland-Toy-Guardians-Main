@@ -16,11 +16,23 @@ public class ChefFoodProjectile : MonoBehaviour
     [SerializeField, Min(0.01f)] private float splashRadius = 2.5f;
 
     private bool hasHit;
+    private BossAttackStamp bossAttackStamp;
+    private void Awake() => bossAttackStamp = BossAttackStamp.Capture();
     private static int nextShotId = 200000;
+
+    public bool CanActivateSynergy => isActiveAndEnabled && !hasHit;
+
+    public bool TryConsumeForSynergy()
+    {
+        if (!CanActivateSynergy) return false;
+        hasHit = true;
+        Destroy(gameObject);
+        return true;
+    }
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (hasHit)
+        if (!isActiveAndEnabled || hasHit)
         {
             return;
         }
@@ -46,7 +58,7 @@ public class ChefFoodProjectile : MonoBehaviour
             false
         );
 
-        bool damageApplied = enemy.TakeDamage(damageInfo);
+        bool damageApplied = enemy.TakeDamage(damageInfo, bossAttackStamp);
 
         ApplySplashDamage(enemy, collision.GetContact(0).point);
 
@@ -87,7 +99,7 @@ public class ChefFoodProjectile : MonoBehaviour
                 PlayerRole.Chef,
                 nextShotId++,
                 hitPoint,
-                true));
+                true), bossAttackStamp);
         }
     }
 

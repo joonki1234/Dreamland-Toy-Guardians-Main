@@ -12,7 +12,7 @@ public enum PlayerJob
     Builder
 }
 
-public class PlayerJobController : NetworkBehaviour
+public partial class PlayerJobController : NetworkBehaviour
 {
     // Fusion 2 네트워크 프로퍼티: 값이 바뀌면 모든 클라이언트에서 OnJobChanged가 호출된다.
     // (currentJob 필드 대신 사용 - [Networked]는 자동 구현 프로퍼티({ get; set; })여야 함)
@@ -721,7 +721,8 @@ public class PlayerJobController : NetworkBehaviour
             new DirtShotContext(
                 firstShardDamage,
                 additionalShardDamage,
-                maxShotDamagePerEnemy
+                maxShotDamagePerEnemy,
+                this
             );
 
         List<Collider> spawnedColliders =

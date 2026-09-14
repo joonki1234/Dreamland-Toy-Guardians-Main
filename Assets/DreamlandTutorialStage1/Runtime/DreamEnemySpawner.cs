@@ -1140,6 +1140,12 @@ namespace DreamGuardians
         /// 것을 지원하지 않기 때문이다(다른 컴포넌트들은 평범한
         /// MonoBehaviour라 예전처럼 여기서 동적으로 붙여도 된다).
         /// </summary>
+        internal void ConfigureSynergyAudio(RoleSynergyTracker tracker)
+        {
+            tracker.ConfigureAudio(emergencySuppressionSfx, emergencySuppressionSfxVolume,
+                synergyAudioMinDistance, synergyAudioMaxDistance, synergyAudioDopplerLevel);
+        }
+
         private EnemyHealth ConfigureSpawnedEnemy(
             GameObject enemyObject,
             bool tutorialEnemy,

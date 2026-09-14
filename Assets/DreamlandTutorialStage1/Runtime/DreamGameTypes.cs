@@ -137,7 +137,10 @@ namespace DreamGuardians
     /// </summary>
     public static class RoleSynergyProgression
     {
-        public static bool IsUnlocked { get; private set; }
+        internal static DreamEnemySpawner NetworkSource { get; set; }
+        internal static bool LocalIsUnlocked { get; private set; }
+        public static bool IsUnlocked => NetworkSource != null && NetworkSource.IsBossFaceNetworkReady
+            ? NetworkSource.SharedSynergyUnlocked : LocalIsUnlocked;
 
         public static event Action Unlocked;
 
@@ -145,23 +148,24 @@ namespace DreamGuardians
             RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetOnPlay()
         {
-            IsUnlocked = false;
+            LocalIsUnlocked = false;
+            NetworkSource = null;
             Unlocked = null;
         }
 
         public static void Lock()
         {
-            IsUnlocked = false;
+            LocalIsUnlocked = false;
         }
 
         public static bool Unlock()
         {
-            if (IsUnlocked)
+            if (LocalIsUnlocked)
             {
                 return false;
             }
 
-            IsUnlocked = true;
+            LocalIsUnlocked = true;
             Unlocked?.Invoke();
             return true;
         }
