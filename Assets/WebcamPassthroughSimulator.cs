@@ -49,9 +49,13 @@ public class WebcamPassthroughSimulator : MonoBehaviour
 
     [Header("웹캠 설정")]
     [Tooltip(
-        "Unity Editor에서 Webcam MR 배경 시뮬레이션을 사용할 때만 켭니다. " +
-        "물리 웹캠이 없는 개발 환경에서는 끈 상태로 둡니다.")]
-    [SerializeField] private bool enableWebcamSimulation = false;
+        "Webcam MR 배경 시뮬레이션을 켭니다. 웹캠이 없는 개발 환경(예: 웹캠 " +
+        "없는 노트북)에서만 Inspector에서 직접 꺼두면 된다. " +
+        "기본값을 true로 바꿨다 - 씬에 이미 배치된 WebcamPassthroughSimulator " +
+        "오브젝트는 이 필드가 추가되기 전에 저장된 씬이라 값이 비어 있었고, " +
+        "비어 있으면 이전 기본값(false)을 그대로 썼다 - 그래서 웹캠 배경이 " +
+        "켜지지 않았다.")]
+    [SerializeField] private bool enableWebcamSimulation = true;
 
     [Tooltip(
         "비워두면 시스템 기본 웹캠을 사용한다. 특정 웹캠을 쓰고 싶으면 " +
@@ -74,12 +78,17 @@ public class WebcamPassthroughSimulator : MonoBehaviour
 
     private void Start()
     {
-#if UNITY_EDITOR
+        // 예전에는 이 호출 자체가 #if UNITY_EDITOR로 감싸져 있어서, Unity
+        // 에디터 안에서 Play할 때만 웹캠 배경이 켜지고 실제로 빌드한 exe로
+        // 실행하면(지금 하는 것처럼 여러 대의 PC에 빌드해서 테스트하는
+        // 경우) 이 메서드 자체가 아예 호출되지 않았다 - "이전엔 됐는데
+        // 지금은 배경(스카이박스)이 다시 보인다"는 증상의 원인이었다.
+        // 빌드에서도 각자 자기 로컬 웹캠을 배경으로 써야 하므로 에디터
+        // 여부와 상관없이 항상 시도한다.
         if (startEnabledOnAwake)
         {
             EnableMrBackground();
         }
-#endif
     }
 
 
@@ -89,9 +98,11 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     /// </summary>
     public void EnableMrBackground()
     {
-#if !UNITY_EDITOR
-        return;
-#else
+        // 예전에는 이 메서드 전체가 #if !UNITY_EDITOR로 막혀 있어서 실제
+        // 빌드에서는 무조건 그냥 리턴하고 끝났다(웹캠이 켜지지도, 배경이
+        // 바뀌지도 않음). 각 플레이어가 자기 PC에 빌드한 실행 파일로
+        // 테스트하는 게 실제 사용 방식이라, 에디터 전용 제한을 없애고
+        // 빌드에서도 정상 동작하게 한다.
         if (isRunning || isStarting)
         {
             return;
@@ -187,7 +198,6 @@ public class WebcamPassthroughSimulator : MonoBehaviour
         }
 
         StartCoroutine(FitBackgroundAspectWhenReady(deviceName));
-#endif
     }
 
 
