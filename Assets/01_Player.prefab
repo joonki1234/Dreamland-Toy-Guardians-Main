@@ -15583,7 +15583,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 18f1131baa53c48bab5f52e81e727d92, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerJobController
-  _CurrentJob: 0
+  _CurrentJob: 2
   _CurrentPlayMode: 0
   modelPolice: {fileID: 5744339855560737236}
   modelFirefighter: {fileID: 8146833931159017438}
@@ -15600,17 +15600,17 @@ MonoBehaviour:
   policeWeaponAnchor: {fileID: 910000000000000013}
   weaponFirefighterGripOffset: {x: 0.3, y: 0, z: 0.2}
   weaponFirefighterGripRotationOffset: {x: 0, y: 0, z: 0}
-  weaponChefGripOffset: {x: 0.23, y: -0.19, z: 0.4}
+  weaponChefGripOffset: {x: 0.297, y: -0.3, z: 0.4}
   weaponChefGripRotationOffset: {x: 0, y: 0, z: 0}
   weaponBuilderGripOffset: {x: 0.66, y: -1.6, z: 2.2}
   weaponBuilderGripRotationOffset: {x: 0, y: 0, z: 0}
   weaponPolicePcOffset: {x: 0.25, y: -0.2, z: 0.45}
   weaponPolicePcRotationOffset: {x: 0, y: 0, z: 0}
-  weaponFirefighterPcOffset: {x: 0.25, y: -2, z: 0.45}
+  weaponFirefighterPcOffset: {x: 0.25, y: -0.2, z: 0.45}
   weaponFirefighterPcRotationOffset: {x: 0, y: 0, z: 0}
   weaponChefPcOffset: {x: 0.25, y: -0.2, z: 0.45}
   weaponChefPcRotationOffset: {x: 0, y: 0, z: 0}
-  weaponBuilderPcOffset: {x: 0.25, y: -0.2, z: 0.45}
+  weaponBuilderPcOffset: {x: -0.15, y: -1.6, z: 2.25}
   weaponBuilderPcRotationOffset: {x: 0, y: 0, z: 0}
   dirtPrefab: {fileID: 6378157156313051141, guid: a2bce693e5de14482bc5aa783a92cd6e, type: 3}
   shovelFirePoint: {fileID: 5664976912871970265}
@@ -16118,7 +16118,7 @@ Transform:
   m_GameObject: {fileID: 6722057484643939664}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: -0.044, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -17619,6 +17619,34 @@ PrefabInstance:
     - target: {fileID: 1268462402759916474, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_Layer
       value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1275679294221546426, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1275679294221546426, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.00007069111
+      objectReference: {fileID: 0}
+    - target: {fileID: 1275679294221546426, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.0034582615
+      objectReference: {fileID: 0}
+    - target: {fileID: 1275679294221546426, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.70556104
+      objectReference: {fileID: 0}
+    - target: {fileID: 1275679294221546426, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.70864916
+      objectReference: {fileID: 0}
+    - target: {fileID: 1275679294221546426, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1275679294221546426, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -90.25
       objectReference: {fileID: 0}
     - target: {fileID: 1338562044388194734, guid: 9da5b0c31c0e1b845ad05c450aff26aa, type: 3}
       propertyPath: m_Layer
