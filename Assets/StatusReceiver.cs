@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using Fusion;
 
 public enum ElementalType { None, Mud, Fire, Water, Electric }
 
@@ -36,6 +37,7 @@ public sealed class StatusReceiver : MonoBehaviour
 
     private Coroutine wetCoroutine;
     private Coroutine shockCoroutine;
+    private Coroutine waterAuraCoroutine;
 
     private void Awake()
     {
@@ -106,15 +108,52 @@ public sealed class StatusReceiver : MonoBehaviour
         currentShockCount = 0;
         TakeDamage(damage);
 
-        if (currentWaterEffectInstance == null && waterEffectPrefab != null)
+        RequestWaterAuraPresentation(duration);
+
+        if (wetCoroutine != null) StopCoroutine(wetCoroutine);
+        wetCoroutine = StartCoroutine(RemoveWetRoutine(duration));
+    }
+
+    private void RequestWaterAuraPresentation(float duration)
+    {
+        NetworkObject target = GetComponentInParent<NetworkObject>();
+        if (target != null && target.IsValid && target.Runner != null && target.Runner.IsRunning)
+            PlayerJobController.RPC_PresentWaterAura(target.Runner, target.Id, duration);
+        else
+            PresentWaterAura(duration);
+    }
+
+    // RPC endpoint: visuals only. Do not call ApplyWetStatus/ApplyElementalAttack here.
+    public void PresentWaterAura(float duration)
+    {
+        if (waterAuraCoroutine != null) StopCoroutine(waterAuraCoroutine);
+        waterAuraCoroutine = null;
+        if (duration <= 0f)
+        {
+            RemoveWaterAuraPresentation();
+            return;
+        }
+        if (!isActiveAndEnabled || waterEffectPrefab == null) return;
+        if (currentWaterEffectInstance == null)
         {
             currentWaterEffectInstance = Instantiate(waterEffectPrefab, transform.position, Quaternion.identity);
             currentWaterEffectInstance.transform.SetParent(transform);
             currentWaterEffectInstance.transform.localPosition = Vector3.zero;
         }
+        waterAuraCoroutine = StartCoroutine(ExpireWaterAuraPresentation(duration));
+    }
 
-        if (wetCoroutine != null) StopCoroutine(wetCoroutine);
-        wetCoroutine = StartCoroutine(RemoveWetRoutine(duration));
+    private IEnumerator ExpireWaterAuraPresentation(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        waterAuraCoroutine = null;
+        RemoveWaterAuraPresentation();
+    }
+
+    private void RemoveWaterAuraPresentation()
+    {
+        if (currentWaterEffectInstance != null) Destroy(currentWaterEffectInstance);
+        currentWaterEffectInstance = null;
     }
 
     private void TriggerElectricShockSynergy(float bonusDamage, Vector3 attackerPosition)
@@ -193,11 +232,7 @@ public sealed class StatusReceiver : MonoBehaviour
             wetCoroutine = null;
         }
 
-        if (currentWaterEffectInstance != null)
-        {
-            Destroy(currentWaterEffectInstance);
-            currentWaterEffectInstance = null;
-        }
+        RequestWaterAuraPresentation(0f);
     }
 
     private IEnumerator RemoveWetRoutine(float duration)

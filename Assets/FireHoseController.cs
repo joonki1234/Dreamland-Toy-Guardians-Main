@@ -20,6 +20,7 @@ public class FireHoseController : MonoBehaviour
     private Coroutine stopRoutine;
     private float defaultSpeed;
     private bool isShooting = false;
+    private bool waterInitialized;
 
     // 내가 조종하는 캐릭터의 무기일 때만 반응하도록 하는 소유권 체크용.
     private NetworkObject ownerNetworkObject;
@@ -31,6 +32,7 @@ public class FireHoseController : MonoBehaviour
     private void Awake()
     {
         ownerNetworkObject = GetComponentInParent<NetworkObject>();
+        InitializeWater();
 
         sfxAudioSource = GetComponent<AudioSource>();
         if (sfxAudioSource == null)
@@ -49,13 +51,14 @@ public class FireHoseController : MonoBehaviour
         }
     }
 
-    private void Start()
+    private void InitializeWater()
     {
-        if (waterParticle != null)
+        if (!waterInitialized && waterParticle != null)
         {
             var main = waterParticle.main;
             defaultSpeed = main.startSpeed.constant;
             waterParticle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            waterInitialized = true;
         }
     }
 
@@ -68,8 +71,11 @@ public class FireHoseController : MonoBehaviour
 
     public void StartWater()
     {
-        if (waterParticle == null) return;
+        if (!isActiveAndEnabled || waterParticle == null) return;
+        // An RPC can arrive on the first enabled frame, before Start would run.
+        InitializeWater();
         if (stopRoutine != null) StopCoroutine(stopRoutine);
+        stopRoutine = null;
 
         var main = waterParticle.main;
         main.startSpeed = defaultSpeed;
@@ -85,6 +91,7 @@ public class FireHoseController : MonoBehaviour
     public void StopWater()
     {
         if (!isShooting) return;
+        if (!isActiveAndEnabled) { ResetWaterPresentation(); return; }
         if (stopRoutine != null) StopCoroutine(stopRoutine);
         stopRoutine = StartCoroutine(PressureDropRoutine());
     }
@@ -105,11 +112,28 @@ public class FireHoseController : MonoBehaviour
         waterParticle.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         main.startSpeed = defaultSpeed;
         isShooting = false;
+        stopRoutine = null;
 
         if (sfxAudioSource != null && sfxAudioSource.isPlaying)
         {
             sfxAudioSource.Stop();
         }
+    }
+
+    private void OnDisable() => ResetWaterPresentation();
+
+    private void ResetWaterPresentation()
+    {
+        if (stopRoutine != null) StopCoroutine(stopRoutine);
+        stopRoutine = null;
+        isShooting = false;
+        if (waterParticle != null && waterInitialized)
+        {
+            waterParticle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = waterParticle.main;
+            main.startSpeed = defaultSpeed;
+        }
+        if (sfxAudioSource != null) sfxAudioSource.Stop();
     }
 
     /// <summary>

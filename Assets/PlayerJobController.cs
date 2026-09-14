@@ -356,6 +356,9 @@ public class PlayerJobController : NetworkBehaviour
     [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
     private void RPC_PlayAttackEffect(PlayerJob job)
     {
+        // Job snapshots and attack RPCs can arrive around a weapon swap.
+        // Never revive an old weapon just to replay a delayed attack.
+        if (!IsAttackPresentationReady(job)) return;
         // 이 RPC 코드는 모든 클라이언트에서 똑같이 실행된다. 하지만
         // Object.HasInputAuthority는 클라이언트마다 다르게 평가된다 - 실제로
         // 쏜 사람 화면에서만 true. 그래서 이 값으로 "진짜 피해를 줄지"를
@@ -480,6 +483,8 @@ public class PlayerJobController : NetworkBehaviour
     [Rpc(RpcSources.InputAuthority, RpcTargets.All)]
     private void RPC_SetFirefighterWaterActive(bool active)
     {
+        if (active && CurrentJob != PlayerJob.Firefighter) return;
+        firefighterWaterPresentationActive = active;
         FireHoseController hose = weaponFirefighter?.GetComponentInChildren<FireHoseController>(true);
 
         if (hose == null)
@@ -489,12 +494,41 @@ public class PlayerJobController : NetworkBehaviour
 
         if (active)
         {
+            if (!IsAttackPresentationReady(PlayerJob.Firefighter)) return;
             hose.StartWater();
         }
         else
         {
             hose.StopWater();
         }
+    }
+
+    private PlayerJob displayedJob;
+    private bool firefighterWaterPresentationActive;
+
+    private bool IsAttackPresentationReady(PlayerJob job)
+    {
+        if (job != CurrentJob || job != displayedJob) return false;
+        GameObject weapon = job switch
+        {
+            PlayerJob.Police => weaponPolice,
+            PlayerJob.Firefighter => weaponFirefighter,
+            PlayerJob.Chef => weaponChef,
+            PlayerJob.Builder => weaponBuilder,
+            _ => null
+        };
+        return weapon != null && weapon.activeInHierarchy;
+    }
+
+    // The hit target is only known after collision, not in the attack-start RPC.
+    // Reuse this existing NetworkBehaviour as a presentation-only transport.
+    [Rpc(RpcSources.All, RpcTargets.All)]
+    public static void RPC_PresentWaterAura(NetworkRunner runner, NetworkId targetId, float duration)
+    {
+        if (!runner.TryFindObject(targetId, out NetworkObject target)) return;
+        StatusReceiver receiver = target.GetComponent<StatusReceiver>();
+        if (receiver == null) receiver = target.GetComponentInChildren<StatusReceiver>();
+        receiver?.PresentWaterAura(duration);
     }
 
 
@@ -951,6 +985,7 @@ public class PlayerJobController : NetworkBehaviour
 
     private void ApplyJobSettings(PlayerJob job)
     {
+        if (job != PlayerJob.Firefighter) firefighterWaterPresentationActive = false;
         DisableAllObjects();
 
         switch (job)
@@ -1011,6 +1046,11 @@ public class PlayerJobController : NetworkBehaviour
 
                 break;
         }
+        displayedJob = job;
+        // A job/play-mode render update temporarily disables the same weapon.
+        // Restore the already-requested stream without sending another attack.
+        if (firefighterWaterPresentationActive && IsAttackPresentationReady(PlayerJob.Firefighter))
+            weaponFirefighter.GetComponentInChildren<FireHoseController>(true)?.StartWater();
     }
 
 
