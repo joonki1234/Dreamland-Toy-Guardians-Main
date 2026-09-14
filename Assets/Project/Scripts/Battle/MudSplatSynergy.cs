@@ -406,8 +406,11 @@ public class MudSplatSynergy : NetworkBehaviour
             EnemyHealth enemy =
                 hitCollider.GetComponentInParent<EnemyHealth>();
 
-            if (enemy == null ||
-                enemy.IsDead || enemy.GetComponent<FinalBossAttackController>() != null)
+            // 보스는 유인(LureNearbyEnemies)만 제외하고, 폭발 피해는 일반 적과
+            // 동일하게 받는다. enemy.TakeDamage()가 내부적으로 보스일 때 자동으로
+            // DreamEnemySpawner.BossCombat(State Authority)에게 데미지를 위임하므로
+            // (EnemyHealth.TakeBossCombatDamage 참고) 여기서는 별도 분기가 필요 없다.
+            if (enemy == null || enemy.IsDead)
             {
                 continue;
             }

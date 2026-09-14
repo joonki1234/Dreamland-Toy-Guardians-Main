@@ -212,6 +212,13 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private readonly List<MaterialColorState> materialColorStates =
         new List<MaterialColorState>();
 
+    // Boss Combat Authority(멀티플레이 동기화, DreamEnemySpawner.BossCombat.cs) 연결.
+    // combatSpawner가 없으면(예외적으로 씬에 스포너가 없는 경우) 예전처럼 이 로컬
+    // 인스턴스가 스스로 판단해서 바로 공격을 재생한다 - 안전한 폴백이다.
+    private DreamEnemySpawner combatSpawner;
+    private bool combatSpawnerResolved;
+    private bool patternRequestPending;
+
     private EnemyHealth health;
     private Rigidbody body;
     private Vector3 baseScale;
@@ -398,10 +405,82 @@ public sealed class FinalBossAttackController : MonoBehaviour
             return;
         }
 
-        if (Time.time >= nextAttackTime)
+        // 어떤 공격을 언제 낼지는 Boss Combat Authority인 Peer 한 명만 결정한다.
+        // 그 결정 결과(BossPatternRevision)를 관찰한 모든 Peer(이 Peer 자신 포함)가
+        // PlayNetworkAttackPattern에서 동시에 코루틴을 재생하므로, 여기서는 그
+        // 권한이 있는 Peer만 "다음 공격을 요청"하고 나머지는 타이머를 건드리지
+        // 않는다 - 그래야 서로 다른 Peer가 각자의 로컬 타이머로 다른 패턴을
+        // 다른 타이밍에 재생하는 일이 없어진다.
+        if (!patternRequestPending &&
+            IsCombatAuthorityLocal() &&
+            Time.time >= nextAttackTime)
         {
-            StartNextAttack(inMeleeRange);
+            patternRequestPending = true;
+            RequestNextAttackFromAuthority(inMeleeRange);
         }
+    }
+
+    /// <summary>
+    /// 씬에 DreamEnemySpawner가 있으면 그 State Authority(+ 방장)인 Peer만 true.
+    /// 스포너를 찾지 못하는 예외적인 상황(예: 단독 테스트 씬)에서는 예전처럼
+    /// 이 로컬 인스턴스가 스스로 판단하도록 true를 반환해 하위 호환을 유지한다.
+    /// </summary>
+    private bool IsCombatAuthorityLocal()
+    {
+        ResolveCombatSpawner();
+        return combatSpawner == null || combatSpawner.IsBossCombatAuthority;
+    }
+
+    private void ResolveCombatSpawner()
+    {
+        if (combatSpawnerResolved) return;
+        combatSpawnerResolved = true;
+        combatSpawner = FindAnyObjectByType<DreamEnemySpawner>();
+    }
+
+    private void RequestNextAttackFromAuthority(bool inMeleeRange)
+    {
+        int pattern = ChooseNextPatternIndex(inMeleeRange);
+
+        if (combatSpawner != null)
+        {
+            combatSpawner.RequestBossPatternStart(pattern);
+        }
+        else
+        {
+            // 스포너가 없는 예외 상황 - 예전처럼 바로 로컬 재생한다.
+            PlayNetworkAttackPattern(pattern);
+        }
+    }
+
+    /// <summary>
+    /// 다음에 낼 공격의 종류만 고른다(실제 재생은 하지 않는다). 기존
+    /// StartNextAttack의 패턴 선택 로직을 그대로 옮겨왔다.
+    /// 0 = 내려찍기, 1 = 회전, 2 = 검은 에너지탄, 3 = 박치기 돌진.
+    /// </summary>
+    private int ChooseNextPatternIndex(bool inMeleeRange)
+    {
+        // HP 1/3 이하(2페이즈)부터는 슬램/스핀/에너지탄 대신 박치기 돌진만 나간다.
+        if (currentPhaseIndex >= 2)
+        {
+            nextAttackIndex++;
+            return 3;
+        }
+
+        // 패턴 2(검은 에너지탄)는 HP 2/3~1/3 구간(currentPhaseIndex == 1)에서만
+        // 순환에 끼워넣는다 - 그 전(0)에는 기존 슬램/스핀 두 개만 번갈아 나온다.
+        int patternCount = currentPhaseIndex == 1 ? 3 : 2;
+        int pattern = nextAttackIndex % patternCount;
+
+        // 슬램/스핀은 근접 공격이라 attackRange 밖에서는 낼 수 없다 - 그 경우
+        // (1페이즈라는 전제 하에) 원거리 공격인 에너지탄으로 강제 전환한다.
+        if (!inMeleeRange)
+        {
+            pattern = 2;
+        }
+
+        nextAttackIndex++;
+        return pattern;
     }
 
     /// <summary>
@@ -519,6 +598,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
             StopCoroutine(attackRoutine);
             attackRoutine = null;
             attacking = false;
+            patternRequestPending = false;
             transform.localScale = baseScale;
             DestroyActiveDarkBolt();
         }
@@ -668,9 +748,16 @@ public sealed class FinalBossAttackController : MonoBehaviour
                 turnSpeed * Time.deltaTime);
     }
 
-    private void StartNextAttack(bool inMeleeRange)
+    /// <summary>
+    /// DreamEnemySpawner.BossCombat이 BossPatternRevision 변화를 감지했을 때
+    /// 모든 Peer(공격을 요청한 Authority 자신 포함)에서 동시에 호출한다. 실제
+    /// 공격 코루틴을 시작하는 유일한 지점이다 - 기존 로컬 연출은 그대로 유지된다.
+    /// </summary>
+    public void PlayNetworkAttackPattern(int pattern)
     {
-        if (attackRoutine != null)
+        patternRequestPending = false;
+
+        if (attackRoutine != null || isDead || !configured)
         {
             return;
         }
@@ -682,40 +769,21 @@ public sealed class FinalBossAttackController : MonoBehaviour
             groundY,
             transform.position.z));
 
-        // HP 1/3 이하(2페이즈)부터는 슬램/스핀/에너지탄 대신 박치기 돌진만 나간다.
-        if (currentPhaseIndex >= 2)
+        switch (pattern)
         {
-            attackRoutine = StartCoroutine(HeadbuttLungeRoutine());
-            nextAttackIndex++;
-            return;
+            case 0:
+                attackRoutine = StartCoroutine(SlamAttackRoutine());
+                break;
+            case 1:
+                attackRoutine = StartCoroutine(SpinAttackRoutine());
+                break;
+            case 2:
+                attackRoutine = StartCoroutine(DarkEnergyBoltRoutine());
+                break;
+            default:
+                attackRoutine = StartCoroutine(HeadbuttLungeRoutine());
+                break;
         }
-
-        // 패턴 2(검은 에너지탄)는 HP 2/3~1/3 구간(currentPhaseIndex == 1)에서만
-        // 순환에 끼워넣는다 - 그 전(0)에는 기존 슬램/스핀 두 개만 번갈아 나온다.
-        int patternCount = currentPhaseIndex == 1 ? 3 : 2;
-        int pattern = nextAttackIndex % patternCount;
-
-        // 슬램/스핀은 근접 공격이라 attackRange 밖에서는 낼 수 없다 - 그 경우
-        // (1페이즈라는 전제 하에) 원거리 공격인 에너지탄으로 강제 전환한다.
-        if (!inMeleeRange)
-        {
-            pattern = 2;
-        }
-
-        if (pattern == 0)
-        {
-            attackRoutine = StartCoroutine(SlamAttackRoutine());
-        }
-        else if (pattern == 1)
-        {
-            attackRoutine = StartCoroutine(SpinAttackRoutine());
-        }
-        else
-        {
-            attackRoutine = StartCoroutine(DarkEnergyBoltRoutine());
-        }
-
-        nextAttackIndex++;
     }
 
     private IEnumerator SlamAttackRoutine()
@@ -1145,6 +1213,14 @@ public sealed class FinalBossAttackController : MonoBehaviour
             return;
         }
 
+        // 이 공격 연출(코루틴)은 모든 Peer에서 똑같이 재생되지만, 실제 코어
+        // 피해는 Boss Combat Authority 한 명만 적용해야 한다 - 안 그러면
+        // 인원수만큼(2명이면 2배, 8명이면 8배) 중복으로 깎인다.
+        if (!IsCombatAuthorityLocal())
+        {
+            return;
+        }
+
         float appliedDamage =
             coreDamage * Mathf.Max(0f, damageMultiplier);
 
@@ -1162,6 +1238,12 @@ public sealed class FinalBossAttackController : MonoBehaviour
     private void DamageCoreFlat(float amount)
     {
         if (!CanContinueAttack())
+        {
+            return;
+        }
+
+        // DamageCore와 동일한 이유로 Authority 1곳에서만 실제 피해를 적용한다.
+        if (!IsCombatAuthorityLocal())
         {
             return;
         }
@@ -1941,6 +2023,7 @@ public sealed class FinalBossAttackController : MonoBehaviour
         {
             StopCoroutine(attackRoutine);
             attackRoutine = null;
+            patternRequestPending = false;
             DestroyActiveDarkBolt();
         }
 

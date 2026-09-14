@@ -34,6 +34,11 @@ namespace DreamGuardians
         private readonly Queue<string> processedShotOrder = new Queue<string>();
         private RoleSynergyTracker synergyTracker;
 
+        // 보스(Method B, DreamEnemySpawner.BossCombat.cs)에서만 바인딩된다. 이 값이
+        // null이 아니면 이 EnemyHealth는 실제 HP 권한을 갖지 않는 Presentation Proxy이고,
+        // 모든 체력/데미지/시너지 계산은 이 스포너의 State Authority에게 위임한다.
+        private DreamEnemySpawner bossCombatSpawner;
+
         // 네트워크 오브젝트가 아직 아닌 경우(팀원이 프리팹에 NetworkObject를
         // 붙이기 전, 혹은 옛날 씬을 그대로 열었을 때)를 위한 로컬 전용
         // 체력 저장소. 네트워크 오브젝트라면 NetworkedHealth/NetworkedIsDead가
@@ -114,11 +119,54 @@ namespace DreamGuardians
         private static float editorTestDamageMultiplier = 1f;
 #endif
 
-        public float MaxHealth => IsNetworked ? NetworkedMaxHealth : maxHealth;
-        public float CurrentHealth => IsNetworked ? NetworkedHealth : localHealthFallback;
+        public float MaxHealth =>
+            bossCombatSpawner != null ? bossCombatSpawner.BossMaxHealth :
+            IsNetworked ? NetworkedMaxHealth : maxHealth;
+        public float CurrentHealth =>
+            bossCombatSpawner != null ? bossCombatSpawner.BossCurrentHealth :
+            IsNetworked ? NetworkedHealth : localHealthFallback;
         public float NormalizedHealth => MaxHealth <= 0f ? 0f : CurrentHealth / MaxHealth;
-        public bool IsDead => IsNetworked ? NetworkedIsDead : localIsDeadFallback;
-        public bool DamageEnabled => IsNetworked ? NetworkedDamageEnabled : damageEnabled;
+        public bool IsDead =>
+            bossCombatSpawner != null ? (bool)bossCombatSpawner.BossIsDead :
+            IsNetworked ? (bool)NetworkedIsDead : localIsDeadFallback;
+        public bool DamageEnabled =>
+            bossCombatSpawner != null ? (bool)bossCombatSpawner.BossDamageEnabledNet :
+            IsNetworked ? (bool)NetworkedDamageEnabled : damageEnabled;
+
+        /// <summary>
+        /// DreamEnemySpawner.BossCombat.BindBossCombat()/UnbindBossCombat()에서만
+        /// 호출된다. spawner가 null이 아니면 이후 모든 체력 조회/데미지 요청이
+        /// 그 스포너의 공유 보스 상태를 사용하도록 전환된다.
+        /// </summary>
+        internal void BindBossCombatSpawner(DreamEnemySpawner spawner)
+        {
+            bossCombatSpawner = spawner;
+
+            if (spawner != null)
+            {
+                // 바인딩 시점의 최신 공유 상태를 즉시 반영한다(재접속/재바인딩 대비).
+                HealthChanged?.Invoke(this, CurrentHealth, MaxHealth);
+            }
+        }
+
+        /// <summary>DreamEnemySpawner.BossCombat이 BossCurrentHealth가 바뀔 때마다 호출한다.</summary>
+        internal void HandleBossCombatStateChanged()
+        {
+            HealthChanged?.Invoke(this, CurrentHealth, MaxHealth);
+        }
+
+        /// <summary>DreamEnemySpawner.BossCombat이 BossIsDead가 true로 바뀔 때 한 번 호출한다.</summary>
+        internal void HandleBossCombatDeath()
+        {
+            damageEnabled = false;
+            PlayDeathSfx();
+
+            DamageInfo fallbackInfo = new DamageInfo(
+                0f, "BOSS_AUTHORITY", PlayerRole.None, -1, transform.position, false);
+
+            Died?.Invoke(this, fallbackInfo);
+            DreamGameEvents.RaiseEnemyDied(this, fallbackInfo);
+        }
         public bool IsPlayerTutorialTarget =>
             IsNetworked && NetworkedHasTutorialTargetOwner;
         public PlayerRef TutorialTargetOwner => NetworkedTutorialTargetOwner;
@@ -143,6 +191,16 @@ namespace DreamGuardians
             editorTestDamageBoostEnabled = enabled;
             editorTestDamageMultiplier = Mathf.Max(1f, multiplier);
         }
+
+        /// <summary>
+        /// DreamEnemySpawner.BossCombat.ApplyBossDamageAuthoritative가 보스 데미지에
+        /// 기존과 동일한 Editor 전용 테스트 배율을 적용하기 위해 사용한다. 값 자체는
+        /// 여기(EnemyHealth)의 기존 설정을 그대로 따르며, Editor에서만 컴파일된다.
+        /// </summary>
+        internal static float GetEditorTestDamageMultiplierForBoss()
+        {
+            return editorTestDamageBoostEnabled ? editorTestDamageMultiplier : 1f;
+        }
 #endif
 
         private void Awake()
@@ -165,6 +223,17 @@ namespace DreamGuardians
             damageEnabled = canTakeDamage;
             processedShotKeys.Clear();
             processedShotOrder.Clear();
+
+            if (bossCombatSpawner != null)
+            {
+                // 보스는 이 로컬 값이 아니라 BossCombat의 공유 상태가 진짜 HP다 -
+                // 새 보스전 시작을 요청하고(Revision 증가 포함) 초기 피격 가능 여부도
+                // 같이 반영한다. 실제로 값을 쓰는 것은 그중 State Authority뿐이다.
+                bossCombatSpawner.RequestBossBattleStart(maxHealth);
+                bossCombatSpawner.RequestSetBossDamageEnabled(canTakeDamage);
+                HealthChanged?.Invoke(this, CurrentHealth, MaxHealth);
+                return;
+            }
 
             if (IsNetworked)
             {
@@ -189,6 +258,13 @@ namespace DreamGuardians
         public void SetDamageEnabled(bool enabled)
         {
             damageEnabled = enabled;
+
+            if (bossCombatSpawner != null)
+            {
+                bossCombatSpawner.RequestSetBossDamageEnabled(enabled);
+                return;
+            }
+
             if (!IsNetworked) return;
             if (Object.HasStateAuthority)
                 NetworkedDamageEnabled = enabled;
@@ -248,6 +324,11 @@ namespace DreamGuardians
                 (Runner == null || Runner.LocalPlayer != NetworkedTutorialTargetOwner))
                 return false;
 
+            if (bossCombatSpawner != null)
+            {
+                return TakeBossCombatDamage(info);
+            }
+
             PlayerRef attacker = IsNetworked ? Runner.LocalPlayer : PlayerRef.None;
             if (IsDead || IsDuplicateShot(info, attacker))
             {
@@ -284,6 +365,27 @@ namespace DreamGuardians
             }
 
             ApplyDamageAuthoritative(info, attacker);
+            return true;
+        }
+
+        /// <summary>
+        /// 보스는 이 로컬 EnemyHealth가 실제 HP 권한을 갖지 않는다(Method B,
+        /// DreamEnemySpawner.BossCombat.cs 참고). 여기서는 "맞았다"는 사실만 확인해서
+        /// 즉각적인 피격 피드백(이펙트/사운드)만 이 클라이언트에서 바로 재생하고,
+        /// 실제 데미지 계산/적용/중복 검사는 전부 BossCombat의 State Authority에게
+        /// 위임한다.
+        /// </summary>
+        private bool TakeBossCombatDamage(DamageInfo info)
+        {
+            if (IsDead || !DamageEnabled)
+            {
+                return false;
+            }
+
+            HitRegistered?.Invoke(this, info);
+            DreamGameEvents.RaiseEnemyHit(this, info);
+
+            bossCombatSpawner.RequestBossDamage(info);
             return true;
         }
 
@@ -546,6 +648,16 @@ namespace DreamGuardians
         internal void PublishSynergy(SynergyResult result)
         {
             if (!CanCalculateSynergy || !result.Triggered) return;
+
+            if (bossCombatSpawner != null)
+            {
+                // 보스 시너지는 항상 BossCombat의 State Authority에서만 이 지점에
+                // 도달한다(RegisterHit이 그쪽에 바인딩된 localBossSynergyTracker에서만
+                // 호출되므로) - 여기서 모든 Peer에 Presentation을 방송한다.
+                bossCombatSpawner.BroadcastBossSynergy(result);
+                return;
+            }
+
             if (IsNetworked && GetComponent<FinalBossAttackController>() == null)
                 RPC_PresentSynergy((int)result.Kind, result.BonusDamage,
                     (int)result.FirstRole, (int)result.SecondRole);

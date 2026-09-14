@@ -790,6 +790,13 @@ public sealed class FinalBossDirector : MonoBehaviour
             bossSpinWindEffectPrefab,
             bossSpinWhooshSfx);
 
+        // 멀티플레이 동기화: 실제 HP/Damage/Synergy/Phase/Pattern/Death 권한은
+        // DreamEnemySpawner.BossCombat(State Authority)이 갖는다. 이 로컬 bossHealth/
+        // bossAttack은 그 공유 상태를 반영해 보여주기만 하는 Presentation Proxy로
+        // 바뀐다(Configure 호출보다 먼저 바인딩해야 최초 Configure부터 올바르게
+        // BossCombat 경로를 탄다).
+        enemySpawner?.BindBossCombat(bossHealth, bossAttack);
+
         // 등장/스토리 연출 중에는 피격되지 않도록 막습니다.
         bossHealth.Configure(bossMaxHealth, false);
         enemySpawner?.BindBossFace(bossObject.GetComponent<FinalBossFaceController>());
@@ -2303,6 +2310,9 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         if (bossObject != null)
             enemySpawner?.UnbindBossFace(bossObject.GetComponent<FinalBossFaceController>());
+
+        if (bossHealth != null)
+            enemySpawner?.UnbindBossCombat(bossHealth);
 
         if (bossObject != null)
         {
