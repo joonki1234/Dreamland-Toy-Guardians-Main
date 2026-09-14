@@ -239,6 +239,15 @@ public class PlayerJobController : NetworkBehaviour
 
 #if UNITY_EDITOR
         PollEditorJobDebugInput();
+
+        // Play 모드에서 Inspector의 weaponXxxPcOffset 값을 드래그하면서 바로
+        // 눈으로 확인할 수 있게 한다. 원래 이 오프셋은 ApplyJobSettings에서
+        // 직업이 바뀌는 순간에만 한 번 적용됐어서, Play 도중 값을 바꿔도
+        // 무기가 안 움직이는 것처럼 보여 튜닝이 불가능했다.
+        if (CurrentPlayMode == PlayMode.PC)
+        {
+            RefreshLocalPcWeaponOffsetForEditorTuning();
+        }
 #endif
 
         bool attackPressed;
@@ -1118,6 +1127,36 @@ public class PlayerJobController : NetworkBehaviour
         weapon.transform.localPosition = positionOffset;
         weapon.transform.localRotation = Quaternion.Euler(rotationOffsetEuler);
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// PC 모드 1인칭 무기 오프셋(weaponXxxPcOffset/RotationOffset) 튜닝 전용.
+    /// 현재 들고 있는 직업의 무기에 해당 오프셋을 매 프레임 다시 적용해서,
+    /// Play 모드 중 Inspector에서 값을 드래그하면 바로바로 화면에 반영되게 한다.
+    /// 실제 빌드에는 포함되지 않는다(UNITY_EDITOR 전용).
+    /// </summary>
+    private void RefreshLocalPcWeaponOffsetForEditorTuning()
+    {
+        switch (CurrentJob)
+        {
+            case PlayerJob.Police:
+                AttachWeaponToPcCamera(weaponPolice, weaponPolicePcOffset, weaponPolicePcRotationOffset);
+                break;
+
+            case PlayerJob.Firefighter:
+                AttachWeaponToPcCamera(weaponFirefighter, weaponFirefighterPcOffset, weaponFirefighterPcRotationOffset);
+                break;
+
+            case PlayerJob.Chef:
+                AttachWeaponToPcCamera(weaponChef, weaponChefPcOffset, weaponChefPcRotationOffset);
+                break;
+
+            case PlayerJob.Builder:
+                AttachWeaponToPcCamera(weaponBuilder, weaponBuilderPcOffset, weaponBuilderPcRotationOffset);
+                break;
+        }
+    }
+#endif
 
     [System.Serializable]
     private sealed class LocalGripAdjustment

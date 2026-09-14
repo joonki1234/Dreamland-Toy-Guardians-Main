@@ -15610,7 +15610,7 @@ MonoBehaviour:
   weaponFirefighterPcRotationOffset: {x: 0, y: 0, z: 0}
   weaponChefPcOffset: {x: 0.25, y: -0.2, z: 0.45}
   weaponChefPcRotationOffset: {x: 0, y: 0, z: 0}
-  weaponBuilderPcOffset: {x: -0.15, y: -1.6, z: 2.25}
+  weaponBuilderPcOffset: {x: 1.15, y: -1.6, z: 2.75}
   weaponBuilderPcRotationOffset: {x: 0, y: 0, z: 0}
   dirtPrefab: {fileID: 6378157156313051141, guid: a2bce693e5de14482bc5aa783a92cd6e, type: 3}
   shovelFirePoint: {fileID: 5664976912871970265}
