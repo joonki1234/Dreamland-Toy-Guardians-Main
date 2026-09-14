@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using DreamGuardians;
+using Fusion;
 
 /// <summary>
 /// 소방관의 물 파티클이 몬스터와 실제로 충돌했을 때
@@ -30,6 +31,7 @@ public sealed class WaterParticleHit : MonoBehaviour
 
 
     private ParticleSystem waterParticle;
+    private NetworkObject attackOwner;
 
     private readonly List<ParticleCollisionEvent> collisionEvents =
         new List<ParticleCollisionEvent>();
@@ -46,6 +48,7 @@ public sealed class WaterParticleHit : MonoBehaviour
     private void Awake()
     {
         waterParticle = GetComponent<ParticleSystem>();
+        attackOwner = GetComponentInParent<NetworkObject>();
     }
 
 
@@ -55,7 +58,8 @@ public sealed class WaterParticleHit : MonoBehaviour
     /// </summary>
     private void OnParticleCollision(GameObject other)
     {
-        if (waterParticle == null || other == null)
+        if (!isActiveAndEnabled || waterParticle == null || other == null ||
+            (attackOwner != null && (!attackOwner.IsValid || !attackOwner.HasInputAuthority)))
         {
             return;
         }

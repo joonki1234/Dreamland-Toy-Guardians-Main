@@ -3,6 +3,16 @@ using UnityEngine;
 
 namespace DreamGuardians
 {
+    internal static class SynergyNetLog
+    {
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        internal static void Write(string message, UnityEngine.Object context = null)
+        {
+            Debug.Log("[SynergyNet] " + message, context);
+        }
+    }
+
     public static class DreamGameEvents
     {
         public static event Action<EnemyHealth, DamageInfo> EnemyHit;

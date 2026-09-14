@@ -2,12 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using DreamGuardians;
+using Fusion;
 
 /// <summary>
 /// 건축가의 흙 장판에 요리사 음식이 닿으면
 /// 주변 적을 장판으로 유인한 뒤 범위 폭발을 일으킨다.
 /// </summary>
-public class MudSplatSynergy : MonoBehaviour
+public class MudSplatSynergy : NetworkBehaviour
 {
     [Header("유인 설정")]
 
@@ -101,11 +102,69 @@ public class MudSplatSynergy : MonoBehaviour
     private bool synergyActivated;
 
     private static int nextShotId = 100000;
+    private bool spawnCompleted;
+    private bool activationPresented;
+    private bool explosionPresented;
+    private float lifetime = 30f;
+    private bool IsNetworked => spawnCompleted && Object != null && Object.IsValid;
+    [Networked] public int Phase { get; private set; }
+    [Networked] private TickTimer PhaseTimer { get; set; }
+    [Networked] private TickTimer ExpiryTimer { get; set; }
+    [Networked] private Vector3 PlacementPosition { get; set; }
+    [Networked] private Quaternion PlacementRotation { get; set; }
+
+    public void ConfigureLifetime(float seconds) => lifetime = Mathf.Max(0.1f, seconds);
+
+    public override void Spawned()
+    {
+        spawnCompleted = true;
+        if (Object.HasStateAuthority)
+        {
+            Phase = 0;
+            PlacementPosition = transform.position;
+            PlacementRotation = transform.rotation;
+            ExpiryTimer = TickTimer.CreateFromSeconds(Runner, lifetime);
+            SynergyNetLog.Write($"MudSplat Spawn Builder={Object.StateAuthority} Object={Object.Id}", this);
+        }
+        Render();
+    }
+
+    public override void Render()
+    {
+        transform.SetPositionAndRotation(PlacementPosition, PlacementRotation);
+        if (Phase == 3) HideTrap();
+    }
+
+    public override void FixedUpdateNetwork()
+    {
+        if (!Object.HasStateAuthority) return;
+        if (ExpiryTimer.Expired(Runner))
+        {
+            Runner.Despawn(Object);
+            return;
+        }
+        if (!PhaseTimer.Expired(Runner)) return;
+        if (Phase == 1)
+        {
+            Phase = 2;
+            LureNearbyEnemies();
+            PhaseTimer = TickTimer.CreateFromSeconds(Runner, lureDuration);
+        }
+        else if (Phase == 2)
+        {
+            Phase = 3; // commit before any damage/event callback can re-enter
+            PhaseTimer = TickTimer.None;
+            RPC_PresentExplosion();
+            Explode();
+            // Keep the network object alive while the reliable result is delivered.
+            ExpiryTimer = TickTimer.CreateFromSeconds(Runner, explosionEffectLifetime);
+        }
+    }
 
 
     private void OnTriggerEnter(Collider other)
     {
-        if (synergyActivated ||
+        if (!isActiveAndEnabled || synergyActivated || (IsNetworked && Phase != 0) ||
             !RoleSynergyProgression.IsUnlocked)
         {
             return;
@@ -114,13 +173,43 @@ public class MudSplatSynergy : MonoBehaviour
         ChefFoodProjectile food =
             other.GetComponentInParent<ChefFoodProjectile>();
 
-        if (food == null)
+        if (food == null || !food.CanActivateMudSplat)
         {
             return;
         }
 
-        synergyActivated = true;
+        if (!food.TryConsumeForMudSplat()) return;
+        if (IsNetworked)
+        {
+            SynergyNetLog.Write($"Chef Enter MudSplat Chef={Runner.LocalPlayer} Object={Object.Id}", this);
+            RPC_RequestActivation();
+            return;
+        }
 
+        synergyActivated = true;
+        PresentActivation();
+        StartCoroutine(ActivateSynergyRoutine());
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    private void RPC_RequestActivation(RpcInfo info = default)
+    {
+        if (Phase != 0 || !RoleSynergyProgression.IsUnlocked || ExpiryTimer.Expired(Runner)) return;
+        Phase = 1;
+        PhaseTimer = TickTimer.CreateFromSeconds(Runner, lureStartDelay);
+        // Activation wins against the unused trap lifetime.
+        ExpiryTimer = TickTimer.None;
+        SynergyNetLog.Write($"MudSplat TRIGGERED Builder={Object.StateAuthority} Chef={info.Source} Object={Object.Id}", this);
+        RPC_PresentActivation();
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_PresentActivation() => PresentActivation();
+
+    private void PresentActivation()
+    {
+        if (activationPresented) return;
+        activationPresented = true;
         SpatialAudioOneShot.Play(
             activationSound,
             transform.position,
@@ -133,16 +222,7 @@ public class MudSplatSynergy : MonoBehaviour
 
         RaiseOfficialSynergyEvent();
 
-        Debug.Log(
-            "요리사 + 건축가 시너지: 미끼 함정 준비!"
-        );
-
-        // 장판에 닿은 음식은 제거한다.
-        Destroy(food.gameObject);
-
-        StartCoroutine(
-            ActivateSynergyRoutine()
-        );
+        SynergyNetLog.Write("MudSplat activation presentation", this);
     }
 
 
@@ -174,14 +254,25 @@ public class MudSplatSynergy : MonoBehaviour
         int luredEnemyCount =
             LureNearbyEnemies();
 
-        Debug.Log(
-            $"미끼에 유인된 적 수: {luredEnemyCount}"
-        );
+        SynergyNetLog.Write($"MudSplat Lured={luredEnemyCount}", this);
 
         yield return new WaitForSeconds(
             lureDuration
         );
 
+        PresentExplosion();
+        Explode();
+        Destroy(gameObject);
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    private void RPC_PresentExplosion() => PresentExplosion();
+
+    private void PresentExplosion()
+    {
+        if (explosionPresented) return;
+        explosionPresented = true;
+        SynergyNetLog.Write("MudSplat explosion presentation", this);
         CreateExplosionEffect();
         SpatialAudioOneShot.Play(
             explosionSound,
@@ -192,13 +283,13 @@ public class MudSplatSynergy : MonoBehaviour
             audioDopplerLevel,
             "ChefBuilderSynergy_ExplosionAudio"
         );
-        Explode();
+        HideTrap();
+    }
 
-        Debug.Log(
-            "요리사 + 건축가 시너지: 미끼 폭발!"
-        );
-
-        Destroy(gameObject);
+    private void HideTrap()
+    {
+        foreach (Renderer visual in GetComponentsInChildren<Renderer>()) visual.enabled = false;
+        foreach (Collider hitbox in GetComponentsInChildren<Collider>()) hitbox.enabled = false;
     }
 
 
@@ -208,6 +299,7 @@ public class MudSplatSynergy : MonoBehaviour
     /// </summary>
     private int LureNearbyEnemies()
     {
+        if (IsNetworked && !Object.HasStateAuthority) return 0;
         Collider[] hitColliders =
             Physics.OverlapSphere(
                 transform.position,
@@ -226,7 +318,7 @@ public class MudSplatSynergy : MonoBehaviour
                 hitCollider.GetComponentInParent<EnemyHealth>();
 
             if (enemy == null ||
-                enemy.IsDead)
+                enemy.IsDead || enemy.GetComponent<FinalBossAttackController>() != null)
             {
                 continue;
             }
@@ -244,7 +336,7 @@ public class MudSplatSynergy : MonoBehaviour
                 continue;
             }
 
-            mover.ApplyLure(
+            enemy.RequestMudSplatLure(
                 transform.position,
                 lureDuration
             );
@@ -295,6 +387,7 @@ public class MudSplatSynergy : MonoBehaviour
     /// </summary>
     private void Explode()
     {
+        if (IsNetworked && !Object.HasStateAuthority) return;
         Collider[] hitColliders =
             Physics.OverlapSphere(
                 transform.position,
@@ -314,7 +407,7 @@ public class MudSplatSynergy : MonoBehaviour
                 hitCollider.GetComponentInParent<EnemyHealth>();
 
             if (enemy == null ||
-                enemy.IsDead)
+                enemy.IsDead || enemy.GetComponent<FinalBossAttackController>() != null)
             {
                 continue;
             }
@@ -327,12 +420,14 @@ public class MudSplatSynergy : MonoBehaviour
             DamageInfo damageInfo =
                 new DamageInfo(
                     explosionDamage,
-                    "CHEF_BUILDER_SYNERGY",
+                    IsNetworked ? "MUDSPLAT_" + Object.Id : "CHEF_BUILDER_SYNERGY",
                     PlayerRole.Architect,
                     shotId,
                     enemy.transform.position,
                     false
                 );
+            damageInfo.synergyOrigin = transform.position;
+            damageInfo.synergyImpulse = new Vector3(stunDuration, knockbackDistance, knockbackDuration);
 
             bool damageApplied =
                 enemy.TakeDamage(damageInfo);
@@ -342,40 +437,10 @@ public class MudSplatSynergy : MonoBehaviour
                 continue;
             }
 
-            EnemyCoreMover mover =
-                enemy.GetComponent<EnemyCoreMover>();
-
-            if (mover != null &&
-                !enemy.IsDead)
-            {
-                Vector3 knockbackDirection =
-                    enemy.transform.position -
-                    transform.position;
-
-                knockbackDirection.y = 0f;
-
-                mover.ApplyStun(
-                    stunDuration
-                );
-
-                mover.ApplyKnockback(
-                    knockbackDirection,
-                    knockbackDistance,
-                    knockbackDuration
-                );
-            }
-
-            Debug.Log(
-                $"미끼 폭발 피해 및 넉백: " +
-                $"{enemy.gameObject.name} / " +
-                $"{explosionDamage}"
-            );
+            SynergyNetLog.Write($"MudSplat Explosion Enemy={enemy.name} ShotId={shotId} Damage={explosionDamage}", this);
         }
 
-        Debug.Log(
-            $"미끼 폭발에 맞은 적 수: " +
-            $"{damagedEnemies.Count}"
-        );
+        SynergyNetLog.Write($"MudSplat Explosion Targets={damagedEnemies.Count}", this);
     }
 
 

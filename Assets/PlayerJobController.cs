@@ -812,7 +812,8 @@ public class PlayerJobController : NetworkBehaviour
                 {
                     projectile.Initialize(
                         shotContext,
-                        nextBuilderProjectileShotId++
+                        nextBuilderProjectileShotId++,
+                        Runner
                     );
                 }
                 else
