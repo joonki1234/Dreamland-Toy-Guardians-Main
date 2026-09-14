@@ -85,8 +85,38 @@ public class FireHoseController : MonoBehaviour
     public void StopWater()
     {
         if (!isShooting) return;
+
+        if (!isActiveAndEnabled)
+        {
+            // 상대방이 이미 다른 직업으로 바꿔서 이 무기(Weapon_Firefighter)
+            // 오브젝트가 비활성화된 뒤에 "물 멈춰라" RPC가 뒤늦게 도착하면,
+            // 아래 StartCoroutine이 "게임 오브젝트가 비활성 상태라 코루틴을
+            // 시작할 수 없다"는 에러를 던진다. 화면에 어차피 안 보이는
+            // 상태라 서서히 줄어드는 연출(PressureDropRoutine)은 의미가
+            // 없으니, 상태만 즉시 정리하고 끝낸다.
+            StopWaterImmediate();
+            return;
+        }
+
         if (stopRoutine != null) StopCoroutine(stopRoutine);
         stopRoutine = StartCoroutine(PressureDropRoutine());
+    }
+
+    private void StopWaterImmediate()
+    {
+        if (waterParticle != null)
+        {
+            var main = waterParticle.main;
+            main.startSpeed = defaultSpeed;
+            waterParticle.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        }
+
+        isShooting = false;
+
+        if (sfxAudioSource != null && sfxAudioSource.isPlaying)
+        {
+            sfxAudioSource.Stop();
+        }
     }
 
     private IEnumerator PressureDropRoutine()
