@@ -16,7 +16,7 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (hasHit || collision == null) return;
+        if (!isActiveAndEnabled || hasHit || collision == null) return;
 
         Vector3 hitPoint = transform.position;
         if (collision.contactCount > 0) hitPoint = collision.GetContact(0).point;
@@ -34,7 +34,7 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (hasHit || other == null) return;
+        if (!isActiveAndEnabled || hasHit || other == null) return;
 
         EnemyHealth enemy = other.GetComponentInParent<EnemyHealth>();
         if (enemy == null) return;

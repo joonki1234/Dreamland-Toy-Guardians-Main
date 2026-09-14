@@ -359,6 +359,7 @@ namespace DreamGuardians
 
         private void OnDisable()
         {
+            RoleSynergyProgression.Unbind(this);
             DespawnBasicTutorialTargets();
             DespawnSkillTutorialTargets();
             foreach (Coroutine routine in skillTargetBindingRoutines.Values)
@@ -367,6 +368,12 @@ namespace DreamGuardians
             skillTutorialTargets.Clear();
             basicTutorialTargets.Clear();
             completedBasicTutorialPlayers.Clear();
+        }
+
+        internal void ConfigureSynergyAudio(RoleSynergyTracker tracker)
+        {
+            tracker.ConfigureAudio(emergencySuppressionSfx, emergencySuppressionSfxVolume,
+                synergyAudioMinDistance, synergyAudioMaxDistance, synergyAudioDopplerLevel);
         }
 
         private NetworkRunner GetRunner()

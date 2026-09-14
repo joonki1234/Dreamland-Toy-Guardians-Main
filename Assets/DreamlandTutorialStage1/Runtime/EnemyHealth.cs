@@ -80,6 +80,7 @@ namespace DreamGuardians
         // 추적한다(PlayerJobController/NetworkPlayerMovement와 동일한 패턴).
         private bool _spawnCompleted;
         private bool IsNetworked => _spawnCompleted && Object != null;
+        internal bool CanCalculateSynergy => !IsNetworked || Object.HasStateAuthority;
 
         public override void Spawned()
         {
@@ -247,12 +248,13 @@ namespace DreamGuardians
                 (Runner == null || Runner.LocalPlayer != NetworkedTutorialTargetOwner))
                 return false;
 
-            if (IsDead || IsDuplicateShot(info))
+            PlayerRef attacker = IsNetworked ? Runner.LocalPlayer : PlayerRef.None;
+            if (IsDead || IsDuplicateShot(info, attacker))
             {
                 return false;
             }
 
-            RememberShot(info);
+            RememberShot(info, attacker);
 
             // 맞은 순간의 즉각적인 피드백(히트마커/사운드 등)은 누가
             // 때렸는지와 무관하게 바로 쏴 준다.
@@ -274,12 +276,14 @@ namespace DreamGuardians
                     (int)info.role,
                     info.shotId,
                     info.hitPoint,
-                    info.allowSynergy);
+                    info.allowSynergy,
+                    info.synergyOrigin,
+                    info.synergyImpulse);
 
                 return true;
             }
 
-            ApplyDamageAuthoritative(info);
+            ApplyDamageAuthoritative(info, attacker);
             return true;
         }
 
@@ -291,6 +295,8 @@ namespace DreamGuardians
             int shotId,
             Vector3 hitPoint,
             bool allowSynergy,
+            Vector3 synergyOrigin,
+            Vector3 synergyImpulse,
             RpcInfo rpcInfo = default)
         {
             if (IsPlayerTutorialTarget && rpcInfo.Source != NetworkedTutorialTargetOwner)
@@ -303,15 +309,17 @@ namespace DreamGuardians
                 shotId,
                 hitPoint,
                 allowSynergy);
+            info.synergyOrigin = synergyOrigin;
+            info.synergyImpulse = synergyImpulse;
 
-            if (IsDead || IsDuplicateShot(info))
+            if (IsDead || IsDuplicateShot(info, rpcInfo.Source))
             {
                 return;
             }
 
-            RememberShot(info);
+            RememberShot(info, rpcInfo.Source);
 
-            ApplyDamageAuthoritative(info);
+            ApplyDamageAuthoritative(info, rpcInfo.Source);
         }
 
         /// <summary>
@@ -364,8 +372,9 @@ namespace DreamGuardians
         /// HandleNetworkedHealthChanged/HandleNetworkedDeathChanged가
         /// 담당한다 - 여기서 이중으로 이벤트를 쏘지 않는다.
         /// </summary>
-        private void ApplyDamageAuthoritative(DamageInfo info)
+        private void ApplyDamageAuthoritative(DamageInfo info, PlayerRef attacker)
         {
+            if (!CanCalculateSynergy) return;
             bool wasDamageEnabled = DamageEnabled;
 
             SynergyResult synergyResult = SynergyResult.None;
@@ -374,7 +383,8 @@ namespace DreamGuardians
                 synergyTracker ??= GetComponent<RoleSynergyTracker>();
                 if (synergyTracker != null)
                 {
-                    synergyResult = synergyTracker.RegisterHit(info.role);
+                    SynergyNetLog.Write($"Enemy={name} Authority={(IsNetworked ? Object.StateAuthority.ToString() : "LOCAL")} Attacker={attacker} Role={info.role} ShotId={info.shotId}", this);
+                    synergyResult = synergyTracker.RegisterHit(info.role, attacker.ToString());
                 }
             }
 
@@ -402,6 +412,15 @@ namespace DreamGuardians
 
             float newHealth = Mathf.Max(0f, CurrentHealth - totalDamage);
             bool willDie = newHealth <= 0f;
+
+            if (!willDie && info.synergyImpulse != Vector3.zero &&
+                GetComponent<FinalBossAttackController>() == null)
+            {
+                var mover = GetComponent<EnemyCoreMover>();
+                mover?.ApplyStun(info.synergyImpulse.x);
+                mover?.ApplyKnockback(transform.position - info.synergyOrigin,
+                    info.synergyImpulse.y, info.synergyImpulse.z);
+            }
 
             if (IsNetworked)
             {
@@ -485,24 +504,24 @@ namespace DreamGuardians
             }
         }
 
-        private bool IsDuplicateShot(DamageInfo info)
+        private bool IsDuplicateShot(DamageInfo info, PlayerRef attacker)
         {
             if (info.shotId < 0)
             {
                 return false;
             }
 
-            return processedShotKeys.Contains(BuildShotKey(info));
+            return processedShotKeys.Contains(BuildShotKey(info, attacker));
         }
 
-        private void RememberShot(DamageInfo info)
+        private void RememberShot(DamageInfo info, PlayerRef attacker)
         {
             if (info.shotId < 0)
             {
                 return;
             }
 
-            string key = BuildShotKey(info);
+            string key = BuildShotKey(info, attacker);
             if (!processedShotKeys.Add(key))
             {
                 return;
@@ -515,10 +534,53 @@ namespace DreamGuardians
             }
         }
 
-        private static string BuildShotKey(DamageInfo info)
+        private string BuildShotKey(DamageInfo info, PlayerRef attacker)
         {
             string playerId = string.IsNullOrWhiteSpace(info.playerId) ? "LOCAL" : info.playerId;
-            return playerId + ":" + info.shotId;
+            // Preserve the final boss path; normal enemies also namespace by sender.
+            string prefix = GetComponent<FinalBossAttackController>() == null
+                ? attacker.ToString() + ":" : string.Empty;
+            return prefix + playerId + ":" + info.shotId;
+        }
+
+        internal void PublishSynergy(SynergyResult result)
+        {
+            if (!CanCalculateSynergy || !result.Triggered) return;
+            if (IsNetworked && GetComponent<FinalBossAttackController>() == null)
+                RPC_PresentSynergy((int)result.Kind, result.BonusDamage,
+                    (int)result.FirstRole, (int)result.SecondRole);
+            else
+                PresentSynergy(result);
+        }
+
+        [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+        private void RPC_PresentSynergy(int kind, float bonus, int firstRole, int secondRole)
+        {
+            PresentSynergy(new SynergyResult((SynergyKind)kind, bonus,
+                (PlayerRole)firstRole, (PlayerRole)secondRole));
+        }
+
+        private void PresentSynergy(SynergyResult result)
+        {
+            synergyTracker ??= GetComponent<RoleSynergyTracker>();
+            // Spawner's runtime MonoBehaviour addition is local to the authority.
+            if (synergyTracker == null) synergyTracker = gameObject.AddComponent<RoleSynergyTracker>();
+            synergyTracker.Present(result);
+        }
+
+        public void RequestMudSplatLure(Vector3 position, float duration)
+        {
+            if (GetComponent<FinalBossAttackController>() != null || IsDead) return;
+            if (IsNetworked && !Object.HasStateAuthority)
+                RPC_RequestMudSplatLure(position, duration);
+            else
+                GetComponent<EnemyCoreMover>()?.ApplyLure(position, duration);
+        }
+
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_RequestMudSplatLure(Vector3 position, float duration)
+        {
+            RequestMudSplatLure(position, duration);
         }
 
         private void OnValidate()

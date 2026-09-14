@@ -18,9 +18,19 @@ public class ChefFoodProjectile : MonoBehaviour
     private bool hasHit;
     private static int nextShotId = 200000;
 
+    public bool CanActivateMudSplat => isActiveAndEnabled && !hasHit;
+
+    public bool TryConsumeForMudSplat()
+    {
+        if (!CanActivateMudSplat) return false;
+        hasHit = true;
+        Destroy(gameObject);
+        return true;
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
-        if (hasHit)
+        if (!isActiveAndEnabled || hasHit)
         {
             return;
         }

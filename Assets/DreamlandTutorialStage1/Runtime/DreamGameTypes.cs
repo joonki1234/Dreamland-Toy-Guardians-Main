@@ -42,6 +42,9 @@ namespace DreamGuardians
         public int shotId;
         public Vector3 hitPoint;
         public bool allowSynergy;
+        // Only MudSplat fills these; ordinary attacks keep their existing effects.
+        public Vector3 synergyOrigin;
+        public Vector3 synergyImpulse; // stun seconds, knockback distance, duration
 
         public DamageInfo(
             float amount,
@@ -57,6 +60,8 @@ namespace DreamGuardians
             this.shotId = shotId;
             this.hitPoint = hitPoint;
             this.allowSynergy = allowSynergy;
+            synergyOrigin = default;
+            synergyImpulse = default;
         }
     }
 
@@ -137,7 +142,10 @@ namespace DreamGuardians
     /// </summary>
     public static class RoleSynergyProgression
     {
-        public static bool IsUnlocked { get; private set; }
+        private static bool localUnlocked;
+        private static DreamEnemySpawner networkOwner;
+        public static bool IsUnlocked => networkOwner != null && networkOwner.IsTutorialSessionReady
+            ? (bool)networkOwner.NetworkedSynergyUnlocked : localUnlocked;
 
         public static event Action Unlocked;
 
@@ -145,13 +153,19 @@ namespace DreamGuardians
             RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetOnPlay()
         {
-            IsUnlocked = false;
+            localUnlocked = false;
+            networkOwner = null;
             Unlocked = null;
         }
 
         public static void Lock()
         {
-            IsUnlocked = false;
+            if (networkOwner != null && networkOwner.IsTutorialSessionReady)
+            {
+                networkOwner.SetSynergyUnlocked(false);
+                return;
+            }
+            ApplySnapshot(false);
         }
 
         public static bool Unlock()
@@ -161,9 +175,31 @@ namespace DreamGuardians
                 return false;
             }
 
-            IsUnlocked = true;
-            Unlocked?.Invoke();
+            if (networkOwner != null && networkOwner.IsTutorialSessionReady)
+            {
+                networkOwner.SetSynergyUnlocked(true);
+                return true;
+            }
+            ApplySnapshot(true);
             return true;
+        }
+
+        internal static void Bind(DreamEnemySpawner owner)
+        {
+            networkOwner = owner;
+            ApplySnapshot(owner.NetworkedSynergyUnlocked);
+        }
+
+        internal static void Unbind(DreamEnemySpawner owner)
+        {
+            if (networkOwner == owner) networkOwner = null;
+        }
+
+        internal static void ApplySnapshot(bool unlocked)
+        {
+            bool changed = localUnlocked != unlocked;
+            localUnlocked = unlocked;
+            if (changed && unlocked) Unlocked?.Invoke();
         }
     }
 }

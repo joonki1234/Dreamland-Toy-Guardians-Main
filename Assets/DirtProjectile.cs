@@ -1,5 +1,6 @@
 using UnityEngine;
 using DreamGuardians;
+using Fusion;
 
 /// <summary>
 /// 건축가가 삽으로 흩뿌리는 흙 파편.
@@ -26,6 +27,7 @@ public class DirtProjectile : MonoBehaviour
     private DirtShotContext shotContext;
     private int projectileShotId = -1;
     private bool hasHit;
+    private NetworkRunner attackRunner;
 
     /// <summary>
     /// PlayerJobController가 파편을 생성한 직후 호출한다.
@@ -35,15 +37,17 @@ public class DirtProjectile : MonoBehaviour
     /// </summary>
     public void Initialize(
         DirtShotContext context,
-        int uniqueProjectileShotId)
+        int uniqueProjectileShotId,
+        NetworkRunner runner = null)
     {
         shotContext = context;
         projectileShotId = uniqueProjectileShotId;
+        attackRunner = runner;
     }
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (hasHit)
+        if (!isActiveAndEnabled || hasHit)
         {
             return;
         }
@@ -188,6 +192,20 @@ public class DirtProjectile : MonoBehaviour
                 Random.Range(0f, 360f),
                 contact.normal
             );
+
+        if (attackRunner != null && attackRunner.IsRunning)
+        {
+            NetworkObject prefab = mudSplatPrefab.GetComponent<NetworkObject>();
+            if (prefab == null)
+            {
+                Debug.LogError("[SynergyNet] MudSplat prefab requires a baked NetworkObject.", this);
+                return;
+            }
+            attackRunner.Spawn(prefab, spawnPosition, randomRotation * surfaceRotation,
+                attackRunner.LocalPlayer, (runner, spawned) =>
+                    spawned.GetComponent<MudSplatSynergy>().ConfigureLifetime(destroyDelay));
+            return;
+        }
 
         GameObject splat = Instantiate(
             mudSplatPrefab,

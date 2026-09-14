@@ -29,6 +29,9 @@ namespace DreamGuardians
 
         private readonly Dictionary<PlayerRole, float> lastHitTimes =
             new Dictionary<PlayerRole, float>();
+        private readonly Dictionary<PlayerRole, string> lastAttackers =
+            new Dictionary<PlayerRole, string>();
+        private bool audioConfigured;
 
         private readonly Dictionary<SynergyKind, float> lastTriggerTimes =
             new Dictionary<SynergyKind, float>();
@@ -59,6 +62,7 @@ namespace DreamGuardians
             float dopplerLevel)
         {
             emergencySuppressionSfx = clip;
+            audioConfigured = true;
             emergencySuppressionSfxVolume = Mathf.Clamp01(volume);
             synergyAudioMinDistance = Mathf.Max(0.01f, minDistance);
             synergyAudioMaxDistance = Mathf.Max(
@@ -73,9 +77,9 @@ namespace DreamGuardians
         /// 적이 어떤 직업의 공격에 맞았는지 기록하고
         /// 가능한 시너지가 있는지 확인한다.
         /// </summary>
-        public SynergyResult RegisterHit(PlayerRole role)
+        public SynergyResult RegisterHit(PlayerRole role, string attacker = "LOCAL")
         {
-            if (role == PlayerRole.None ||
+            if (owner == null || !owner.CanCalculateSynergy || role == PlayerRole.None ||
                 !RoleSynergyProgression.IsUnlocked)
             {
                 return SynergyResult.None;
@@ -83,6 +87,7 @@ namespace DreamGuardians
 
             float now = Time.time;
             lastHitTimes[role] = now;
+            lastAttackers[role] = attacker;
 
             SynergyResult result = role switch
             {
@@ -110,6 +115,18 @@ namespace DreamGuardians
 
             ApplyEffect(result.Kind);
 
+            SynergyNetLog.Write($"{result.Kind} TRIGGERED Enemy={name} Police={lastAttackers[PlayerRole.Police]} Firefighter={lastAttackers[PlayerRole.Firefighter]}", this);
+            owner.PublishSynergy(result);
+            return result;
+        }
+
+        // Result RPC calls presentation only; never RegisterHit or ApplyEffect.
+        internal void Present(SynergyResult result)
+        {
+            SynergyNetLog.Write($"Presentation={result.Kind} Enemy={name}", this);
+            if (!audioConfigured)
+                FindAnyObjectByType<DreamEnemySpawner>()?.ConfigureSynergyAudio(this);
+
             if (result.Kind == SynergyKind.EmergencySuppression)
             {
                 SpatialAudioOneShot.Play(
@@ -127,7 +144,6 @@ namespace DreamGuardians
                 new SynergyEventData(owner, result)
             );
 
-            return result;
         }
 
 

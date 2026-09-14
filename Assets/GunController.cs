@@ -113,6 +113,7 @@ public class GunController : MonoBehaviour
     /// </summary>
     private void Shoot(bool dealsDamage)
     {
+        if (!isActiveAndEnabled) return;
         if (Time.time < nextFireTime)
         {
             return;
@@ -279,7 +280,7 @@ public class GunController : MonoBehaviour
 
     private void PlayMuzzleFlash()
     {
-        if (muzzleFlashLight == null)
+        if (!isActiveAndEnabled || muzzleFlashLight == null)
         {
             return;
         }
