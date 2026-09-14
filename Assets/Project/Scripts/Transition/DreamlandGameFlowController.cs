@@ -92,6 +92,12 @@ public sealed class DreamlandGameFlowController : MonoBehaviour
     private void Awake()
     {
         ResolveFlowComponents();
+
+        // 게임오버 화면(GameOverUI)이 씬에 수동으로 배치돼 있지 않아도
+        // 항상 존재하도록 이 컨트롤러가 켜질 때마다(=게임플레이 씬이
+        // 로드될 때마다) 자동으로 만들어준다. 자세한 이유는
+        // GameOverUI.EnsureInstanceExists()의 주석 참고.
+        GameOverUI.EnsureInstanceExists();
     }
 
     private void OnEnable()
