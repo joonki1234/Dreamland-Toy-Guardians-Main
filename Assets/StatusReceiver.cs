@@ -66,6 +66,8 @@ public sealed class StatusReceiver : MonoBehaviour
 
     public void ApplyElementalAttack(ElementalType type, float damage, Vector3 attackerPosition = default)
     {
+        DreamGuardians.EnemyHealth tutorialHealth = GetComponentInParent<DreamGuardians.EnemyHealth>();
+        if (tutorialHealth != null && !tutorialHealth.CanPresentLocally) return;
         switch (type)
         {
             case ElementalType.Water:
@@ -116,6 +118,14 @@ public sealed class StatusReceiver : MonoBehaviour
 
     private void RequestWaterAuraPresentation(float duration)
     {
+        DreamGuardians.EnemyHealth health = GetComponentInParent<DreamGuardians.EnemyHealth>();
+        if (health != null && !health.PresentationReady) return;
+        if (health != null && health.IsPlayerTutorialTarget)
+        {
+            // Personal tutorial targets still have network HP. Their water VFX do not.
+            PresentWaterAura(duration);
+            return;
+        }
         NetworkObject target = GetComponentInParent<NetworkObject>();
         if (target != null && target.IsValid && target.Runner != null && target.Runner.IsRunning)
             PlayerJobController.RPC_PresentWaterAura(target.Runner, target.Id, duration);
@@ -126,6 +136,12 @@ public sealed class StatusReceiver : MonoBehaviour
     // RPC endpoint: visuals only. Do not call ApplyWetStatus/ApplyElementalAttack here.
     public void PresentWaterAura(float duration)
     {
+        DreamGuardians.EnemyHealth health = GetComponentInParent<DreamGuardians.EnemyHealth>();
+        if (health != null && !health.CanPresentLocally)
+        {
+            RemoveWaterAuraPresentation();
+            return;
+        }
         if (waterAuraCoroutine != null) StopCoroutine(waterAuraCoroutine);
         waterAuraCoroutine = null;
         if (duration <= 0f)

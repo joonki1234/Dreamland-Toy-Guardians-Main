@@ -163,9 +163,8 @@ namespace DreamGuardians
         {
             if (!CanSpawnTutorialEnemy || basicTutorialTargets.ContainsKey(player)) return;
             EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
-                Quaternion.identity, true, 0.4f, null, null, true);
+                Quaternion.identity, true, 0.4f, null, null, true, player);
             if (target == null) return;
-            target.SetTutorialTargetOwner(player);
             RPC_RegisterBasicTutorialTarget(player, target.Object.Id);
             EnemyPurification purification = target.GetComponent<EnemyPurification>();
             if (purification != null)
@@ -245,7 +244,7 @@ namespace DreamGuardians
                 return;
             }
             EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
-                Quaternion.identity, true, 0.4f, null, null, false);
+                Quaternion.identity, true, 0.4f, null, null, false, player);
             if (target == null)
             {
                 if (!skillTutorialSpawnErrorLogged)
@@ -253,7 +252,6 @@ namespace DreamGuardians
                 skillTutorialSpawnErrorLogged = true;
                 return;
             }
-            target.SetTutorialTargetOwner(player);
             RPC_RegisterSkillTutorialTarget(player, target.Object.Id);
         }
 
@@ -1080,7 +1078,8 @@ namespace DreamGuardians
             float healthMultiplier,
             Transform spawnPoint,
             GameObject prefabOverride,
-            bool registerTutorialEnemy = true)
+            bool registerTutorialEnemy = true,
+            PlayerRef? tutorialOwner = null)
         {
             GameObject selectedPrefab =
                 prefabOverride != null
@@ -1134,6 +1133,9 @@ namespace DreamGuardians
                 PlayerRef.None,
                 (spawnRunner, networkObject) =>
                 {
+                    if (tutorialOwner.HasValue)
+                        networkObject.GetComponent<EnemyHealth>()?.PrepareTutorialTarget(
+                            tutorialOwner.Value, !registerTutorialEnemy);
                     spawnedHealth = ConfigureSpawnedEnemy(
                         networkObject.gameObject,
                         tutorialEnemy,
@@ -1761,15 +1763,14 @@ namespace DreamGuardians
     public sealed class TutorialTargetLocalPresentation : MonoBehaviour
     {
         private PlayerRef owner;
-        private bool initialized;
 
         public PlayerRef Owner => owner;
 
         public void Initialize(PlayerRef targetOwner, NetworkRunner runner)
         {
-            if (initialized && owner == targetOwner) return;
             owner = targetOwner;
-            initialized = true;
+            // Binding may follow Spawned and reapply materials/renderer visibility.
+            // Reapply the owner mask even when the owner has not changed.
 
             bool showLocally = runner != null && runner.LocalPlayer == owner;
             foreach (Renderer targetRenderer in GetComponentsInChildren<Renderer>(true))

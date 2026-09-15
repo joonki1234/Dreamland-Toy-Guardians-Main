@@ -18,6 +18,8 @@ namespace DreamGuardians
         private GameObject barRoot;
         private Slider slider;
 
+        private bool CanShowLocally => health == null || health.CanPresentLocally;
+
         private void Awake()
         {
             health = GetComponent<EnemyHealth>();
@@ -53,7 +55,7 @@ namespace DreamGuardians
 
             if (barRoot != null)
             {
-                barRoot.SetActive(alwaysVisible);
+                barRoot.SetActive(alwaysVisible && CanShowLocally);
             }
         }
 
@@ -69,6 +71,11 @@ namespace DreamGuardians
 
         private void LateUpdate()
         {
+            if (!CanShowLocally)
+            {
+                Hide();
+                return;
+            }
             if (barRoot == null)
             {
                 return;
@@ -108,6 +115,7 @@ namespace DreamGuardians
         /// </summary>
         public void SetManualRatio(float ratio)
         {
+            if (!CanShowLocally) { Hide(); return; }
             if (barRoot != null)
             {
                 barRoot.SetActive(true);
@@ -131,6 +139,7 @@ namespace DreamGuardians
             }
 
             barRoot = Instantiate(prefab, transform);
+            barRoot.SetActive(alwaysVisible && CanShowLocally);
             barRoot.name = "WorldHealthBar";
             barRoot.transform.localPosition = localOffset;
             barRoot.transform.localRotation = Quaternion.identity;
@@ -207,6 +216,7 @@ namespace DreamGuardians
 
         private void HandleHealthChanged(EnemyHealth _, float current, float maximum)
         {
+            if (!CanShowLocally) { Hide(); return; }
             UpdateBar(maximum <= 0f ? 0f : current / maximum);
 
             // Health is authoritative/networked, but visibility is local. A remote
@@ -221,6 +231,7 @@ namespace DreamGuardians
 
         private void HandleHit(EnemyHealth _, DamageInfo __)
         {
+            if (!CanShowLocally) { Hide(); return; }
             if (barRoot != null)
             {
                 UpdatePlacement();
