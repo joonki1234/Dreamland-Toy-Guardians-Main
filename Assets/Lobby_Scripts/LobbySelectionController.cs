@@ -481,6 +481,7 @@ public class LobbySelectionController : MonoBehaviour
             case GameDifficulty.Extreme:
                 return "최상 · 8인용";
 
+            case GameDifficulty.Medium:
             default:
                 return "중 · 2~4인용";
         }
