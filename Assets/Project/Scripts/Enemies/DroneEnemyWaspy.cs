@@ -107,6 +107,15 @@ namespace DreamGuardians
         [SerializeField]
         private string dieTriggerName = "Die";
 
+#if UNITY_EDITOR
+        [Header("Editor Hit Test")]
+        [SerializeField, InspectorName("Freeze For Hit Test")]
+        private bool freezeForHitTest;
+
+        [SerializeField, InspectorName("Large Hitbox For Hit Test")]
+        private bool largeHitboxForHitTest;
+#endif
+
 
         private CoreState targetCore;
         private EnemyHealth health;
@@ -125,7 +134,6 @@ namespace DreamGuardians
         private LineRenderer attackBeam;
         private Material beamMaterial;
         private Coroutine beamRoutine;
-        private static int lastProxyPhysicsSyncFrame = -1;
 
 
         public float AttackRange => attackRange;
@@ -175,22 +183,13 @@ namespace DreamGuardians
             // ConfigureSpawnedEnemy는 State Authority에서만 실행되므로,
             // 런타임 피격 Collider는 각 클라이언트의 복제본에도 따로 필요하다.
             EnsureHitCollider();
-        }
-
-
-        public override void Render()
-        {
-            if (Object == null || Object.HasStateAuthority ||
-                lastProxyPhysicsSyncFrame == Time.frameCount)
+#if UNITY_EDITOR
+            if (largeHitboxForHitTest &&
+                GetComponent<BoxCollider>() is BoxCollider hitCollider)
             {
-                return;
+                hitCollider.size *= 3f;
             }
-
-            // NetworkTransform이 Proxy 루트를 Render 보간한 뒤, 같은 루트의
-            // 피격 Collider도 화면에 보이는 위치로 Physics에 반영한다.
-            // 드론 수와 관계없이 클라이언트당 프레임당 한 번만 동기화한다.
-            lastProxyPhysicsSyncFrame = Time.frameCount;
-            Physics.SyncTransforms();
+#endif
         }
 
 
@@ -211,6 +210,14 @@ namespace DreamGuardians
             {
                 return;
             }
+
+#if UNITY_EDITOR
+            if (freezeForHitTest)
+            {
+                TryAttackCore();
+                return;
+            }
+#endif
 
             if (!hasReachedOrbit)
             {
