@@ -27,30 +27,6 @@ namespace DreamGuardians
         // 클라이언트는 그 결과를 그대로 받아서 보게 된다 - 그래야
         // 인원수만큼 몬스터가 중복 생성되지 않는다.
         private RoomManager roomManager;
-
-        // 난이도(하/중/상/최상) 시스템: 로비에서 고른 GameDifficultyState 값을
-        // 읽어서 일반/원거리/드론 몬스터 HP에 배율로 적용한다. 못 찾으면
-        // (아직 스폰 전이거나 싱글 테스트 등) 항상 "상"과 동일한 1배로
-        // 취급해 기존 밸런스를 그대로 유지한다.
-        private GameDifficultyState difficultyState;
-        private bool difficultyStateResolveAttempted;
-
-        private float ResolveEnemyHealthDifficultyMultiplier()
-        {
-            if (difficultyState == null && !difficultyStateResolveAttempted)
-            {
-                difficultyState = FindAnyObjectByType<GameDifficultyState>();
-                difficultyStateResolveAttempted = true;
-            }
-
-            if (difficultyState == null || !difficultyState.IsReady)
-            {
-                return 1f;
-            }
-
-            return DifficultyBalance.GetEnemyHealthMultiplier(difficultyState.CurrentDifficulty);
-        }
-
         public event Action TutorialPresentationRequested;
         public event Action BasicTutorialCompletionChanged;
         public event Action SkillTutorialRequested;
@@ -1415,8 +1391,7 @@ namespace DreamGuardians
                     0.1f,
                     tutorialEnemy || droneEnemy != null || rangedEnemy != null
                         ? healthMultiplier
-                        : 1f) *
-                ResolveEnemyHealthDifficultyMultiplier();
+                        : 1f);
 
             health.Configure(
                 configuredHealth * GameDifficultyState.Settings.EnemyHealth,
