@@ -12,6 +12,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: DroneEnemy_Waspy Variant
       objectReference: {fileID: 0}
+    - target: {fileID: 3991375454132728119, guid: 85906bcee8198914c9be08c27a11bace, type: 3}
+      propertyPath: m_Layer
+      value: 7
+      objectReference: {fileID: 0}
     - target: {fileID: 4336938371776195469, guid: 85906bcee8198914c9be08c27a11bace, type: 3}
       propertyPath: m_LocalPosition.x
       value: 1.8720769

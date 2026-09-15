@@ -404,9 +404,6 @@ namespace DreamGuardians
             if (IsNetworked && !Object.HasStateAuthority)
             {
                 RPC_RequestDamage(
-                    Runner,
-                    Object.StateAuthority,
-                    Object.Id,
                     info.amount,
                     info.playerId,
                     (int)info.role,
@@ -444,11 +441,8 @@ namespace DreamGuardians
             return true;
         }
 
-        [Rpc]
-        private static void RPC_RequestDamage(
-            NetworkRunner runner,
-            [RpcTarget] PlayerRef target,
-            NetworkId targetId,
+        [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+        private void RPC_RequestDamage(
             float amount,
             string playerId,
             int role,
@@ -459,16 +453,7 @@ namespace DreamGuardians
             Vector3 synergyImpulse,
             RpcInfo rpcInfo = default)
         {
-            if (!runner.TryFindObject(targetId, out NetworkObject targetObject) ||
-                targetObject == null || !targetObject.HasStateAuthority)
-                return;
-
-            EnemyHealth targetHealth = targetObject.GetComponent<EnemyHealth>();
-            if (targetHealth == null)
-                return;
-
-            if (targetHealth.IsPlayerTutorialTarget &&
-                rpcInfo.Source != targetHealth.NetworkedTutorialTargetOwner)
+            if (IsPlayerTutorialTarget && rpcInfo.Source != NetworkedTutorialTargetOwner)
                 return;
 
             DamageInfo info = new DamageInfo(
@@ -481,18 +466,16 @@ namespace DreamGuardians
             info.synergyOrigin = synergyOrigin;
             info.synergyImpulse = synergyImpulse;
 
-            if (!targetHealth.PresentationReady ||
-                !targetHealth.AcceptTutorialAttack(info, rpcInfo.Source)) return;
+            if (!PresentationReady || !AcceptTutorialAttack(info, rpcInfo.Source)) return;
 
-            if (targetHealth.IsDead ||
-                targetHealth.IsDuplicateShot(info, rpcInfo.Source))
+            if (IsDead || IsDuplicateShot(info, rpcInfo.Source))
             {
                 return;
             }
 
-            targetHealth.RememberShot(info, rpcInfo.Source);
+            RememberShot(info, rpcInfo.Source);
 
-            targetHealth.ApplyDamageAuthoritative(info, rpcInfo.Source);
+            ApplyDamageAuthoritative(info, rpcInfo.Source);
         }
 
         /// <summary>
