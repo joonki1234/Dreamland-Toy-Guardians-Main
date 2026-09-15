@@ -211,6 +211,7 @@ namespace DreamGuardians
             {
                 if (Runner.TryFindObject(id, out NetworkObject target))
                 {
+                    MakeTutorialEnemyHighlyVisible(target.gameObject);
                     TutorialTargetLocalPresentation presentation =
                         target.GetComponent<TutorialTargetLocalPresentation>() ??
                         target.gameObject.AddComponent<TutorialTargetLocalPresentation>();
@@ -351,7 +352,8 @@ namespace DreamGuardians
         }
 
 
-        [Networked] public NetworkId TutorialEnemyId { get; private set; }
+        [Networked, OnChangedRender(nameof(HandleTutorialEnemyChanged))]
+        public NetworkId TutorialEnemyId { get; private set; }
         // Retain the attempt even if Spawn throws or the enemy later disappears.
         // Missing replication must never authorize another Spawn.
         [Networked] public NetworkBool TutorialSpawnIssued { get; private set; }
@@ -376,6 +378,27 @@ namespace DreamGuardians
                 !Runner.TryFindObject(TutorialEnemyId, out var networkObject)) return false;
             enemy = networkObject.GetComponent<EnemyHealth>();
             return enemy != null;
+        }
+
+        private void HandleTutorialEnemyChanged()
+        {
+            if (TutorialEnemyId.IsValid)
+                StartCoroutine(BindTutorialEnemyVisual(TutorialEnemyId));
+        }
+
+        private IEnumerator BindTutorialEnemyVisual(NetworkId id)
+        {
+            while (IsTutorialSessionReady && TutorialEnemyId == id)
+            {
+                if (Runner.TryFindObject(id, out NetworkObject target) &&
+                    target != null && target.IsValid)
+                {
+                    MakeTutorialEnemyHighlyVisible(target.gameObject);
+                    yield break;
+                }
+
+                yield return null;
+            }
         }
 
         private void OnDisable()
