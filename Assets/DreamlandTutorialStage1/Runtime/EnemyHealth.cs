@@ -83,22 +83,12 @@ namespace DreamGuardians
             (IsNetworked ? (bool)NetworkedPresentationReady : GetComponent<NetworkObject>() == null);
         public bool CanPresentLocally => PresentationReady &&
             (!IsPlayerTutorialTarget || (Runner != null && Runner.LocalPlayer == TutorialTargetOwner));
-        private bool IsSkillTutorialTarget => IsPlayerTutorialTarget && NetworkedSkillTutorialTarget;
-
-        private static bool IsTutorialSkillAttack(DamageInfo info)
-        {
-            // These source IDs are emitted by the four existing skill damage producers.
-            // playerId labels the attack here; it is NOT the authenticated player identity.
-            return (info.role == PlayerRole.Police && info.playerId == "POLICE_FOCUSED_FIRE") ||
-                   (info.role == PlayerRole.Firefighter && info.playerId == "FIREFIGHTER_FIRE_TRUCK_SKILL") ||
-                   (info.role == PlayerRole.Chef && info.playerId == "CHEF_SPECIAL_MENU_SKILL") ||
-                   (info.role == PlayerRole.Architect && info.playerId == "BUILDER_EMERGENCY_DEMOLITION");
-        }
+        public bool IsSkillTutorialTarget => IsPlayerTutorialTarget && NetworkedSkillTutorialTarget;
 
         private bool AcceptTutorialAttack(DamageInfo info, PlayerRef attacker)
         {
             return !IsPlayerTutorialTarget ||
-                (attacker == TutorialTargetOwner && (!IsSkillTutorialTarget || IsTutorialSkillAttack(info)));
+                attacker == TutorialTargetOwner;
         }
 
         // 튜토리얼 훈련용 몬스터(damageEnabled=false, 무적)는 실제 체력이
@@ -542,7 +532,9 @@ namespace DreamGuardians
         {
             if (!CanCalculateSynergy) return;
             if (!AcceptTutorialAttack(info, attacker)) return;
-            // Only authenticated skill hits bypass the practice dummy's invulnerability.
+            // Skill tutorial targets may be spawned with damageEnabled=false,
+            // but they still need to lose HP when the player's skill hits them.
+            // Other invulnerable tutorial targets keep the existing no-damage behavior.
             bool wasDamageEnabled = DamageEnabled || IsSkillTutorialTarget;
 
             SynergyResult synergyResult = SynergyResult.None;

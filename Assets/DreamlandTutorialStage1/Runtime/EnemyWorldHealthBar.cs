@@ -19,6 +19,7 @@ namespace DreamGuardians
         private Slider slider;
 
         private bool CanShowLocally => health == null || health.CanPresentLocally;
+        private bool KeepVisible => alwaysVisible || (health != null && health.IsSkillTutorialTarget);
 
         private void Awake()
         {
@@ -55,7 +56,7 @@ namespace DreamGuardians
 
             if (barRoot != null)
             {
-                barRoot.SetActive(alwaysVisible && CanShowLocally);
+                barRoot.SetActive(KeepVisible && CanShowLocally);
             }
         }
 
@@ -79,6 +80,13 @@ namespace DreamGuardians
             if (barRoot == null)
             {
                 return;
+            }
+
+            // Owner metadata may become ready after Start.
+            if (health != null && health.IsSkillTutorialTarget)
+            {
+                barRoot.SetActive(true);
+                UpdateBar(health.NormalizedHealth);
             }
 
             if (targetCamera == null)
@@ -139,7 +147,7 @@ namespace DreamGuardians
             }
 
             barRoot = Instantiate(prefab, transform);
-            barRoot.SetActive(alwaysVisible && CanShowLocally);
+            barRoot.SetActive(KeepVisible && CanShowLocally);
             barRoot.name = "WorldHealthBar";
             barRoot.transform.localPosition = localOffset;
             barRoot.transform.localRotation = Quaternion.identity;

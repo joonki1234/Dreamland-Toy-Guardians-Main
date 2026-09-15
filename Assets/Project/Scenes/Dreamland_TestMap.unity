@@ -1810,6 +1810,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemySpawner
   enemyPrefab: {fileID: 7208967736245470348, guid: e9ca6d0fb3a1c4643b165805b83a86eb, type: 3}
+  tutorialModelSource: {fileID: 919132149155446097, guid: 5f2dda943057c3446827a6360d626066, type: 3}
   spawnSpacing: 1.2
   spawnInterval: 0.35
 --- !u!4 &209256043 stripped

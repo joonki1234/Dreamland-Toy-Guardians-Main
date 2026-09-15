@@ -159,11 +159,31 @@ namespace DreamGuardians
             return true;
         }
 
+        private bool TryGetTutorialFacing(PlayerRef owner, Vector3 position, out Quaternion rotation)
+        {
+            // The spawning authority must use the requesting player's avatar, not its own camera.
+            foreach (PlayerJobController player in FindObjectsByType<PlayerJobController>(FindObjectsSortMode.None))
+            {
+                if (player.Runner != Runner || player.Object == null || !player.Object.IsValid ||
+                    player.Object.InputAuthority != owner) continue;
+                Vector3 direction = player.transform.position - position;
+                direction.y = 0f;
+                rotation = direction.sqrMagnitude > 0.0001f
+                    ? Quaternion.LookRotation(direction, Vector3.up)
+                    : Quaternion.identity;
+                return true;
+            }
+            rotation = Quaternion.identity;
+            return false;
+        }
+
         public void SpawnBasicTutorialTarget(PlayerRef player, Vector3 groundPosition)
         {
             if (!CanSpawnTutorialEnemy || basicTutorialTargets.ContainsKey(player)) return;
-            EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
-                Quaternion.identity, true, 0.4f, null, null, true, player);
+            Vector3 position = groundPosition + Vector3.up * enemyGroundOffset;
+            if (!TryGetTutorialFacing(player, position, out Quaternion rotation)) return;
+            EnemyHealth target = SpawnEnemy(position,
+                rotation, true, 0.4f, null, null, true, player);
             if (target == null) return;
             RPC_RegisterBasicTutorialTarget(player, target.Object.Id);
             EnemyPurification purification = target.GetComponent<EnemyPurification>();
@@ -243,8 +263,10 @@ namespace DreamGuardians
                 skillTutorialSpawnErrorLogged = true;
                 return;
             }
-            EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
-                Quaternion.identity, true, 0.4f, null, null, false, player);
+            Vector3 position = groundPosition + Vector3.up * enemyGroundOffset;
+            if (!TryGetTutorialFacing(player, position, out Quaternion rotation)) return;
+            EnemyHealth target = SpawnEnemy(position,
+                rotation, true, 0.4f, null, null, false, player);
             if (target == null)
             {
                 if (!skillTutorialSpawnErrorLogged)
@@ -385,6 +407,8 @@ namespace DreamGuardians
         }
         [Header("Enemy")]
         [SerializeField] private GameObject enemyPrefab;
+        [Tooltip("튜토리얼 로봇에만 적용할 원본 FBX의 메시별 재질입니다.")]
+        [SerializeField] private GameObject tutorialModelSource;
         [SerializeField, Min(1f)] private float baseEnemyHealth = 100f;
         [SerializeField, Min(0f)] private float energyRewardPerEnemy = 10f;
 
@@ -1544,7 +1568,7 @@ namespace DreamGuardians
                 portalForward: portalForward);
         }
 
-        private static void MakeTutorialEnemyHighlyVisible(
+        private void MakeTutorialEnemyHighlyVisible(
             GameObject enemyObject)
         {
             if (enemyObject == null)
@@ -1555,54 +1579,25 @@ namespace DreamGuardians
             enemyObject.transform.localScale =
                 Vector3.one * 1.5f;
 
-            Shader shader =
-                Shader.Find(
-                    "Universal Render Pipeline/Unlit");
-
-            shader ??=
-                Shader.Find("Unlit/Color");
-
-            shader ??=
-                Shader.Find("Standard");
-
-            if (shader == null)
+            // The enemy already uses these FBX meshes. Restore only their original
+            // material slots, preserving the animated hierarchy and all hitboxes.
+            if (tutorialModelSource != null)
             {
-                return;
-            }
-
-            Color visibleColor =
-                new Color(
-                    1f,
-                    0.08f,
-                    0.65f,
-                    1f);
-
-            Material material =
-                new Material(shader)
+                MeshFilter[] sourceParts = tutorialModelSource.GetComponentsInChildren<MeshFilter>(true);
+                foreach (MeshFilter part in enemyObject.GetComponentsInChildren<MeshFilter>(true))
                 {
-                    name =
-                        "TutorialEnemy_Visible_Runtime",
-
-                    color =
-                        visibleColor
-                };
-
-            if (material.HasProperty("_BaseColor"))
-            {
-                material.SetColor(
-                    "_BaseColor",
-                    visibleColor);
+                    if (part.sharedMesh == null) continue;
+                    Renderer target = part.GetComponent<Renderer>();
+                    if (target == null) continue;
+                    foreach (MeshFilter source in sourceParts)
+                    {
+                        if (source.sharedMesh != part.sharedMesh) continue;
+                        Renderer original = source.GetComponent<Renderer>();
+                        if (original != null) target.sharedMaterials = original.sharedMaterials;
+                        break;
+                    }
+                }
             }
-
-            if (material.HasProperty("_EmissionColor"))
-            {
-                material.EnableKeyword("_EMISSION");
-
-                material.SetColor(
-                    "_EmissionColor",
-                    visibleColor * 2f);
-            }
-
             foreach (
                 Renderer targetRenderer
                 in enemyObject
@@ -1612,9 +1607,6 @@ namespace DreamGuardians
                 {
                     continue;
                 }
-
-                targetRenderer.sharedMaterial =
-                    material;
 
                 targetRenderer.shadowCastingMode =
                     UnityEngine.Rendering
