@@ -272,6 +272,7 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
 
     private void ApplyCoreDamage(float amount)
     {
+        amount *= GameDifficultyState.Settings.CoreDamage;
         NetworkedCoreHealth = Mathf.Max(0f, NetworkedCoreHealth - amount);
     }
 

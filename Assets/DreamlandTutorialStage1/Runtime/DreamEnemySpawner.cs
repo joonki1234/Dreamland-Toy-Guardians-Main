@@ -273,7 +273,8 @@ namespace DreamGuardians
                 if (Runner.TryFindObject(id, out NetworkObject target) && target != null && target.IsValid)
                 {
                     EnemyHealth health = target.GetComponent<EnemyHealth>();
-                    if (health != null) health.Configure(baseEnemyHealth * 0.4f, false);
+                    if (health != null && target.HasStateAuthority)
+                        health.Configure(baseEnemyHealth * 0.4f * GameDifficultyState.Settings.EnemyHealth, false);
                     EnemyCoreMover mover = target.GetComponent<EnemyCoreMover>();
                     if (mover != null)
                     {
@@ -409,9 +410,10 @@ namespace DreamGuardians
         [SerializeField, Min(0.01f)] private float synergyAudioMaxDistance = 30f;
         [SerializeField, Range(0f, 1f)] private float synergyAudioDopplerLevel;
 
-        [Header("Editor Test Damage")]
-        [Tooltip("Unity Editor Play Mode에서만 플레이어의 적 대상 피해를 강화합니다.")]
-        [SerializeField] private bool enableTestDamageBoost = true;
+        [Header("Editor Solo Boss Test Damage")]
+        [Tooltip("Unity Editor Play Mode에서 이 옵션을 켠 경우에만 플레이어의 보스 대상 피해를 강화합니다. PC/Quest 빌드에는 적용되지 않습니다.")]
+        [SerializeField, InspectorName("Enable Solo Boss Test Damage")]
+        private bool enableTestDamageBoost = false;
         [Tooltip("1이면 원래 밸런스이며, 실제 빌드에서는 이 값과 무관하게 항상 1배입니다.")]
         [SerializeField, Min(1f)] private float testDamageMultiplier = 5f;
 
@@ -571,6 +573,12 @@ namespace DreamGuardians
             int safeCount =
                 safePrimaryCount + safeAdditionalCount;
 
+            var difficulty = GameDifficultyState.Settings;
+            int originalTotal = 0;
+            safePrimaryCount = difficulty.AllocateCount(safePrimaryCount, ref originalTotal);
+            safeAdditionalCount = difficulty.AllocateCount(safeAdditionalCount, ref originalTotal);
+            safeCount = safePrimaryCount + safeAdditionalCount;
+
             float safeInterval = Mathf.Max(0f, spawnInterval);
 
             List<Transform> waveSpawnPoints =
@@ -728,16 +736,19 @@ namespace DreamGuardians
             int[] remainingRanged = new int[directionCount];
             int[] remainingDrone = new int[directionCount];
 
+            var difficulty = GameDifficultyState.Settings;
+            int originalTotal = 0;
+
             for (int d = 0; d < directionCount; d++)
             {
-                remainingMelee[d] = safeMelee;
-                remainingRanged[d] = safeRanged;
-                remainingDrone[d] = safeDrone;
+                remainingMelee[d] = difficulty.AllocateCount(safeMelee, ref originalTotal);
+                remainingRanged[d] = difficulty.AllocateCount(safeRanged, ref originalTotal);
+                remainingDrone[d] = difficulty.AllocateCount(safeDrone, ref originalTotal);
             }
 
             float safeInterval = Mathf.Max(0f, spawnInterval);
             int totalToSpawn =
-                directionCount * (safeMelee + safeRanged + safeDrone);
+                difficulty.ScaleCount(originalTotal);
             int spawned = 0;
 
             while (spawned < totalToSpawn)
@@ -1383,7 +1394,7 @@ namespace DreamGuardians
                         : 1f);
 
             health.Configure(
-                configuredHealth,
+                configuredHealth * GameDifficultyState.Settings.EnemyHealth,
                 !tutorialEnemy);
 
             if (purification != null)

@@ -29957,7 +29957,7 @@ MonoBehaviour:
   synergyAudioMinDistance: 3
   synergyAudioMaxDistance: 30
   synergyAudioDopplerLevel: 0
-  enableTestDamageBoost: 1
+  enableTestDamageBoost: 0
   testDamageMultiplier: 5
   targetCore: {fileID: 2019763646}
   spawnPoints:

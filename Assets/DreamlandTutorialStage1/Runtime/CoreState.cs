@@ -104,7 +104,7 @@ namespace DreamGuardians
                 return;
             }
 
-            currentHealth = Mathf.Max(0f, currentHealth - amount);
+            currentHealth = Mathf.Max(0f, currentHealth - amount * GameDifficultyState.Settings.CoreDamage);
             HealthChanged?.Invoke(currentHealth, maxHealth);
 
             if (currentHealth <= 0f)

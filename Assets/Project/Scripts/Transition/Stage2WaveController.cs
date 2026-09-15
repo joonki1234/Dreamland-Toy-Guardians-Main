@@ -640,10 +640,10 @@ public sealed class Stage2WaveController : MonoBehaviour
                 : 0;
 
         int totalEnemyCount =
-            DirectionCount *
+            GameDifficultyState.Settings.ScaleCount(DirectionCount *
             (safeMeleePerDirection +
              safeRangedPerDirection +
-             safeDronePerDirection);
+             safeDronePerDirection));
 
         // EnemyPortalStageController가 이 이벤트를 받아
         // 해당 웨이브의 포탈을 활성화하거나 확장합니다.

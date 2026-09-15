@@ -92,9 +92,18 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private Button difficultyRightArrowButton;
 
-    [Tooltip("현재 난이도(하/중/상)를 보여줄 텍스트")]
+    [Tooltip("현재 난이도(하/중/상/최상)와 권장 인원을 보여줄 텍스트")]
     [SerializeField]
     private TMP_Text difficultyText;
+
+    [SerializeField] private Button[] difficultyButtons;
+
+    public void SelectDifficulty(int value)
+    {
+        if (isCountdownActive || roomManager == null || value < 0 || value > 3) return;
+        var state = roomManager.GetOrFindDifficultyState();
+        if (state != null && state.IsReady) state.RequestSetDifficulty((GameDifficulty)value);
+    }
 
     [Header("PC/VR 플레이 모드 선택 (개인별)")]
     [Tooltip("플레이 모드를 VR 쪽으로 넘기는(왼쪽) 화살표 버튼")]
@@ -387,7 +396,7 @@ public class LobbySelectionController : MonoBehaviour
             Mathf.Clamp(
                 (int)difficultyState.CurrentDifficulty + direction,
                 0,
-                2
+                3
             );
 
         difficultyState.RequestSetDifficulty((GameDifficulty)nextValue);
@@ -426,7 +435,22 @@ public class LobbySelectionController : MonoBehaviour
                     : "난이도: 중 (연결 중...)";
         }
 
-        bool locked = isCountdownActive || !difficultyReady;
+        bool locked = isCountdownActive || !difficultyReady ||
+            (difficultyReady && difficultyState.SelectionLocked);
+
+        if (difficultyButtons != null)
+        {
+            for (int i = 0; i < difficultyButtons.Length; i++)
+            {
+                var button = difficultyButtons[i];
+                if (button == null) continue;
+                button.interactable = !locked;
+                var colors = button.colors;
+                colors.normalColor = i == (int)difficulty ? selectedButtonColor : normalButtonColor;
+                colors.selectedColor = colors.normalColor;
+                button.colors = colors;
+            }
+        }
 
         if (difficultyLeftArrowButton != null)
         {
@@ -437,7 +461,7 @@ public class LobbySelectionController : MonoBehaviour
         if (difficultyRightArrowButton != null)
         {
             difficultyRightArrowButton.interactable =
-                !locked && difficulty != GameDifficulty.Hard;
+                !locked && difficulty != GameDifficulty.Extreme;
         }
     }
 
@@ -449,13 +473,16 @@ public class LobbySelectionController : MonoBehaviour
         switch (difficulty)
         {
             case GameDifficulty.Easy:
-                return "하";
+                return "하 · 1인용";
 
             case GameDifficulty.Hard:
-                return "상";
+                return "상 · 6인용";
+
+            case GameDifficulty.Extreme:
+                return "최상 · 8인용";
 
             default:
-                return "중";
+                return "중 · 2~4인용";
         }
     }
 

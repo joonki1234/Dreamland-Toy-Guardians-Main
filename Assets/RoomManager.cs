@@ -207,6 +207,7 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         // Simulate()해주지 않는다. 그 결과 AddForce/velocity로 초기 속도는 걸리지만
         // 실제 위치 갱신(중력 포함)이 전혀 일어나지 않아 총알/음식/흙덩이가 허공에 멈춰버렸다.
         // None으로 두면 Unity 기본(자동 시뮬레이션되는) PhysicsScene을 그대로 사용한다.
+        GetOrFindDifficultyState()?.LockSelection();
         _runner.LoadScene(SceneRef.FromIndex(buildIndex), LoadSceneMode.Single, LocalPhysicsMode.None, true);
     }
 

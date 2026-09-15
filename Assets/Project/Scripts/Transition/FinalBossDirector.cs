@@ -632,7 +632,7 @@ public sealed class FinalBossDirector : MonoBehaviour
 
         Debug.Log(
             "[FinalBoss] 오염된 선물상자 보스전 시작. 보스 HP: " +
-            bossMaxHealth.ToString("0") +
+            bossHealth.MaxHealth.ToString("0") +
             " / 근접·원거리·비행 적 순환 소환 활성화",
             this);
 
@@ -1010,9 +1010,9 @@ public sealed class FinalBossDirector : MonoBehaviour
 
             // 보스가 직접 생성한 적만 제한합니다. 이전 웨이브에 남은 적 때문에
             // 보스 소환이 멈추는 현상을 방지합니다.
-            for (int i = 0; i < droneBurstCount; i++)
+            for (int i = 0; i < GameDifficultyState.Settings.ScaleCount(droneBurstCount); i++)
             {
-                if (bossSpawnedEnemies.Count >= maxActiveMinions)
+                if (bossSpawnedEnemies.Count >= GameDifficultyState.Settings.ScaleCount(maxActiveMinions))
                 {
                     // Capacity may change after the preparation cue.
                     if (i == 0) bossObject.GetComponent<FinalBossFaceController>()?.CancelSummon();
@@ -1033,7 +1033,7 @@ public sealed class FinalBossDirector : MonoBehaviour
         int count = 0;
         foreach (EnemyHealth enemy in bossSpawnedEnemies)
             if (enemy != null && !enemy.IsDead) count++;
-        return count < maxActiveMinions;
+        return count < GameDifficultyState.Settings.ScaleCount(maxActiveMinions);
     }
 
     private IEnumerator WaitForBossSummon(float duration)
