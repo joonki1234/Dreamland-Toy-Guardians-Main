@@ -104,11 +104,6 @@ namespace DreamGuardians
         /// </summary>
         public void SetCamera(Camera camera)
         {
-            if (camera != null && camera.gameObject.scene != gameObject.scene)
-            {
-                return;
-            }
-
             explicitCamera = camera;
             cameraExplicitlySet = camera != null;
             ApplyCamera();
@@ -240,9 +235,6 @@ namespace DreamGuardians
                 typeof(Canvas),
                 typeof(CanvasScaler));
             canvasObject.transform.SetParent(null, false);
-            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(
-                canvasObject,
-                gameObject.scene);
 
             canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
@@ -356,12 +348,6 @@ namespace DreamGuardians
             // MissionBannerUI.ApplyCamera()의 주석 참고 - 같은 원인의 버그다.)
             Camera localPlayerCamera =
                 NetworkPlayerMovement.LocalPlayerCamera;
-
-            if (localPlayerCamera != null &&
-                localPlayerCamera.gameObject.scene != gameObject.scene)
-            {
-                localPlayerCamera = null;
-            }
 
             Camera target;
 
