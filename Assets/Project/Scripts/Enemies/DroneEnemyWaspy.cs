@@ -169,6 +169,14 @@ namespace DreamGuardians
         }
 
 
+        public override void Spawned()
+        {
+            // ConfigureSpawnedEnemy는 State Authority에서만 실행되므로,
+            // 런타임 피격 Collider는 각 클라이언트의 복제본에도 따로 필요하다.
+            EnsureHitCollider();
+        }
+
+
         public override void FixedUpdateNetwork()
         {
             // 협동 플레이 동기화: 비행/공격 이동은 State Authority(방장)

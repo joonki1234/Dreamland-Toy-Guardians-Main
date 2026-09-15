@@ -30424,7 +30424,7 @@ MonoBehaviour:
   backgroundImage: {fileID: 275248283610961759}
   backgroundCamera: {fileID: 239866164339949681}
   gameCamera: {fileID: 0}
-  enableWebcamSimulation: 1
+  enableWebcamSimulation: 0
   preferredDeviceName: 
   requestedWidth: 1280
   requestedHeight: 720
