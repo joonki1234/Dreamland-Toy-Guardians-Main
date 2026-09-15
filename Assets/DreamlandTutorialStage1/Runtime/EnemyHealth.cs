@@ -369,6 +369,12 @@ namespace DreamGuardians
         /// </summary>
         public bool TakeDamage(DamageInfo info)
         {
+            Debug.Log(
+                $"[DroneDamageTrace][TakeDamage] attacker={(IsNetworked && Runner != null ? Runner.LocalPlayer.ToString() : "local")} " +
+                $"target={name} shot={info.shotId} stateAuthority={(IsNetworked && Object.HasStateAuthority)} " +
+                $"inputAuthority={(IsNetworked && Object.HasInputAuthority)} hp={CurrentHealth}",
+                this);
+
             if (!PresentationReady ||
                 !AcceptTutorialAttack(info, IsNetworked ? Runner.LocalPlayer : PlayerRef.None))
                 return false;
@@ -403,6 +409,11 @@ namespace DreamGuardians
 
             if (IsNetworked && !Object.HasStateAuthority)
             {
+                Debug.Log(
+                    $"[DroneDamageTrace][RPC Send] attacker={Runner.LocalPlayer} target={name} " +
+                    $"shot={info.shotId} stateAuthority={Object.HasStateAuthority} " +
+                    $"inputAuthority={Object.HasInputAuthority}",
+                    this);
                 RPC_RequestDamage(
                     info.amount,
                     info.playerId,
@@ -453,6 +464,12 @@ namespace DreamGuardians
             Vector3 synergyImpulse,
             RpcInfo rpcInfo = default)
         {
+            Debug.Log(
+                $"[DroneDamageTrace][RPC Receive] attacker={rpcInfo.Source} target={name} " +
+                $"shot={shotId} stateAuthority={Object.HasStateAuthority} " +
+                $"inputAuthority={Object.HasInputAuthority} hp={CurrentHealth}",
+                this);
+
             if (IsPlayerTutorialTarget && rpcInfo.Source != NetworkedTutorialTargetOwner)
                 return;
 
@@ -572,6 +589,13 @@ namespace DreamGuardians
 
             float newHealth = Mathf.Max(0f, CurrentHealth - totalDamage);
             bool willDie = newHealth <= 0f;
+
+            Debug.Log(
+                $"[DroneDamageTrace][HP Apply] attacker={attacker} target={name} " +
+                $"shot={info.shotId} stateAuthority={(IsNetworked && Object.HasStateAuthority)} " +
+                $"inputAuthority={(IsNetworked && Object.HasInputAuthority)} " +
+                $"hp={CurrentHealth}->{newHealth} damage={totalDamage}",
+                this);
 
             if (!willDie && info.synergyImpulse != Vector3.zero &&
                 GetComponent<FinalBossAttackController>() == null)
