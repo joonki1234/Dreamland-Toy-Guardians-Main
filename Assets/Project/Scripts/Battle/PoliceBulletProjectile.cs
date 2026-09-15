@@ -22,13 +22,6 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
         if (collision.contactCount > 0) hitPoint = collision.GetContact(0).point;
 
         EnemyHealth enemy = collision.collider.GetComponentInParent<EnemyHealth>();
-        Debug.Log(
-            $"[DroneDamageTrace][Hit] shot={shotId} target={collision.collider.name} " +
-            $"enemy={(enemy != null ? enemy.name : "none")} trigger=false " +
-            $"localPlayer={(enemy != null && enemy.Runner != null ? enemy.Runner.LocalPlayer.ToString() : "none")} " +
-            $"stateAuthority={(enemy != null && enemy.Object != null && enemy.Object.HasStateAuthority)} " +
-            $"inputAuthority={(enemy != null && enemy.Object != null && enemy.Object.HasInputAuthority)}",
-            collision.collider);
         if (enemy != null)
         {
             HitEnemy(enemy, hitPoint);
@@ -44,13 +37,6 @@ public sealed class PoliceBulletProjectile : MonoBehaviour
         if (!isActiveAndEnabled || hasHit || other == null) return;
 
         EnemyHealth enemy = other.GetComponentInParent<EnemyHealth>();
-        Debug.Log(
-            $"[DroneDamageTrace][Hit] shot={shotId} target={other.name} " +
-            $"enemy={(enemy != null ? enemy.name : "none")} trigger=true " +
-            $"localPlayer={(enemy != null && enemy.Runner != null ? enemy.Runner.LocalPlayer.ToString() : "none")} " +
-            $"stateAuthority={(enemy != null && enemy.Object != null && enemy.Object.HasStateAuthority)} " +
-            $"inputAuthority={(enemy != null && enemy.Object != null && enemy.Object.HasInputAuthority)}",
-            other);
         if (enemy == null) return;
 
         Vector3 hitPoint = other.ClosestPoint(transform.position);

@@ -107,16 +107,6 @@ namespace DreamGuardians
         [SerializeField]
         private string dieTriggerName = "Die";
 
-#if UNITY_EDITOR
-        [Header("Editor Hit Test")]
-        [SerializeField, InspectorName("Freeze For Hit Test")]
-        private bool freezeForHitTest;
-
-        [SerializeField, InspectorName("Large Hitbox For Hit Test")]
-        private bool largeHitboxForHitTest;
-#endif
-
-
         private CoreState targetCore;
         private EnemyHealth health;
         private float spawnGroundHeight;
@@ -178,21 +168,6 @@ namespace DreamGuardians
         }
 
 
-        public override void Spawned()
-        {
-            // ConfigureSpawnedEnemy는 State Authority에서만 실행되므로,
-            // 런타임 피격 Collider는 각 클라이언트의 복제본에도 따로 필요하다.
-            EnsureHitCollider();
-#if UNITY_EDITOR
-            if (largeHitboxForHitTest &&
-                GetComponent<BoxCollider>() is BoxCollider hitCollider)
-            {
-                hitCollider.size *= 3f;
-            }
-#endif
-        }
-
-
         public override void FixedUpdateNetwork()
         {
             // 협동 플레이 동기화: 비행/공격 이동은 State Authority(방장)
@@ -210,14 +185,6 @@ namespace DreamGuardians
             {
                 return;
             }
-
-#if UNITY_EDITOR
-            if (freezeForHitTest)
-            {
-                TryAttackCore();
-                return;
-            }
-#endif
 
             if (!hasReachedOrbit)
             {
