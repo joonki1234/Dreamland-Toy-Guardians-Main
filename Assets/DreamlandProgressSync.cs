@@ -114,7 +114,7 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
         // 로비에서 막 스폰된 시점에는 아직 게임플레이 씬(Dreamland_map_3)이
         // 아니라서 CoreState/DreamlandGameFlowController를 찾아도 없다.
         // OnEnteredGameplayScene()이 호출될 때 다시 찾는다.
-        _core = FindCoreInRunnerScene();
+        _core = FindAnyObjectByType<CoreState>(FindObjectsInactive.Include);
         _flowController =
             FindAnyObjectByType<DreamlandGameFlowController>(
                 FindObjectsInactive.Include);
@@ -145,7 +145,7 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
             return;
         }
 
-        _core = FindCoreInRunnerScene();
+        _core = FindAnyObjectByType<CoreState>(FindObjectsInactive.Include);
         _flowController =
             FindAnyObjectByType<DreamlandGameFlowController>(
                 FindObjectsInactive.Include);
@@ -282,33 +282,8 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
     /// </summary>
     private void HandleCoreHealthChanged()
     {
-        _core ??= FindCoreInRunnerScene();
+        _core ??= FindAnyObjectByType<CoreState>(FindObjectsInactive.Include);
         _core?.ApplyNetworkedDamageState(NetworkedCoreHealth);
-    }
-
-    private CoreState FindCoreInRunnerScene()
-    {
-        NetworkSceneManagerDefault sceneManager =
-            Runner != null
-                ? Runner.GetComponent<NetworkSceneManagerDefault>()
-                : null;
-
-        if (sceneManager == null)
-        {
-            return FindAnyObjectByType<CoreState>(FindObjectsInactive.Include);
-        }
-
-        GameObject[] roots = sceneManager.MainRunnerScene.GetRootGameObjects();
-        for (int i = 0; i < roots.Length; i++)
-        {
-            CoreState core = roots[i].GetComponentInChildren<CoreState>(true);
-            if (core != null)
-            {
-                return core;
-            }
-        }
-
-        return null;
     }
 
     /// <summary>

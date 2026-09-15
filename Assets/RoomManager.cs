@@ -350,20 +350,8 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
         while (Time.unscaledTime - startTime < maxWaitSeconds)
         {
-            DreamlandProgressSync sync = null;
-            DreamlandProgressSync[] syncCandidates =
-                FindObjectsByType<DreamlandProgressSync>(
-                    FindObjectsInactive.Include,
-                    FindObjectsSortMode.None);
-
-            for (int i = 0; i < syncCandidates.Length; i++)
-            {
-                if (syncCandidates[i].Runner == _runner)
-                {
-                    sync = syncCandidates[i];
-                    break;
-                }
-            }
+            DreamlandProgressSync sync =
+                FindAnyObjectByType<DreamlandProgressSync>(FindObjectsInactive.Include);
 
             // sync가 "찾아졌다"는 것과 "Fusion이 [Networked] 값을 읽을 준비를
             // 마쳤다"는 건 다르다 - GameDifficultyState에서 실제로 재현된
