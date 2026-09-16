@@ -1778,16 +1778,33 @@ namespace DreamGuardians
     public sealed class TutorialTargetLocalPresentation : MonoBehaviour
     {
         private PlayerRef owner;
+        private NetworkRunner runner;
+        private bool showLocally;
 
         public PlayerRef Owner => owner;
 
         public void Initialize(PlayerRef targetOwner, NetworkRunner runner)
         {
             owner = targetOwner;
+            this.runner = runner;
             // Binding may follow Spawned and reapply materials/renderer visibility.
             // Reapply the owner mask even when the owner has not changed.
 
-            bool showLocally = runner != null && runner.LocalPlayer == owner;
+            ApplyOwnerVisibility();
+        }
+
+        private void LateUpdate()
+        {
+            // Network Spawn/Spawned callbacks and runtime-added presentation
+            // components can enable renderers after the first binding pass. Keep
+            // replicated tutorial targets hidden on every non-owning peer.
+            if (!showLocally)
+                ApplyOwnerVisibility();
+        }
+
+        private void ApplyOwnerVisibility()
+        {
+            showLocally = runner != null && runner.LocalPlayer == owner;
             foreach (Renderer targetRenderer in GetComponentsInChildren<Renderer>(true))
                 if (targetRenderer != null) targetRenderer.enabled = showLocally;
             foreach (Collider targetCollider in GetComponentsInChildren<Collider>(true))
