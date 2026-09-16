@@ -88,6 +88,8 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
     /// </summary>
     public bool IsReady => Object != null && Object.IsValid;
 
+    public bool IsCoreHealthReady => IsReady && Initialized;
+
     private CoreState _core;
     private DreamlandGameFlowController _flowController;
     private DreamRoadRevealController _roadRevealController;
@@ -121,6 +123,19 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
         ResolveRevealControllers();
     }
 
+    public override void Render()
+    {
+        if (!IsReady || Runner.IsSceneManagerBusy)
+            return;
+
+        // Recover even if scene loading/replication outlasted RoomManager's retry.
+        // A late join snapshot does not trigger OnChangedRender on initial spawn.
+        if (_core == null || !Initialized)
+            OnEnteredGameplayScene();
+
+        HandleCoreHealthChanged();
+    }
+
     private void OnDestroy()
     {
         if (Instance == this)
@@ -149,6 +164,10 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
         _flowController =
             FindAnyObjectByType<DreamlandGameFlowController>(
                 FindObjectsInactive.Include);
+
+        // Do not initialize HP to the default network value (0) in the lobby.
+        if (_core == null)
+            return;
 
         if (Object != null &&
             Object.HasStateAuthority &&
@@ -190,7 +209,7 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
     /// </summary>
     public void RequestCoreDamage(float amount)
     {
-        if (Object == null || amount <= 0f)
+        if (!IsReady || amount <= 0f)
         {
             return;
         }
@@ -272,8 +291,31 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
 
     private void ApplyCoreDamage(float amount)
     {
+        if (!IsReady || !Object.HasStateAuthority || amount <= 0f)
+            return;
+
+        if (!Initialized)
+            OnEnteredGameplayScene();
+
+        if (!Initialized || NetworkedCoreHealth <= 0f)
+            return;
+
         amount *= GameDifficultyState.Settings.CoreDamage;
         NetworkedCoreHealth = Mathf.Max(0f, NetworkedCoreHealth - amount);
+    }
+
+    // Existing direct-scenario reset: only the HP authority can reset shared HP.
+    // Other peers receive the result through the same replicated state.
+    public void ResetCoreHealth()
+    {
+        if (!IsReady || !Object.HasStateAuthority)
+            return;
+
+        if (!Initialized)
+            OnEnteredGameplayScene();
+
+        if (Initialized && _core != null)
+            NetworkedCoreHealth = _core.MaxHealth;
     }
 
     /// <summary>
@@ -282,8 +324,15 @@ public sealed class DreamlandProgressSync : NetworkBehaviour
     /// </summary>
     private void HandleCoreHealthChanged()
     {
-        _core ??= FindAnyObjectByType<CoreState>(FindObjectsInactive.Include);
-        _core?.ApplyNetworkedDamageState(NetworkedCoreHealth);
+        if (!IsCoreHealthReady || Runner.IsSceneManagerBusy)
+            return;
+
+        // Unity's destroyed-object null comparison is needed after scene changes.
+        if (_core == null)
+            _core = FindAnyObjectByType<CoreState>(FindObjectsInactive.Include);
+
+        if (_core != null && _core.CurrentHealth != NetworkedCoreHealth)
+            _core.ApplyNetworkedDamageState(NetworkedCoreHealth);
     }
 
     /// <summary>

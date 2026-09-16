@@ -11859,6 +11859,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DreamlandMapDevEntry
   roomManagerPrefab: {fileID: 0}
+  difficultyStatePrefab: {fileID: 976307760436495300, guid: 7f3a9c1e4d6b4f2e9a8c5b1d3e6f8a2c, type: 3}
   devDefaultJob: 0
 --- !u!4 &664377636
 Transform:

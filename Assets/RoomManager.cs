@@ -221,10 +221,14 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (player != runner.LocalPlayer) return;
 
+        // Core HP uses this shared object in both lobby and direct-map entry.
+        SpawnDifficultyStateIfNeeded(runner);
+
         // Dreamland_map_3를 단독으로 열어서 테스트하는 중이면 로비 단계를 통째로 건너뛴다.
         // 개발용 단독 실행은 기존 VR 테스트 흐름을 그대로 유지한다(PlayMode.VR).
         if (_devDirectMode)
         {
+            StartCoroutine(ConnectProgressSyncWhenReady());
             SpawnGameplayCharacter(runner, _devDefaultJob, PlayMode.VR);
             return;
         }
@@ -249,6 +253,10 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
             lobbyIntroController.ShowJobSelectionScreen();
         }
 
+    }
+
+    private void SpawnDifficultyStateIfNeeded(NetworkRunner runner)
+    {
         // 난이도는 개별 플레이어 값이 아니라 방 전체가 공유하는 하나의 값이라,
         // 아무나 스폰하면 안 되고 딱 한 번만 만들어져야 한다. 방을 만든
         // 마스터 클라이언트만 스폰하도록 제한한다 - 나중에 들어오는
