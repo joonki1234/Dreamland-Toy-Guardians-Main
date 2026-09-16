@@ -149,6 +149,7 @@ public class LobbySelectionController : MonoBehaviour
     private float countdownRemaining;
     private Sprite defaultPortraitSprite;
     private ToyFriendDialogueHUD sharedDialogueHud;
+    private PlayMode lastSelectedPlayMode = PlayMode.VR;
 
     private void Awake()
     {
@@ -495,17 +496,22 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private void UpdatePlayModeUI(LobbyPlayerState state, bool ready)
     {
+        if (state != null)
+        {
+            lastSelectedPlayMode = state.SelectedPlayMode;
+        }
+
         PlayMode playMode =
             state != null
                 ? state.SelectedPlayMode
-                : PlayMode.VR;
+                : lastSelectedPlayMode;
 
         if (playModeText != null)
         {
             playModeText.text =
                 state != null
                     ? $"모드: {GetPlayModeName(playMode)}"
-                    : "모드: VR (연결 중...)";
+                    : $"{GetPlayModeName(playMode)} 연결 중...";
         }
 
         bool locked = ready || state == null;
@@ -528,7 +534,7 @@ public class LobbySelectionController : MonoBehaviour
     /// </summary>
     private string GetPlayModeName(PlayMode mode)
     {
-        return mode == PlayMode.PC ? "컴퓨터" : "VR";
+        return mode == PlayMode.PC ? "PC" : "VR";
     }
 
     /// <summary>
