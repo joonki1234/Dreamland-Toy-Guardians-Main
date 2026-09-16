@@ -69,11 +69,42 @@ public class WebcamPassthroughSimulator : MonoBehaviour
     [Tooltip("씬을 시작하자마자 자동으로 MR 모드(웹캠 배경)를 켤지 여부")]
     [SerializeField] private bool startEnabledOnAwake = true;
 
+    [Header("Stage 2 틴트")]
+    [Tooltip(
+        "Stage 2 동안 웹캠 배경 위에 은은하게 씌우는 분홍색 틴트. RawImage.color를 " +
+        "이 값으로 바꾸는 방식이라 웹캠 화면(현실) 자체는 그대로 보이고 색상만 이 " +
+        "값과 곱해진다 - '카메라는 계속 보이지만 살짝 핑크빛이 도는' 연출용이다.")]
+    [SerializeField] private Color stage2PinkTint = new Color(1f, 0.78f, 0.85f, 1f);
+
     private WebCamTexture webCamTexture;
     private CameraClearFlags originalGameCameraClearFlags;
     private bool originalFlagsCached;
+    private Color originalBackgroundImageColor = Color.white;
+    private bool originalBackgroundColorCached;
     private bool isRunning;
     private bool isStarting;
+
+
+    /// <summary>
+    /// Stage 2 시작 시 호출: 웹캠 배경(현실)은 그대로 유지한 채, RawImage 색상만
+    /// 분홍 틴트로 바꿔서 화면에 은은하게 핑크빛이 돌게 한다. 완전 꿈나라 전환
+    /// (EndMrAndSwitchToFullVr) 시점에 원래 색으로 되돌아간다.
+    /// </summary>
+    public void ApplyStage2PinkTint()
+    {
+        if (backgroundImage == null)
+        {
+            return;
+        }
+
+        if (!originalBackgroundColorCached)
+        {
+            originalBackgroundImageColor = backgroundImage.color;
+            originalBackgroundColorCached = true;
+        }
+
+        backgroundImage.color = stage2PinkTint;
+    }
 
 
     private void Start()
@@ -362,6 +393,12 @@ public class WebcamPassthroughSimulator : MonoBehaviour
         if (backgroundImage != null)
         {
             backgroundImage.texture = null;
+
+            if (originalBackgroundColorCached)
+            {
+                backgroundImage.color = originalBackgroundImageColor;
+                originalBackgroundColorCached = false;
+            }
         }
 
         if (gameCamera != null && originalFlagsCached)

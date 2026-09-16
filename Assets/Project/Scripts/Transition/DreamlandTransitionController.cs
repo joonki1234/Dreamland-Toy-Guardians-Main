@@ -53,6 +53,15 @@ public sealed class DreamlandTransitionController : MonoBehaviour
     [SerializeField]
     private DreamSkyTransitionController skyTransitionController;
 
+    [Tooltip(
+        "MR(웹캠 배경) 모드를 켜고 끄는 시뮬레이터(MR_PassthroughSimulator). " +
+        "Stage1~Stage2 동안은 씬 시작 시 자동으로 켜져 있다가, 완전 꿈나라로 " +
+        "넘어가는 이 시점(현실 오브젝트 제거)에 꺼서 그때부터는 스카이박스가 " +
+        "그린 하늘(분홍/꿈나라)이 실제로 화면에 보이게 한다. 없어도(None) " +
+        "동작에는 문제없다 - 웹캠 시뮬레이터가 아예 없는 빌드/씬을 위한 안전장치.")]
+    [SerializeField]
+    private WebcamPassthroughSimulator webcamPassthroughSimulator;
+
 
     [Header("World Groups")]
 
@@ -376,6 +385,13 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             skyTransitionController =
                 UnityEngine.Object.FindAnyObjectByType
                     <DreamSkyTransitionController>();
+        }
+
+        if (webcamPassthroughSimulator == null)
+        {
+            webcamPassthroughSimulator =
+                UnityEngine.Object.FindAnyObjectByType
+                    <WebcamPassthroughSimulator>();
         }
 
         realityWorld ??=
@@ -816,6 +832,15 @@ public sealed class DreamlandTransitionController : MonoBehaviour
             false);
 
         /*
+         * MR(웹캠 배경) 모드 종료: 이 시점부터는 완전한 꿈나라(가상 배경)이므로
+         * 현실(웹캠) 카메라 스택을 내려서 플레이어 카메라가 다시 자기 스카이박스
+         * (분홍/꿈나라 하늘)를 직접 그리게 한다. 웹캠이 꺼져 있었거나 시뮬레이터가
+         * 씬에 없으면 아무 일도 일어나지 않는다.
+         */
+        webcamPassthroughSimulator?.
+            EndMrAndSwitchToFullVr();
+
+        /*
          * 기존 Interior Dream이 없어도 문제없습니다.
          */
         SetActiveSafe(
@@ -1190,6 +1215,14 @@ public sealed class DreamlandTransitionController : MonoBehaviour
          */
         skyTransitionController?.
             ApplyBlueSkyImmediately();
+
+        /*
+         * Stage 2에서는 웹캠(현실) 배경은 계속 보여주되, 살짝 핑크빛이
+         * 돌도록 틴트만 씌운다. 완전히 가상 배경으로 바뀌는 건 보스전
+         * 직전(FullVRTransition)에 EndMrAndSwitchToFullVr()가 처리한다.
+         */
+        webcamPassthroughSimulator?.
+            ApplyStage2PinkTint();
 
         Debug.Log(
             "[DreamTransition] Stage 2 상태 적용 완료",
