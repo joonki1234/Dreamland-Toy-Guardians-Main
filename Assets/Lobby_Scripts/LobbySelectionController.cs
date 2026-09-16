@@ -92,7 +92,7 @@ public class LobbySelectionController : MonoBehaviour
     [SerializeField]
     private Button difficultyRightArrowButton;
 
-    [Tooltip("현재 난이도(하/중/상)를 보여줄 텍스트")]
+    [Tooltip("현재 난이도(하/중/상/최상)를 보여줄 텍스트")]
     [SerializeField]
     private TMP_Text difficultyText;
 
@@ -426,7 +426,8 @@ public class LobbySelectionController : MonoBehaviour
                     : "난이도: 중 (연결 중...)";
         }
 
-        bool locked = isCountdownActive || !difficultyReady;
+        bool locked = isCountdownActive || !difficultyReady ||
+            (difficultyReady && difficultyState.SelectionLocked);
 
         if (difficultyLeftArrowButton != null)
         {
@@ -437,7 +438,7 @@ public class LobbySelectionController : MonoBehaviour
         if (difficultyRightArrowButton != null)
         {
             difficultyRightArrowButton.interactable =
-                !locked && difficulty != GameDifficulty.Highest;
+                !locked && difficulty != GameDifficulty.Extreme;
         }
     }
 
@@ -454,9 +455,10 @@ public class LobbySelectionController : MonoBehaviour
             case GameDifficulty.Hard:
                 return "상";
 
-            case GameDifficulty.Highest:
+            case GameDifficulty.Extreme:
                 return "최상";
 
+            case GameDifficulty.Medium:
             default:
                 return "중";
         }

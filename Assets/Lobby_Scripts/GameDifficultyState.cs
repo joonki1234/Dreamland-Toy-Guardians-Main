@@ -1,43 +1,41 @@
 using Fusion;
+using UnityEngine;
 
 public enum GameDifficulty
 {
-    Easy,
-    Medium,
-    Hard,
-    Highest
+    Easy = 0,
+    Medium = 1,
+    Hard = 2,
+    Extreme = 3
 }
 
-/// <summary>
-/// 난이도별 실제 밸런스 배율. 현재 게임에 들어있는 기본값(적/보스 HP,
-/// 드론 속도)은 "상"(Hard) 기준으로 잡혀 있으므로 Hard = 1배(기준값)로 두고,
-/// 하/중은 그보다 살짝 약하게, 최상은 그보다 살짝 강하게 잡았다.
-/// DreamEnemySpawner(일반 적 HP), FinalBossDirector(보스 HP),
-/// DroneEnemyWaspy(드론 속도)에서 사용한다.
-/// </summary>
-public static class DifficultyBalance
+public readonly struct DifficultySettings
 {
-    public static float GetEnemyHealthMultiplier(GameDifficulty difficulty)
+    public readonly float EnemyCount, EnemyHealth, CoreDamage, BossHealth;
+    public DifficultySettings(float count, float health, float damage, float boss)
     {
-        switch (difficulty)
-        {
-            case GameDifficulty.Easy: return 0.7f;
-            case GameDifficulty.Medium: return 0.85f;
-            case GameDifficulty.Hard: return 1f;
-            case GameDifficulty.Highest: return 1.2f;
-            default: return 1f;
-        }
+        EnemyCount = count; EnemyHealth = health; CoreDamage = damage; BossHealth = boss;
     }
 
-    public static float GetDroneSpeedMultiplier(GameDifficulty difficulty)
+    // Zero means an absent enemy type. Positive waves round halves upward, minimum one.
+    public int ScaleCount(int count) => count <= 0 ? 0 : Mathf.Max(1, Mathf.FloorToInt(count * EnemyCount + 0.5f));
+
+    // Round cumulative totals so mixed types/directions sum to the exact scaled wave count.
+    public int AllocateCount(int count, ref int originalTotal)
+    {
+        int previous = ScaleCount(originalTotal);
+        originalTotal += Mathf.Max(0, count);
+        return ScaleCount(originalTotal) - previous;
+    }
+
+    public static DifficultySettings For(GameDifficulty difficulty)
     {
         switch (difficulty)
         {
-            case GameDifficulty.Easy: return 0.85f;
-            case GameDifficulty.Medium: return 0.92f;
-            case GameDifficulty.Hard: return 1f;
-            case GameDifficulty.Highest: return 1.1f;
-            default: return 1f;
+            case GameDifficulty.Easy: return new DifficultySettings(0.5f, 0.7f, 0.7f, 0.3f);
+            case GameDifficulty.Hard: return new DifficultySettings(1.5f, 1.1f, 1.1f, 1.5f);
+            case GameDifficulty.Extreme: return new DifficultySettings(2f, 1.2f, 1.2f, 2f);
+            default: return new DifficultySettings(1f, 1f, 1f, 1f);
         }
     }
 }
@@ -51,16 +49,37 @@ public static class DifficultyBalance
 ///
 /// Shared Mode 규칙상 값을 실제로 바꿀 수 있는 건 이 오브젝트의
 /// State Authority(=스폰한 마스터 클라이언트)뿐이다. 다른 클라이언트가
-/// 화살표를 누르면 RPC로 "이걸로 바꿔줘"라고 요청만 하고, State
+/// 난이도 버튼을 누르면 RPC로 "이걸로 바꿔줘"라고 요청만 하고, State
 /// Authority가 값을 바꾸면 그 결과가 다시 모두에게 동기화된다
 /// (EnemyHealth의 데미지 요청 패턴과 동일).
 ///
-/// Fusion에서 런타임에 Spawn한 오브젝트는 씬이 바뀌어도 유지되므로,
-/// Dreamland_map_3로 넘어간 뒤에도 이 값을 그대로 읽어서 몬스터 체력
-/// 배율 등 실제 게임플레이 난이도에 반영할 수 있다(추후 확장 지점).
+/// Spawned에서 Runner의 DontDestroyOnLoad로 등록해 씬 전환에도 유지한다.
+/// 게임 시작 시 선택을 잠그고, 전투 권한 주체가 원본 수치에 Settings를 적용한다.
 /// </summary>
 public class GameDifficultyState : NetworkBehaviour
 {
+    public static GameDifficultyState Instance { get; private set; }
+    public static DifficultySettings Settings => DifficultySettings.For(
+        Instance != null && Instance.IsReady ? Instance.CurrentDifficulty : GameDifficulty.Medium);
+
+    [Networked] public NetworkBool SelectionLocked { get; private set; }
+
+    public override void Spawned()
+    {
+        Instance = this;
+        Runner.MakeDontDestroyOnLoad(gameObject);
+    }
+
+    public override void Despawned(NetworkRunner runner, bool hasState)
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    public void LockSelection()
+    {
+        if (IsReady && Object.HasStateAuthority) SelectionLocked = true;
+    }
+
     [Networked, OnChangedRender(nameof(HandleDifficultyChanged))]
     public GameDifficulty CurrentDifficulty { get; set; }
 
@@ -85,7 +104,7 @@ public class GameDifficultyState : NetworkBehaviour
     /// </summary>
     public void RequestSetDifficulty(GameDifficulty difficulty)
     {
-        if (Object == null)
+        if (!IsReady || SelectionLocked || (int)difficulty < 0 || (int)difficulty > 3)
         {
             return;
         }
@@ -103,7 +122,8 @@ public class GameDifficultyState : NetworkBehaviour
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     private void RPC_RequestSetDifficulty(GameDifficulty difficulty)
     {
-        CurrentDifficulty = difficulty;
+        if (!SelectionLocked && (int)difficulty >= 0 && (int)difficulty <= 3)
+            CurrentDifficulty = difficulty;
     }
 
     private void HandleDifficultyChanged()

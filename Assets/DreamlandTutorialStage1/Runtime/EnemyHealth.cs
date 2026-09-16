@@ -64,6 +64,33 @@ namespace DreamGuardians
         [Networked]
         private PlayerRef NetworkedTutorialTargetOwner { get; set; }
 
+        [Networked] private NetworkBool NetworkedPresentationReady { get; set; }
+        [Networked] private NetworkBool NetworkedSkillTutorialTarget { get; set; }
+        private bool pendingTutorialOwner;
+        private PlayerRef pendingOwner;
+        private bool pendingSkillTarget;
+        private TutorialTargetLocalPresentation tutorialPresentation;
+
+        // Called in onBeforeSpawned. Commit together in Spawned, before any UI runs.
+        internal void PrepareTutorialTarget(PlayerRef owner, bool skillTarget)
+        {
+            pendingTutorialOwner = true;
+            pendingOwner = owner;
+            pendingSkillTarget = skillTarget;
+        }
+
+        public bool PresentationReady => bossCombatSpawner != null ||
+            (IsNetworked ? (bool)NetworkedPresentationReady : GetComponent<NetworkObject>() == null);
+        public bool CanPresentLocally => PresentationReady &&
+            (!IsPlayerTutorialTarget || (Runner != null && Runner.LocalPlayer == TutorialTargetOwner));
+        public bool IsSkillTutorialTarget => IsPlayerTutorialTarget && NetworkedSkillTutorialTarget;
+
+        private bool AcceptTutorialAttack(DamageInfo info, PlayerRef attacker)
+        {
+            return !IsPlayerTutorialTarget ||
+                attacker == TutorialTargetOwner;
+        }
+
         // 튜토리얼 훈련용 몬스터(damageEnabled=false, 무적)는 실제 체력이
         // 줄지 않아 ApplyDamageAuthoritative가 아무 것도 하지 않는다. 그래서
         // "명중 횟수"만 따로 네트워크에 동기화해서, 방 안의 누가 맞혔든
@@ -91,6 +118,15 @@ namespace DreamGuardians
         {
             _spawnCompleted = true;
 
+            if (Object.HasStateAuthority)
+            {
+                NetworkedHasTutorialTargetOwner = pendingTutorialOwner;
+                NetworkedTutorialTargetOwner = pendingOwner;
+                NetworkedSkillTutorialTarget = pendingSkillTarget;
+                NetworkedPresentationReady = true;
+            }
+            EnsureTutorialPresentation();
+
             // EnemyWorldHealthBar is local presentation. ConfigureSpawnedEnemy's
             // onBeforeSpawned callback runs only on the spawning authority, and a
             // runtime-added MonoBehaviour is not replicated by Fusion. Ensure every
@@ -112,6 +148,19 @@ namespace DreamGuardians
                 NetworkedDamageEnabled = damageEnabled;
                 NetworkedTutorialHitCount = 0;
             }
+        }
+
+        public override void Render()
+        {
+            EnsureTutorialPresentation();
+        }
+
+        private void EnsureTutorialPresentation()
+        {
+            if (!PresentationReady || !IsPlayerTutorialTarget || tutorialPresentation != null) return;
+            tutorialPresentation = GetComponent<TutorialTargetLocalPresentation>() ??
+                gameObject.AddComponent<TutorialTargetLocalPresentation>();
+            tutorialPresentation.Initialize(TutorialTargetOwner, Runner);
         }
 
 #if UNITY_EDITOR
@@ -320,6 +369,9 @@ namespace DreamGuardians
         /// </summary>
         public bool TakeDamage(DamageInfo info)
         {
+            if (!PresentationReady ||
+                !AcceptTutorialAttack(info, IsNetworked ? Runner.LocalPlayer : PlayerRef.None))
+                return false;
             if (IsPlayerTutorialTarget &&
                 (Runner == null || Runner.LocalPlayer != NetworkedTutorialTargetOwner))
                 return false;
@@ -342,7 +394,7 @@ namespace DreamGuardians
             HitRegistered?.Invoke(this, info);
             DreamGameEvents.RaiseEnemyHit(this, info);
 
-            if (!DamageEnabled)
+            if (!DamageEnabled && !IsSkillTutorialTarget)
             {
                 // 무적 상태(튜토리얼 훈련용)라 실제 데미지 계산 경로를
                 // 타지 않으므로, 명중 횟수만 별도로 동기화한다.
@@ -414,6 +466,8 @@ namespace DreamGuardians
             info.synergyOrigin = synergyOrigin;
             info.synergyImpulse = synergyImpulse;
 
+            if (!PresentationReady || !AcceptTutorialAttack(info, rpcInfo.Source)) return;
+
             if (IsDead || IsDuplicateShot(info, rpcInfo.Source))
             {
                 return;
@@ -477,10 +531,14 @@ namespace DreamGuardians
         private void ApplyDamageAuthoritative(DamageInfo info, PlayerRef attacker)
         {
             if (!CanCalculateSynergy) return;
-            bool wasDamageEnabled = DamageEnabled;
+            if (!AcceptTutorialAttack(info, attacker)) return;
+            // Skill tutorial targets may be spawned with damageEnabled=false,
+            // but they still need to lose HP when the player's skill hits them.
+            // Other invulnerable tutorial targets keep the existing no-damage behavior.
+            bool wasDamageEnabled = DamageEnabled || IsSkillTutorialTarget;
 
             SynergyResult synergyResult = SynergyResult.None;
-            if (info.allowSynergy)
+            if (info.allowSynergy && !IsSkillTutorialTarget)
             {
                 synergyTracker ??= GetComponent<RoleSynergyTracker>();
                 if (synergyTracker != null)
@@ -495,7 +553,7 @@ namespace DreamGuardians
                 return;
             }
 
-            float multiplier = synergyTracker != null ? synergyTracker.CurrentDamageMultiplier : 1f;
+            float multiplier = !IsSkillTutorialTarget && synergyTracker != null ? synergyTracker.CurrentDamageMultiplier : 1f;
             float totalDamage = Mathf.Max(0f, info.amount * multiplier + synergyResult.BonusDamage);
 
 #if UNITY_EDITOR
@@ -555,6 +613,7 @@ namespace DreamGuardians
         /// </summary>
         private void HandleNetworkedHealthChanged()
         {
+            if (!CanPresentLocally) return;
             HealthChanged?.Invoke(this, NetworkedHealth, MaxHealth);
         }
 
@@ -572,6 +631,14 @@ namespace DreamGuardians
             }
 
             damageEnabled = false;
+            if (IsPlayerTutorialTarget && !CanPresentLocally)
+            {
+                // Basic purification still needs its authority-side completion callback.
+                // Skill targets have no purification lifecycle or remote death presentation.
+                if (!IsSkillTutorialTarget && Object.HasStateAuthority)
+                    Died?.Invoke(this, default);
+                return;
+            }
             PlayDeathSfx();
 
             DamageInfo fallbackInfo = new DamageInfo(
@@ -674,6 +741,7 @@ namespace DreamGuardians
 
         private void PresentSynergy(SynergyResult result)
         {
+            if (!CanPresentLocally) return;
             synergyTracker ??= GetComponent<RoleSynergyTracker>();
             // Spawner's runtime MonoBehaviour addition is local to the authority.
             if (synergyTracker == null) synergyTracker = gameObject.AddComponent<RoleSynergyTracker>();

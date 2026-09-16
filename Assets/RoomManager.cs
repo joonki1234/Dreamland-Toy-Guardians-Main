@@ -207,6 +207,7 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
         // Simulate()해주지 않는다. 그 결과 AddForce/velocity로 초기 속도는 걸리지만
         // 실제 위치 갱신(중력 포함)이 전혀 일어나지 않아 총알/음식/흙덩이가 허공에 멈춰버렸다.
         // None으로 두면 Unity 기본(자동 시뮬레이션되는) PhysicsScene을 그대로 사용한다.
+        GetOrFindDifficultyState()?.LockSelection();
         _runner.LoadScene(SceneRef.FromIndex(buildIndex), LoadSceneMode.Single, LocalPhysicsMode.None, true);
     }
 
@@ -220,10 +221,14 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
     {
         if (player != runner.LocalPlayer) return;
 
+        // Core HP uses this shared object in both lobby and direct-map entry.
+        SpawnDifficultyStateIfNeeded(runner);
+
         // Dreamland_map_3를 단독으로 열어서 테스트하는 중이면 로비 단계를 통째로 건너뛴다.
         // 개발용 단독 실행은 기존 VR 테스트 흐름을 그대로 유지한다(PlayMode.VR).
         if (_devDirectMode)
         {
+            StartCoroutine(ConnectProgressSyncWhenReady());
             SpawnGameplayCharacter(runner, _devDefaultJob, PlayMode.VR);
             return;
         }
@@ -248,6 +253,10 @@ public class RoomManager : MonoBehaviour, INetworkRunnerCallbacks
             lobbyIntroController.ShowJobSelectionScreen();
         }
 
+    }
+
+    private void SpawnDifficultyStateIfNeeded(NetworkRunner runner)
+    {
         // 난이도는 개별 플레이어 값이 아니라 방 전체가 공유하는 하나의 값이라,
         // 아무나 스폰하면 안 되고 딱 한 번만 만들어져야 한다. 방을 만든
         // 마스터 클라이언트만 스폰하도록 제한한다 - 나중에 들어오는

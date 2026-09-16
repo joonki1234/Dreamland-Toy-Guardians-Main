@@ -22,6 +22,9 @@ public class DreamlandMapDevEntry : MonoBehaviour
     [Tooltip("LobbyScene의 '@RoomManager'와 동일한 프리팹(필드가 전부 채워진 것)을 연결하세요.")]
     [SerializeField] private RoomManager roomManagerPrefab;
 
+    [Tooltip("직접 맵 실행에서도 Core HP를 공유할 GameDifficultyState 프리팹입니다.")]
+    [SerializeField] private GameObject difficultyStatePrefab;
+
     [Tooltip("로비 없이 바로 시작할 때 사용할 기본 직업입니다.")]
     [SerializeField] private PlayerJob devDefaultJob = PlayerJob.Police;
 
@@ -46,6 +49,8 @@ public class DreamlandMapDevEntry : MonoBehaviour
 
             // private serialized 필드에 값 할당 (reflection 사용)
             var rmType = typeof(RoomManager);
+            var difficultyField = rmType.GetField("difficultyStatePrefab", BindingFlags.Instance | BindingFlags.NonPublic);
+            difficultyField?.SetValue(roomManager, difficultyStatePrefab);
             var runnerField = rmType.GetField("runnerPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
             if (runnerField != null)
             {

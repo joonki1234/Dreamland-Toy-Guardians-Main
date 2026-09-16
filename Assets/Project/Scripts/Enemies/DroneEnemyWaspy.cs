@@ -107,7 +107,6 @@ namespace DreamGuardians
         [SerializeField]
         private string dieTriggerName = "Die";
 
-
         private CoreState targetCore;
         private EnemyHealth health;
         private float spawnGroundHeight;
@@ -305,27 +304,6 @@ namespace DreamGuardians
         }
 
 
-        // 난이도(하/중/상/최상) 시스템: 스폰 직후 한 번만 moveSpeed에 배율을
-        // 적용한다. Configure()는 드론 스폰 시 한 번만 호출되므로 재적용
-        // 걱정 없이 필드 값을 직접 바꿔도 안전하다(EnemyHealth.Configure가
-        // maxHealth를 덮어쓰는 것과 동일한 패턴). FixedUpdateNetwork의
-        // 이동 로직 자체는 손대지 않고 moveSpeed 값만 바뀐다.
-        private void ApplyDroneSpeedDifficultyMultiplier()
-        {
-            GameDifficultyState difficultyState =
-                FindAnyObjectByType<GameDifficultyState>();
-
-            if (difficultyState == null || !difficultyState.IsReady)
-            {
-                return;
-            }
-
-            float multiplier =
-                DifficultyBalance.GetDroneSpeedMultiplier(difficultyState.CurrentDifficulty);
-
-            moveSpeed = Mathf.Max(0f, moveSpeed * multiplier);
-        }
-
         /// <summary>
         /// DreamEnemySpawner가 드론을 만든 직후 호출합니다.
         /// </summary>
@@ -335,7 +313,6 @@ namespace DreamGuardians
             CacheReferences();
             CacheAnimatorParameters();
             SubscribeToHealth();
-            ApplyDroneSpeedDifficultyMultiplier();
 
             if (targetCore == null)
             {

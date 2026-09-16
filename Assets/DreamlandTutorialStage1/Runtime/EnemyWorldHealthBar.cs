@@ -18,6 +18,9 @@ namespace DreamGuardians
         private GameObject barRoot;
         private Slider slider;
 
+        private bool CanShowLocally => health == null || health.CanPresentLocally;
+        private bool KeepVisible => alwaysVisible || (health != null && health.IsSkillTutorialTarget);
+
         private void Awake()
         {
             health = GetComponent<EnemyHealth>();
@@ -53,7 +56,7 @@ namespace DreamGuardians
 
             if (barRoot != null)
             {
-                barRoot.SetActive(alwaysVisible);
+                barRoot.SetActive(KeepVisible && CanShowLocally);
             }
         }
 
@@ -69,9 +72,21 @@ namespace DreamGuardians
 
         private void LateUpdate()
         {
+            if (!CanShowLocally)
+            {
+                Hide();
+                return;
+            }
             if (barRoot == null)
             {
                 return;
+            }
+
+            // Owner metadata may become ready after Start.
+            if (health != null && health.IsSkillTutorialTarget)
+            {
+                barRoot.SetActive(true);
+                UpdateBar(health.NormalizedHealth);
             }
 
             if (targetCamera == null)
@@ -108,6 +123,7 @@ namespace DreamGuardians
         /// </summary>
         public void SetManualRatio(float ratio)
         {
+            if (!CanShowLocally) { Hide(); return; }
             if (barRoot != null)
             {
                 barRoot.SetActive(true);
@@ -131,6 +147,7 @@ namespace DreamGuardians
             }
 
             barRoot = Instantiate(prefab, transform);
+            barRoot.SetActive(KeepVisible && CanShowLocally);
             barRoot.name = "WorldHealthBar";
             barRoot.transform.localPosition = localOffset;
             barRoot.transform.localRotation = Quaternion.identity;
@@ -207,6 +224,7 @@ namespace DreamGuardians
 
         private void HandleHealthChanged(EnemyHealth _, float current, float maximum)
         {
+            if (!CanShowLocally) { Hide(); return; }
             UpdateBar(maximum <= 0f ? 0f : current / maximum);
 
             // Health is authoritative/networked, but visibility is local. A remote
@@ -221,6 +239,7 @@ namespace DreamGuardians
 
         private void HandleHit(EnemyHealth _, DamageInfo __)
         {
+            if (!CanShowLocally) { Hide(); return; }
             if (barRoot != null)
             {
                 UpdatePlacement();

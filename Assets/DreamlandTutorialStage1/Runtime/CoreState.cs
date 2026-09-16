@@ -1,4 +1,5 @@
 using System;
+using Fusion;
 using TMPro;
 using UnityEngine;
 
@@ -104,7 +105,18 @@ namespace DreamGuardians
                 return;
             }
 
-            currentHealth = Mathf.Max(0f, currentHealth - amount);
+            // A missing/not-yet-spawned bridge in an online room is not offline mode.
+            // Never let one peer create its own independent HP in that interval.
+            foreach (NetworkRunner runner in NetworkRunner.Instances)
+            {
+                if (runner.IsRunning)
+                {
+                    Debug.LogError("[CoreState] Network session has no DreamlandProgressSync; Core damage was not applied locally.", this);
+                    return;
+                }
+            }
+
+            currentHealth = Mathf.Max(0f, currentHealth - amount * GameDifficultyState.Settings.CoreDamage);
             HealthChanged?.Invoke(currentHealth, maxHealth);
 
             if (currentHealth <= 0f)
@@ -146,7 +158,10 @@ namespace DreamGuardians
 
         public void ResetCore()
         {
-            currentHealth = maxHealth;
+            if (DreamlandProgressSync.Instance != null)
+                DreamlandProgressSync.Instance.ResetCoreHealth();
+            else
+                currentHealth = maxHealth;
             currentEnergy = 0f;
             HealthChanged?.Invoke(currentHealth, maxHealth);
             EnergyChanged?.Invoke(currentEnergy);

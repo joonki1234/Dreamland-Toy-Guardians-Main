@@ -65,6 +65,15 @@ namespace DreamGuardians
         {
             started = true;
 
+            if (health != null && health.IsPlayerTutorialTarget && !health.CanPresentLocally)
+            {
+                // Keep authority-side tutorial completion/cleanup, without a remote orb or fade.
+                yield return new WaitForSeconds(fadeDuration + (targetCore != null ? orbTravelDuration : 0f));
+                Completed?.Invoke(this);
+                Destroy(gameObject);
+                yield break;
+            }
+
             EnemyCoreMover mover = GetComponent<EnemyCoreMover>();
             if (mover != null)
             {

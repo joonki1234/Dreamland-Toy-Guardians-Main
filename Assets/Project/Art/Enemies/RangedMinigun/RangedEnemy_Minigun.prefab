@@ -57,7 +57,7 @@ MonoBehaviour:
   isShocked: 0
   shockDuration: 0.25
   knockbackDistance: 0.3
-  waterEffectPrefab: {fileID: 0}
+  waterEffectPrefab: {fileID: 2334455049011862081, guid: c1335396aea434a6ab7bf94c401421a0, type: 3}
   electricSynergyVFX: {fileID: 0}
   fireSynergyVFX: {fileID: 0}
   maxShockCount: 3

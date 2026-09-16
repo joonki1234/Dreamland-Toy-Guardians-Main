@@ -27,30 +27,6 @@ namespace DreamGuardians
         // 클라이언트는 그 결과를 그대로 받아서 보게 된다 - 그래야
         // 인원수만큼 몬스터가 중복 생성되지 않는다.
         private RoomManager roomManager;
-
-        // 난이도(하/중/상/최상) 시스템: 로비에서 고른 GameDifficultyState 값을
-        // 읽어서 일반/원거리/드론 몬스터 HP에 배율로 적용한다. 못 찾으면
-        // (아직 스폰 전이거나 싱글 테스트 등) 항상 "상"과 동일한 1배로
-        // 취급해 기존 밸런스를 그대로 유지한다.
-        private GameDifficultyState difficultyState;
-        private bool difficultyStateResolveAttempted;
-
-        private float ResolveEnemyHealthDifficultyMultiplier()
-        {
-            if (difficultyState == null && !difficultyStateResolveAttempted)
-            {
-                difficultyState = FindAnyObjectByType<GameDifficultyState>();
-                difficultyStateResolveAttempted = true;
-            }
-
-            if (difficultyState == null || !difficultyState.IsReady)
-            {
-                return 1f;
-            }
-
-            return DifficultyBalance.GetEnemyHealthMultiplier(difficultyState.CurrentDifficulty);
-        }
-
         public event Action TutorialPresentationRequested;
         public event Action BasicTutorialCompletionChanged;
         public event Action SkillTutorialRequested;
@@ -183,13 +159,32 @@ namespace DreamGuardians
             return true;
         }
 
+        private bool TryGetTutorialFacing(PlayerRef owner, Vector3 position, out Quaternion rotation)
+        {
+            // The spawning authority must use the requesting player's avatar, not its own camera.
+            foreach (PlayerJobController player in FindObjectsByType<PlayerJobController>(FindObjectsSortMode.None))
+            {
+                if (player.Runner != Runner || player.Object == null || !player.Object.IsValid ||
+                    player.Object.InputAuthority != owner) continue;
+                Vector3 direction = player.transform.position - position;
+                direction.y = 0f;
+                rotation = direction.sqrMagnitude > 0.0001f
+                    ? Quaternion.LookRotation(direction, Vector3.up)
+                    : Quaternion.identity;
+                return true;
+            }
+            rotation = Quaternion.identity;
+            return false;
+        }
+
         public void SpawnBasicTutorialTarget(PlayerRef player, Vector3 groundPosition)
         {
             if (!CanSpawnTutorialEnemy || basicTutorialTargets.ContainsKey(player)) return;
-            EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
-                Quaternion.identity, true, 0.4f, null, null, true);
+            Vector3 position = groundPosition + Vector3.up * enemyGroundOffset;
+            if (!TryGetTutorialFacing(player, position, out Quaternion rotation)) return;
+            EnemyHealth target = SpawnEnemy(position,
+                rotation, true, 0.4f, null, null, true, player);
             if (target == null) return;
-            target.SetTutorialTargetOwner(player);
             RPC_RegisterBasicTutorialTarget(player, target.Object.Id);
             EnemyPurification purification = target.GetComponent<EnemyPurification>();
             if (purification != null)
@@ -216,6 +211,7 @@ namespace DreamGuardians
             {
                 if (Runner.TryFindObject(id, out NetworkObject target))
                 {
+                    MakeTutorialEnemyHighlyVisible(target.gameObject);
                     TutorialTargetLocalPresentation presentation =
                         target.GetComponent<TutorialTargetLocalPresentation>() ??
                         target.gameObject.AddComponent<TutorialTargetLocalPresentation>();
@@ -268,8 +264,10 @@ namespace DreamGuardians
                 skillTutorialSpawnErrorLogged = true;
                 return;
             }
-            EnemyHealth target = SpawnEnemy(groundPosition + Vector3.up * enemyGroundOffset,
-                Quaternion.identity, true, 0.4f, null, null, false);
+            Vector3 position = groundPosition + Vector3.up * enemyGroundOffset;
+            if (!TryGetTutorialFacing(player, position, out Quaternion rotation)) return;
+            EnemyHealth target = SpawnEnemy(position,
+                rotation, true, 0.4f, null, null, false, player);
             if (target == null)
             {
                 if (!skillTutorialSpawnErrorLogged)
@@ -277,7 +275,6 @@ namespace DreamGuardians
                 skillTutorialSpawnErrorLogged = true;
                 return;
             }
-            target.SetTutorialTargetOwner(player);
             RPC_RegisterSkillTutorialTarget(player, target.Object.Id);
         }
 
@@ -297,7 +294,8 @@ namespace DreamGuardians
                 if (Runner.TryFindObject(id, out NetworkObject target) && target != null && target.IsValid)
                 {
                     EnemyHealth health = target.GetComponent<EnemyHealth>();
-                    if (health != null) health.Configure(baseEnemyHealth * 0.4f, false);
+                    if (health != null && target.HasStateAuthority)
+                        health.Configure(baseEnemyHealth * 0.4f * GameDifficultyState.Settings.EnemyHealth, false);
                     EnemyCoreMover mover = target.GetComponent<EnemyCoreMover>();
                     if (mover != null)
                     {
@@ -354,7 +352,8 @@ namespace DreamGuardians
         }
 
 
-        [Networked] public NetworkId TutorialEnemyId { get; private set; }
+        [Networked, OnChangedRender(nameof(HandleTutorialEnemyChanged))]
+        public NetworkId TutorialEnemyId { get; private set; }
         // Retain the attempt even if Spawn throws or the enemy later disappears.
         // Missing replication must never authorize another Spawn.
         [Networked] public NetworkBool TutorialSpawnIssued { get; private set; }
@@ -379,6 +378,27 @@ namespace DreamGuardians
                 !Runner.TryFindObject(TutorialEnemyId, out var networkObject)) return false;
             enemy = networkObject.GetComponent<EnemyHealth>();
             return enemy != null;
+        }
+
+        private void HandleTutorialEnemyChanged()
+        {
+            if (TutorialEnemyId.IsValid)
+                StartCoroutine(BindTutorialEnemyVisual(TutorialEnemyId));
+        }
+
+        private IEnumerator BindTutorialEnemyVisual(NetworkId id)
+        {
+            while (IsTutorialSessionReady && TutorialEnemyId == id)
+            {
+                if (Runner.TryFindObject(id, out NetworkObject target) &&
+                    target != null && target.IsValid)
+                {
+                    MakeTutorialEnemyHighlyVisible(target.gameObject);
+                    yield break;
+                }
+
+                yield return null;
+            }
         }
 
         private void OnDisable()
@@ -410,6 +430,8 @@ namespace DreamGuardians
         }
         [Header("Enemy")]
         [SerializeField] private GameObject enemyPrefab;
+        [Tooltip("튜토리얼 로봇에만 적용할 원본 FBX의 메시별 재질입니다.")]
+        [SerializeField] private GameObject tutorialModelSource;
         [SerializeField, Min(1f)] private float baseEnemyHealth = 100f;
         [SerializeField, Min(0f)] private float energyRewardPerEnemy = 10f;
 
@@ -433,9 +455,10 @@ namespace DreamGuardians
         [SerializeField, Min(0.01f)] private float synergyAudioMaxDistance = 30f;
         [SerializeField, Range(0f, 1f)] private float synergyAudioDopplerLevel;
 
-        [Header("Editor Test Damage")]
-        [Tooltip("Unity Editor Play Mode에서만 플레이어의 적 대상 피해를 강화합니다.")]
-        [SerializeField] private bool enableTestDamageBoost = true;
+        [Header("Editor Solo Boss Test Damage")]
+        [Tooltip("Unity Editor Play Mode에서 이 옵션을 켠 경우에만 플레이어의 보스 대상 피해를 강화합니다. PC/Quest 빌드에는 적용되지 않습니다.")]
+        [SerializeField, InspectorName("Enable Solo Boss Test Damage")]
+        private bool enableTestDamageBoost = false;
         [Tooltip("1이면 원래 밸런스이며, 실제 빌드에서는 이 값과 무관하게 항상 1배입니다.")]
         [SerializeField, Min(1f)] private float testDamageMultiplier = 5f;
 
@@ -595,6 +618,12 @@ namespace DreamGuardians
             int safeCount =
                 safePrimaryCount + safeAdditionalCount;
 
+            var difficulty = GameDifficultyState.Settings;
+            int originalTotal = 0;
+            safePrimaryCount = difficulty.AllocateCount(safePrimaryCount, ref originalTotal);
+            safeAdditionalCount = difficulty.AllocateCount(safeAdditionalCount, ref originalTotal);
+            safeCount = safePrimaryCount + safeAdditionalCount;
+
             float safeInterval = Mathf.Max(0f, spawnInterval);
 
             List<Transform> waveSpawnPoints =
@@ -752,16 +781,19 @@ namespace DreamGuardians
             int[] remainingRanged = new int[directionCount];
             int[] remainingDrone = new int[directionCount];
 
+            var difficulty = GameDifficultyState.Settings;
+            int originalTotal = 0;
+
             for (int d = 0; d < directionCount; d++)
             {
-                remainingMelee[d] = safeMelee;
-                remainingRanged[d] = safeRanged;
-                remainingDrone[d] = safeDrone;
+                remainingMelee[d] = difficulty.AllocateCount(safeMelee, ref originalTotal);
+                remainingRanged[d] = difficulty.AllocateCount(safeRanged, ref originalTotal);
+                remainingDrone[d] = difficulty.AllocateCount(safeDrone, ref originalTotal);
             }
 
             float safeInterval = Mathf.Max(0f, spawnInterval);
             int totalToSpawn =
-                directionCount * (safeMelee + safeRanged + safeDrone);
+                difficulty.ScaleCount(originalTotal);
             int spawned = 0;
 
             while (spawned < totalToSpawn)
@@ -1093,7 +1125,8 @@ namespace DreamGuardians
             float healthMultiplier,
             Transform spawnPoint,
             GameObject prefabOverride,
-            bool registerTutorialEnemy = true)
+            bool registerTutorialEnemy = true,
+            PlayerRef? tutorialOwner = null)
         {
             GameObject selectedPrefab =
                 prefabOverride != null
@@ -1147,6 +1180,9 @@ namespace DreamGuardians
                 PlayerRef.None,
                 (spawnRunner, networkObject) =>
                 {
+                    if (tutorialOwner.HasValue)
+                        networkObject.GetComponent<EnemyHealth>()?.PrepareTutorialTarget(
+                            tutorialOwner.Value, !registerTutorialEnemy);
                     spawnedHealth = ConfigureSpawnedEnemy(
                         networkObject.gameObject,
                         tutorialEnemy,
@@ -1404,11 +1440,10 @@ namespace DreamGuardians
                     0.1f,
                     tutorialEnemy || droneEnemy != null || rangedEnemy != null
                         ? healthMultiplier
-                        : 1f) *
-                ResolveEnemyHealthDifficultyMultiplier();
+                        : 1f);
 
             health.Configure(
-                configuredHealth,
+                configuredHealth * GameDifficultyState.Settings.EnemyHealth,
                 !tutorialEnemy);
 
             if (purification != null)
@@ -1556,7 +1591,7 @@ namespace DreamGuardians
                 portalForward: portalForward);
         }
 
-        private static void MakeTutorialEnemyHighlyVisible(
+        private void MakeTutorialEnemyHighlyVisible(
             GameObject enemyObject)
         {
             if (enemyObject == null)
@@ -1567,54 +1602,25 @@ namespace DreamGuardians
             enemyObject.transform.localScale =
                 Vector3.one * 1.5f;
 
-            Shader shader =
-                Shader.Find(
-                    "Universal Render Pipeline/Unlit");
-
-            shader ??=
-                Shader.Find("Unlit/Color");
-
-            shader ??=
-                Shader.Find("Standard");
-
-            if (shader == null)
+            // The enemy already uses these FBX meshes. Restore only their original
+            // material slots, preserving the animated hierarchy and all hitboxes.
+            if (tutorialModelSource != null)
             {
-                return;
-            }
-
-            Color visibleColor =
-                new Color(
-                    1f,
-                    0.08f,
-                    0.65f,
-                    1f);
-
-            Material material =
-                new Material(shader)
+                MeshFilter[] sourceParts = tutorialModelSource.GetComponentsInChildren<MeshFilter>(true);
+                foreach (MeshFilter part in enemyObject.GetComponentsInChildren<MeshFilter>(true))
                 {
-                    name =
-                        "TutorialEnemy_Visible_Runtime",
-
-                    color =
-                        visibleColor
-                };
-
-            if (material.HasProperty("_BaseColor"))
-            {
-                material.SetColor(
-                    "_BaseColor",
-                    visibleColor);
+                    if (part.sharedMesh == null) continue;
+                    Renderer target = part.GetComponent<Renderer>();
+                    if (target == null) continue;
+                    foreach (MeshFilter source in sourceParts)
+                    {
+                        if (source.sharedMesh != part.sharedMesh) continue;
+                        Renderer original = source.GetComponent<Renderer>();
+                        if (original != null) target.sharedMaterials = original.sharedMaterials;
+                        break;
+                    }
+                }
             }
-
-            if (material.HasProperty("_EmissionColor"))
-            {
-                material.EnableKeyword("_EMISSION");
-
-                material.SetColor(
-                    "_EmissionColor",
-                    visibleColor * 2f);
-            }
-
             foreach (
                 Renderer targetRenderer
                 in enemyObject
@@ -1624,9 +1630,6 @@ namespace DreamGuardians
                 {
                     continue;
                 }
-
-                targetRenderer.sharedMaterial =
-                    material;
 
                 targetRenderer.shadowCastingMode =
                     UnityEngine.Rendering
@@ -1775,15 +1778,14 @@ namespace DreamGuardians
     public sealed class TutorialTargetLocalPresentation : MonoBehaviour
     {
         private PlayerRef owner;
-        private bool initialized;
 
         public PlayerRef Owner => owner;
 
         public void Initialize(PlayerRef targetOwner, NetworkRunner runner)
         {
-            if (initialized && owner == targetOwner) return;
             owner = targetOwner;
-            initialized = true;
+            // Binding may follow Spawned and reapply materials/renderer visibility.
+            // Reapply the owner mask even when the owner has not changed.
 
             bool showLocally = runner != null && runner.LocalPlayer == owner;
             foreach (Renderer targetRenderer in GetComponentsInChildren<Renderer>(true))

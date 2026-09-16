@@ -526,8 +526,8 @@ namespace DreamGuardians
                     GetRangedEnemyCount(index);
 
                 int totalEnemyCount =
-                    Mathf.Max(0, group.enemyCount) +
-                    rangedEnemyCount;
+                    GameDifficultyState.Settings.ScaleCount(
+                        Mathf.Max(0, group.enemyCount) + rangedEnemyCount);
 
 
                 missionUI?.ShowBanner(

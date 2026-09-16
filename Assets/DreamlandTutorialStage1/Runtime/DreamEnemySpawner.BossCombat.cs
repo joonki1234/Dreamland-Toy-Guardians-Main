@@ -134,7 +134,7 @@ namespace DreamGuardians
             }
 
             BossBattleRevision++;
-            BossMaxHealth = Mathf.Max(1f, maxHealth);
+            BossMaxHealth = Mathf.Max(1f, maxHealth * GameDifficultyState.Settings.BossHealth);
             BossCurrentHealth = BossMaxHealth;
             BossDamageEnabledNet = false;
             BossIsDead = false;
